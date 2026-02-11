@@ -1,0 +1,41 @@
+.gantt-chart-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-toolbar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.gantt-toolbar button {
+  padding: 4px 10px;
+  font-size: 11px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.gantt-toolbar button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.gantt-container {
+  flex: 1;
+  min-height: 300px;
+  overflow: auto;
+}
+
+/* Override gantt-task-react styles for dark theme & space efficiency */
+.gantt-container ._2WnBO {
+  background: var(--bg) !important;
+}
+
+.gantt-container [class*="wrapper"] {
+  font-family: var(--font-sans) !important;
+}
