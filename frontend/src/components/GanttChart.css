@@ -11,16 +11,16 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
-  border-radius: var(--radius-lg);
-  padding: 20px;
+  border-radius: var(--radius-md);
+  padding: 12px;
   border: 1px solid var(--border);
 }
 
 .chart-legend {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
@@ -32,7 +32,45 @@
   color: var(--text-muted);
 }
 
-.chart-legend .legend-note {
+.priority-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.priority-strip .priority-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.priority-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.priority-strip .priority-range {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+.gantt-tooltip {
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 200px;
+}
+
+.gantt-tooltip-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.gantt-tooltip-dates,
+.gantt-tooltip-meta {
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -40,7 +78,7 @@
 .gantt-toolbar {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -68,11 +106,10 @@
 
 .gantt-container {
   flex: 1;
-  min-height: 320px;
+  min-height: 200px;
   overflow: auto;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--bg);
-  border: 1px solid var(--border);
 }
 
 /* Override gantt-task-react for dark theme – timetable and grid */
@@ -154,17 +191,3 @@
   background: var(--gantt-bg) !important;
 }
 
-/* Override library's white/light container */
-.gantt-container > div,
-.gantt-container > div > div {
-  background: transparent !important;
-}
-
-/* Ensure task list cells match */
-.gantt-container table th,
-.gantt-container table thead td {
-  background: var(--gantt-panel) !important;
-  color: var(--gantt-muted) !important;
-  border-color: var(--gantt-border) !important;
-  font-weight: 500;
-}

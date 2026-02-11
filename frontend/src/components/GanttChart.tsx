@@ -107,6 +107,27 @@ export default function GanttChart({
     if (t && !t.completed) onTaskSplit(t);
   }
 
+  const TooltipContent: React.FC<{ task: GanttTask; fontSize: string; fontFamily: string }> = ({ task }) => {
+    const t = tasks.find((x) => x.id === Number(task.id));
+    const start = task.start.toLocaleDateString();
+    const end = task.end.toISOString().slice(0, 10) !== task.start.toISOString().slice(0, 10)
+      ? task.end.toLocaleDateString()
+      : null;
+    return (
+      <div className="gantt-tooltip">
+        <div className="gantt-tooltip-name">{task.name}</div>
+        <div className="gantt-tooltip-dates">
+          {start}{end ? ` – ${end}` : ''}
+        </div>
+        {t && (
+          <div className="gantt-tooltip-meta">
+            Priority {t.base_priority ?? 5}/10 · Progress {task.progress}%
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="gantt-chart-wrap">
       <div className="chart-legend">
@@ -118,7 +139,21 @@ export default function GanttChart({
           />
           Show completed in chart
         </label>
-        <span className="legend-note">Tasks by priority (gray = low, red = high)</span>
+        <div className="priority-strip">
+          <span className="priority-label">Priority:</span>
+          {[
+            [1, 2, '#64748b'],
+            [3, 4, '#6366f1'],
+            [5, 6, '#0ea5e9'],
+            [7, 7, '#22c55e'],
+            [8, 8, '#eab308'],
+            [9, 9, '#f97316'],
+            [10, 10, '#ef4444'],
+          ].map(([lo, hi, color]) => (
+            <span key={String(lo)} className="priority-swatch" style={{ backgroundColor: color as string }} title={`${lo}-${hi}`} />
+          ))}
+          <span className="priority-range">1 low → 10 high</span>
+        </div>
       </div>
       <div className="gantt-toolbar">
         {([ViewMode.Hour, ViewMode.Day, ViewMode.Week, ViewMode.Month] as const).map((m) => (
@@ -141,17 +176,19 @@ export default function GanttChart({
           onDoubleClick={handleDoubleClick}
           onClick={() => {}}
           listCellWidth="200"
-          columnWidth={52}
+          columnWidth={60}
           rowHeight={36}
-          barFill={75}
+          ganttHeight={ganttTasks.length * 36 + 100}
+          barFill={80}
           barCornerRadius={8}
           barProgressColor="#818cf8"
           barBackgroundColor="#6366f1"
           barProgressSelectedColor="#a5b4fc"
           barBackgroundSelectedColor="#818cf8"
           todayColor="rgba(99, 102, 241, 0.12)"
-          fontSize="13px"
+          fontSize="12px"
           fontFamily="var(--font-sans)"
+          TooltipContent={TooltipContent}
         />
       </div>
     </div>
