@@ -12,14 +12,37 @@
   flex-direction: column;
   background: var(--bg-panel);
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.chart-legend .filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.chart-legend .legend-note {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .gantt-toolbar {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .gantt-toolbar button {
@@ -49,33 +72,99 @@
   overflow: auto;
   border-radius: var(--radius-md);
   background: var(--bg);
+  border: 1px solid var(--border);
 }
 
-/* Override gantt-task-react for dark theme and cleaner grid */
-.gantt-container [class*="wrapper"] {
+/* Override gantt-task-react for dark theme – timetable and grid */
+.gantt-container {
+  --gantt-bg: #18181b;
+  --gantt-panel: #27272a;
+  --gantt-border: #3f3f46;
+  --gantt-text: #fafafa;
+  --gantt-muted: #a1a1aa;
+}
+
+/* Task list table (Name, From, To) */
+.gantt-container table {
+  background: var(--gantt-panel) !important;
+  border-color: var(--gantt-border) !important;
   font-family: var(--font-sans) !important;
 }
 
-.gantt-container [class*="grid"] {
-  background: var(--bg) !important;
+.gantt-container table tr:nth-of-type(even) {
+  background: var(--gantt-bg) !important;
 }
 
-.gantt-container [class*="ganttTable"] {
-  background: var(--bg-panel) !important;
+.gantt-container table td {
+  color: var(--gantt-text) !important;
+  border-color: var(--gantt-border) !important;
 }
 
-.gantt-container [class*="taskListTableRow"] {
-  border-radius: 4px;
+/* Calendar / timeline headers (May 2026, W20, W21...) */
+.gantt-container svg text {
+  fill: var(--gantt-muted) !important;
+  font-size: 11px !important;
 }
 
-/* Task bars - ensure rounded corners are visible */
-.gantt-container [class*="barWrapper"],
-.gantt-container [class*="barBackground"] {
-  border-radius: 8px !important;
+/* Grid row backgrounds – only target grid rows, not task bars */
+.gantt-container .rows rect {
+  fill: var(--gantt-bg) !important;
 }
 
-.gantt-container [class*="calendarTop"],
-.gantt-container [class*="calendarHeader"] {
-  background: var(--bg-panel) !important;
-  border-radius: 8px 8px 0 0;
+.gantt-container .rows rect:nth-of-type(even) {
+  fill: var(--gantt-panel) !important;
+}
+
+/* Grid lines and borders */
+.gantt-container svg line,
+.gantt-container svg path {
+  stroke: var(--gantt-border) !important;
+}
+
+/* Today column – uses inline fill, no override needed */
+
+/* Task bars – rounded pill (bar rects are separate from grid) */
+.gantt-container .bar rect,
+.gantt-container [class*="bar"] rect {
+  rx: 8 !important;
+  ry: 8 !important;
+}
+
+/* Bar label text */
+.gantt-container [class*="barLabel"] {
+  fill: white !important;
+  font-weight: 500 !important;
+}
+
+/* Horizontal container – blend with dark bg */
+.gantt-container [class*="horizontalContainer"],
+.gantt-container [class*="verticalContainer"] {
+  background: var(--gantt-bg) !important;
+}
+
+/* Calendar header box (May 2026, June 2026) */
+.gantt-container .calendarHeader rect,
+.gantt-container [class*="calendarHeader"] rect {
+  fill: var(--gantt-panel) !important;
+  stroke: var(--gantt-border) !important;
+}
+
+/* Unify the timetable with dark theme */
+.gantt-container svg {
+  background: var(--gantt-bg) !important;
+}
+
+/* Override library's white/light container */
+.gantt-container > div,
+.gantt-container > div > div {
+  background: transparent !important;
+}
+
+/* Ensure task list cells match */
+.gantt-container table th,
+.gantt-container table thead td {
+  background: var(--gantt-panel) !important;
+  color: var(--gantt-muted) !important;
+  border-color: var(--gantt-border) !important;
+  font-weight: 500;
 }

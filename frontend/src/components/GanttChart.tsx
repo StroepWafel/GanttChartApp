@@ -8,6 +8,8 @@ interface Props {
   tasks: Task[];
   projects: Project[];
   categories: Category[];
+  includeCompleted: boolean;
+  onIncludeCompletedChange: (v: boolean) => void;
   onTaskChange: (id: number, data: { start_date?: string; end_date?: string; progress?: number }) => void;
   onTaskComplete: (id: number) => void;
   onTaskDelete: (id: number, cascade: boolean) => void;
@@ -49,6 +51,8 @@ function toGanttTask(t: Task, projects: Project[]): GanttTask {
 export default function GanttChart({
   tasks,
   projects,
+  includeCompleted,
+  onIncludeCompletedChange,
   onTaskChange,
   onTaskComplete,
   onTaskDelete,
@@ -105,6 +109,17 @@ export default function GanttChart({
 
   return (
     <div className="gantt-chart-wrap">
+      <div className="chart-legend">
+        <label className="filter-row">
+          <input
+            type="checkbox"
+            checked={includeCompleted}
+            onChange={(e) => onIncludeCompletedChange(e.target.checked)}
+          />
+          Show completed in chart
+        </label>
+        <span className="legend-note">Tasks by priority (gray = low, red = high)</span>
+      </div>
       <div className="gantt-toolbar">
         {([ViewMode.Hour, ViewMode.Day, ViewMode.Week, ViewMode.Month] as const).map((m) => (
           <button
