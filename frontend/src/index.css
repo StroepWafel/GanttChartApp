@@ -59,6 +59,30 @@ input, select, textarea {
   width: 100%;
 }
 
+.priority-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.priority-input input[type="range"] {
+  flex: 1;
+  width: auto;
+  min-width: 100px;
+}
+
+.priority-input .priority-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.priority-input .priority-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  min-width: 1.5em;
+}
+
 .form-actions {
   display: flex;
   gap: 8px;

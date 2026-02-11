@@ -90,14 +90,19 @@ export default function TaskForm({ projects, onClose, onCreate }: Props) {
             />
           </div>
           <div className="form-row">
-            <label>Priority (1-10)</label>
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={basePriority}
-              onChange={(e) => setBasePriority(Number(e.target.value))}
-            />
+            <label>Priority (10 = highest, 1 = lowest)</label>
+            <div className="priority-input">
+              <span className="priority-label">Low</span>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                value={basePriority}
+                onChange={(e) => setBasePriority(Number(e.target.value))}
+              />
+              <span className="priority-label">High</span>
+              <span className="priority-value">{basePriority}</span>
+            </div>
           </div>
           <div className="form-actions">
             <button type="submit">Create</button>

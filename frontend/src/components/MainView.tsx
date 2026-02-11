@@ -129,14 +129,17 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         )}
 
         <main className="gantt-area">
-          <label className="filter-row">
-            <input
-              type="checkbox"
-              checked={includeCompleted}
-              onChange={(e) => setIncludeCompleted(e.target.checked)}
-            />
-            Show completed in chart
-          </label>
+          <div className="chart-legend">
+            <label className="filter-row">
+              <input
+                type="checkbox"
+                checked={includeCompleted}
+                onChange={(e) => setIncludeCompleted(e.target.checked)}
+              />
+              Show completed in chart
+            </label>
+            <span className="legend-note">Tasks ordered by priority (highest first)</span>
+          </div>
           <GanttChart
             tasks={tasks}
             projects={projects}

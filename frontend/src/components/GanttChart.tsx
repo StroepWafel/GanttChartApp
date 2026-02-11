@@ -41,7 +41,13 @@ export default function GanttChart({
 
   const ganttTasks = useMemo(() => {
     return tasks
-      .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+      .sort((a, b) => {
+        // Higher urgency first; then by start date
+        const uA = (a as Task & { urgency?: number }).urgency ?? 0;
+        const uB = (b as Task & { urgency?: number }).urgency ?? 0;
+        if (uB !== uA) return uB - uA;
+        return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+      })
       .map((t) => toGanttTask(t, projects));
   }, [tasks, projects]);
 

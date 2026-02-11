@@ -106,12 +106,24 @@
   padding: 8px;
 }
 
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
 .filter-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 6px;
   font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legend-note {
+  font-size: 11px;
   color: var(--text-muted);
 }
 
