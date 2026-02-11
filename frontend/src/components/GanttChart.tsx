@@ -1,20 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Gantt, Task as GanttTask, ViewMode } from 'gantt-task-react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Category, Project, Task } from '../types';
-import 'gantt-task-react/dist/index.css';
 import './GanttChart.css';
 
-interface Props {
-  tasks: Task[];
-  projects: Project[];
-  categories: Category[];
-  includeCompleted: boolean;
-  onIncludeCompletedChange: (v: boolean) => void;
-  onTaskChange: (id: number, data: { start_date?: string; end_date?: string; progress?: number }) => void;
-  onTaskComplete: (id: number) => void;
-  onTaskDelete: (id: number, cascade: boolean) => void;
-  onTaskSplit: (task: Task) => void;
-}
+type ViewMode = 'Hour' | 'Day' | 'Week' | 'Month';
 
 const PRIORITY_COLORS: Record<number, { bg: string; progress: string }> = {
   1: { bg: '#64748b', progress: '#94a3b8' },
@@ -29,51 +17,216 @@ const PRIORITY_COLORS: Record<number, { bg: string; progress: string }> = {
   10: { bg: '#ef4444', progress: '#f87171' },
 };
 
-function toGanttTask(t: Task, projects: Project[]): GanttTask {
-  const project = projects.find((p) => p.id === t.project_id);
-  const tier = Math.max(1, Math.min(10, t.base_priority ?? 5)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-  const colors = PRIORITY_COLORS[tier];
-  return {
-    id: String(t.id),
-    name: t.name,
-    start: new Date(t.start_date),
-    end: new Date(t.end_date),
-    progress: t.completed ? 100 : t.progress,
-    type: 'task',
-    project: project?.name || t.project_name || '',
-    isDisabled: t.completed,
-    styles: t.completed
-      ? { backgroundColor: '#475569', progressColor: '#64748b' }
-      : { backgroundColor: colors.bg, progressColor: colors.progress },
-  };
+interface Props {
+  tasks: Task[];
+  projects: Project[];
+  categories: Category[];
+  includeCompleted: boolean;
+  onIncludeCompletedChange: (v: boolean) => void;
+  onTaskChange: (id: number, data: { start_date?: string; end_date?: string; progress?: number }) => void;
+  onTaskComplete: (id: number) => void;
+  onTaskDelete: (id: number, cascade: boolean) => void;
+  onTaskSplit: (task: Task) => void;
+}
+
+function toStartOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function toStartOfWeek(d: Date): Date {
+  const x = new Date(d);
+  const day = x.getDay();
+  x.setDate(x.getDate() - day);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function toStartOfMonth(d: Date): Date {
+  const x = new Date(d);
+  x.setDate(1);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function addWeeks(d: Date, n: number): Date {
+  return addDays(d, n * 7);
+}
+
+function addMonths(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setMonth(x.getMonth() + n);
+  return x;
+}
+
+function diffDays(a: Date, b: Date): number {
+  return Math.round((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000));
 }
 
 export default function GanttChart({
   tasks,
-  projects,
+  projects: _projects,
   includeCompleted,
   onIncludeCompletedChange,
-  onTaskChange,
+  onTaskChange: _onTaskChange,
   onTaskComplete,
   onTaskDelete,
   onTaskSplit,
 }: Props) {
-  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day);
+  const [viewMode, setViewMode] = useState<ViewMode>('Day');
+  const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
 
-  const ganttTasks = useMemo(() => {
-    return tasks
-      .sort((a, b) => {
-        // Higher urgency first; then by start date
-        const uA = (a as Task & { urgency?: number }).urgency ?? 0;
-        const uB = (b as Task & { urgency?: number }).urgency ?? 0;
-        if (uB !== uA) return uB - uA;
-        return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
-      })
-      .map((t) => toGanttTask(t, projects));
-  }, [tasks, projects]);
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) => {
+      const uA = (a as Task & { urgency?: number }).urgency ?? 0;
+      const uB = (b as Task & { urgency?: number }).urgency ?? 0;
+      if (uB !== uA) return uB - uA;
+      return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+    });
+  }, [tasks]);
 
-  // gantt-task-react crashes with empty tasks—show placeholder
-  if (ganttTasks.length === 0) {
+  const { columns, rangeStart, rangeEnd, columnWidth, totalWidth } = useMemo(() => {
+    const allStarts = sortedTasks.map((t) => new Date(t.start_date));
+    const allEnds = sortedTasks.map((t) => new Date(t.end_date));
+    const minDate = allStarts.length
+      ? new Date(Math.min(...allStarts.map((d) => d.getTime())))
+      : new Date();
+    const maxDate = allEnds.length
+      ? new Date(Math.max(...allEnds.map((d) => d.getTime())))
+      : addDays(new Date(), 14);
+
+    let start: Date;
+    let end: Date;
+    let cols: { date: Date; label: string; subLabel?: string }[] = [];
+
+    if (viewMode === 'Hour') {
+      start = toStartOfDay(minDate);
+      start.setDate(start.getDate() - 2);
+      end = toStartOfDay(maxDate);
+      end.setDate(end.getDate() + 5);
+      const days = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+      for (let i = 0; i < days; i++) {
+        const d = addDays(start, i);
+        cols.push({
+          date: d,
+          label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+          subLabel: d.getDate().toString(),
+        });
+      }
+    } else if (viewMode === 'Day') {
+      start = toStartOfDay(minDate);
+      start.setDate(start.getDate() - 2);
+      end = toStartOfDay(maxDate);
+      end.setDate(end.getDate() + 5);
+      const days = diffDays(end, start);
+      for (let i = 0; i < days; i++) {
+        const d = addDays(start, i);
+        cols.push({
+          date: d,
+          label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+          subLabel: d.getDate().toString(),
+        });
+      }
+    } else if (viewMode === 'Week') {
+      start = toStartOfWeek(minDate);
+      start.setDate(start.getDate() - 14);
+      end = toStartOfWeek(maxDate);
+      end.setDate(end.getDate() + 28);
+      const weeks = Math.ceil(diffDays(end, start) / 7);
+      for (let i = 0; i < weeks; i++) {
+        const d = addWeeks(start, i);
+        cols.push({
+          date: d,
+          label: `W${Math.ceil(d.getDate() / 7)}`,
+          subLabel: d.toLocaleDateString('en-US', { month: 'short' }),
+        });
+      }
+    } else {
+      start = toStartOfMonth(minDate);
+      start.setMonth(start.getMonth() - 1);
+      end = toStartOfMonth(maxDate);
+      end.setMonth(end.getMonth() + 2);
+      let d = new Date(start);
+      while (d.getTime() <= end.getTime()) {
+        cols.push({
+          date: new Date(d),
+          label: d.toLocaleDateString('en-US', { month: 'short' }),
+          subLabel: d.getFullYear().toString(),
+        });
+        d = addMonths(d, 1);
+      }
+    }
+
+    const colWidth = viewMode === 'Month' ? 80 : viewMode === 'Week' ? 56 : 48;
+    return {
+      columns: cols,
+      rangeStart: start,
+      rangeEnd: cols.length ? cols[cols.length - 1].date : end,
+      columnWidth: colWidth,
+      totalWidth: cols.length * colWidth,
+    };
+  }, [sortedTasks, viewMode]);
+
+  const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
+
+  function dateToX(date: Date): number {
+    const ms = date.getTime() - rangeStart.getTime();
+    return Math.max(0, (ms / rangeMs) * totalWidth);
+  }
+
+  function getBarLayout(task: Task) {
+    const start = new Date(task.start_date);
+    const end = new Date(task.end_date);
+    const x = dateToX(start);
+    const w = Math.max(24, dateToX(end) - x);
+    return { x, w };
+  }
+
+  const handleBarDoubleClick = useCallback(
+    (task: Task) => {
+      if (!task.completed) onTaskSplit(task);
+    },
+    [onTaskSplit]
+  );
+
+  const handleBarContextMenu = useCallback((e: React.MouseEvent, task: Task) => {
+    e.preventDefault();
+    setContextMenu({ task, x: e.clientX, y: e.clientY });
+    setTooltip(null);
+  }, []);
+
+  const handleDeleteTask = useCallback(() => {
+    if (contextMenu) {
+      onTaskDelete(contextMenu.task.id, true);
+      setContextMenu(null);
+    }
+  }, [contextMenu, onTaskDelete]);
+
+  const handleCompleteTask = useCallback(() => {
+    if (contextMenu) {
+      onTaskComplete(contextMenu.task.id);
+      setContextMenu(null);
+    }
+  }, [contextMenu, onTaskComplete]);
+
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, []);
+
+  const todayX = dateToX(new Date());
+  const todayInRange = todayX >= 0 && todayX <= totalWidth;
+
+  if (sortedTasks.length === 0) {
     return (
       <div className="gantt-chart-wrap">
         <div className="gantt-empty">
@@ -83,50 +236,8 @@ export default function GanttChart({
     );
   }
 
-  function handleDateChange(task: GanttTask) {
-    onTaskChange(Number(task.id), {
-      start_date: task.start.toISOString().slice(0, 10),
-      end_date: task.end.toISOString().slice(0, 10),
-    });
-  }
-
-  function handleProgressChange(task: GanttTask) {
-    if (task.progress >= 100) {
-      onTaskComplete(Number(task.id));
-    } else {
-      onTaskChange(Number(task.id), { progress: task.progress });
-    }
-  }
-
-  function handleDelete(task: GanttTask) {
-    onTaskDelete(Number(task.id), true);
-  }
-
-  function handleDoubleClick(task: GanttTask) {
-    const t = tasks.find((x) => x.id === Number(task.id));
-    if (t && !t.completed) onTaskSplit(t);
-  }
-
-  const TooltipContent: React.FC<{ task: GanttTask; fontSize: string; fontFamily: string }> = ({ task }) => {
-    const t = tasks.find((x) => x.id === Number(task.id));
-    const start = task.start.toLocaleDateString();
-    const end = task.end.toISOString().slice(0, 10) !== task.start.toISOString().slice(0, 10)
-      ? task.end.toLocaleDateString()
-      : null;
-    return (
-      <div className="gantt-tooltip">
-        <div className="gantt-tooltip-name">{task.name}</div>
-        <div className="gantt-tooltip-dates">
-          {start}{end ? ` – ${end}` : ''}
-        </div>
-        {t && (
-          <div className="gantt-tooltip-meta">
-            Priority {t.base_priority ?? 5}/10 · Progress {task.progress}%
-          </div>
-        )}
-      </div>
-    );
-  };
+  const rowHeight = 36;
+  const listWidth = 200;
 
   return (
     <div className="gantt-chart-wrap">
@@ -150,13 +261,19 @@ export default function GanttChart({
             [9, 9, '#f97316'],
             [10, 10, '#ef4444'],
           ].map(([lo, hi, color]) => (
-            <span key={String(lo)} className="priority-swatch" style={{ backgroundColor: color as string }} title={`${lo}-${hi}`} />
+            <span
+              key={String(lo)}
+              className="priority-swatch"
+              style={{ backgroundColor: color as string }}
+              title={`${lo}-${hi}`}
+            />
           ))}
           <span className="priority-range">1 low → 10 high</span>
         </div>
       </div>
+
       <div className="gantt-toolbar">
-        {([ViewMode.Hour, ViewMode.Day, ViewMode.Week, ViewMode.Month] as const).map((m) => (
+        {(['Hour', 'Day', 'Week', 'Month'] as const).map((m) => (
           <button
             key={m}
             className={viewMode === m ? 'active' : ''}
@@ -166,31 +283,145 @@ export default function GanttChart({
           </button>
         ))}
       </div>
-      <div className="gantt-container">
-        <Gantt
-          tasks={ganttTasks}
-          viewMode={viewMode}
-          onDateChange={handleDateChange}
-          onProgressChange={handleProgressChange}
-          onDelete={handleDelete}
-          onDoubleClick={handleDoubleClick}
-          onClick={() => {}}
-          listCellWidth="200"
-          columnWidth={60}
-          rowHeight={36}
-          ganttHeight={ganttTasks.length * 36 + 100}
-          barFill={80}
-          barCornerRadius={8}
-          barProgressColor="#818cf8"
-          barBackgroundColor="#6366f1"
-          barProgressSelectedColor="#a5b4fc"
-          barBackgroundSelectedColor="#818cf8"
-          todayColor="rgba(99, 102, 241, 0.12)"
-          fontSize="12px"
-          fontFamily="var(--font-sans)"
-          TooltipContent={TooltipContent}
-        />
+
+      <div className="gantt-main">
+        <div
+          className="gantt-inner"
+          style={{ minWidth: listWidth + totalWidth, minHeight: 40 + sortedTasks.length * rowHeight }}
+        >
+        <div className="gantt-list" style={{ width: listWidth }}>
+          <div className="gantt-list-header">
+            <span>Task</span>
+            <span>From</span>
+            <span>To</span>
+          </div>
+          {sortedTasks.map((task) => {
+            return (
+              <div
+                key={task.id}
+                className={`gantt-list-row ${task.completed ? 'completed' : ''}`}
+              >
+                <span className="gantt-list-name">{task.name}</span>
+                <span className="gantt-list-date">
+                  {new Date(task.start_date).toLocaleDateString()}
+                </span>
+                <span className="gantt-list-date">
+                  {new Date(task.end_date).toLocaleDateString()}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="gantt-timeline-wrap" style={{ minWidth: totalWidth }}>
+          <div className="gantt-timeline" style={{ width: totalWidth, minWidth: '100%' }}>
+            <div className="gantt-header" style={{ width: totalWidth }}>
+              {columns.map((col, i) => (
+                <div
+                  key={i}
+                  className="gantt-header-cell"
+                  style={{ width: columnWidth }}
+                >
+                  <span className="gantt-header-label">{col.label}</span>
+                  <span className="gantt-header-sublabel">{col.subLabel}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="gantt-rows">
+              {todayInRange && (
+                <div
+                  className="gantt-today"
+                  style={{
+                    left: todayX,
+                    top: 0,
+                    height: sortedTasks.length * rowHeight,
+                  }}
+                />
+              )}
+              {sortedTasks.map((task) => {
+                const { x, w } = getBarLayout(task);
+                const tier = Math.max(1, Math.min(10, task.base_priority ?? 5));
+                const colors = task.completed
+                  ? { bg: '#475569', progress: '#64748b' }
+                  : PRIORITY_COLORS[tier];
+                const progressW = (task.progress / 100) * w;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="gantt-row"
+                    style={{ height: rowHeight }}
+                  >
+                    <div
+                      className={`gantt-bar ${task.completed ? 'completed' : ''}`}
+                      style={{
+                        left: x,
+                        width: w,
+                        backgroundColor: colors.bg,
+                      }}
+                      onMouseEnter={(e) => {
+                        const rect = (e.target as HTMLElement).getBoundingClientRect();
+                        setTooltip({ task, x: rect.left + rect.width / 2, y: rect.top });
+                      }}
+                      onMouseLeave={() => setTooltip(null)}
+                      onDoubleClick={() => handleBarDoubleClick(task)}
+                      onContextMenu={(e) => handleBarContextMenu(e, task)}
+                    >
+                      <div
+                        className="gantt-bar-progress"
+                        style={{
+                          width: progressW,
+                          backgroundColor: colors.progress,
+                        }}
+                      />
+                      <span className="gantt-bar-label">{task.name}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        </div>
       </div>
+
+      {tooltip && (
+        <div
+          className="gantt-tooltip"
+          style={{
+            position: 'fixed',
+            left: tooltip.x,
+            top: tooltip.y - 8,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          <div className="gantt-tooltip-name">{tooltip.task.name}</div>
+          <div className="gantt-tooltip-dates">
+            {new Date(tooltip.task.start_date).toLocaleDateString()}
+            {' – '}
+            {new Date(tooltip.task.end_date).toLocaleDateString()}
+          </div>
+          <div className="gantt-tooltip-meta">
+            Priority {tooltip.task.base_priority ?? 5}/10 · Progress {tooltip.task.progress}%
+          </div>
+        </div>
+      )}
+
+      {contextMenu && (
+        <div
+          className="gantt-context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {!contextMenu.task.completed && (
+            <button onClick={handleCompleteTask}>Mark complete</button>
+          )}
+          <button onClick={handleDeleteTask} className="danger">
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }
