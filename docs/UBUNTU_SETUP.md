@@ -79,7 +79,7 @@ sudo npm install -g pm2
 
 ```bash
 cd /opt  # or your preferred directory
-sudo git clone https://github.com/YOUR_USER/GanttChartApp.git
+sudo git clone https://github.com/StroepWafel/GanttChartApp
 sudo chown -R $USER:$USER GanttChartApp
 cd GanttChartApp
 ```
