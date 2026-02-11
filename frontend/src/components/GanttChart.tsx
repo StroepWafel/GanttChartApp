@@ -221,39 +221,43 @@ export default function GanttChart({
     [hierarchicalRows]
   );
 
-  const { projectSpans, categorySpans } = useMemo(() => {
+  const { projectBars, categoryBars, projectSpans, categorySpans } = useMemo(() => {
+    type Bar = { start: string; end: string };
+    const projBars = new Map<number, Bar[]>();
+    const catBars = new Map<number, Bar[]>();
     const projSpans = new Map<number, { start: string; end: string }>();
     const catSpans = new Map<number, { start: string; end: string }>();
+
     for (const p of projects) {
       const projTasks = tasks.filter((t) => t.project_id === p.id);
-      let start: string;
-      let end: string;
       if (projTasks.length > 0) {
-        start = projTasks.reduce((a, t) => (t.start_date < a ? t.start_date : a), projTasks[0].start_date);
-        end = projTasks.reduce((a, t) => (t.end_date > a ? t.end_date : a), projTasks[0].end_date);
+        const bars: Bar[] = projTasks.map((t) => ({ start: t.start_date, end: t.end_date }));
+        projBars.set(p.id, bars);
+        const start = projTasks.reduce((a, t) => (t.start_date < a ? t.start_date : a), projTasks[0].start_date);
+        const end = projTasks.reduce((a, t) => (t.end_date > a ? t.end_date : a), projTasks[0].end_date);
+        projSpans.set(p.id, { start, end });
       } else {
-        start = p.start_date ?? p.due_date ?? new Date().toISOString().slice(0, 10);
-        end = p.due_date ?? p.start_date ?? new Date().toISOString().slice(0, 10);
+        const start = p.start_date ?? p.due_date ?? new Date().toISOString().slice(0, 10);
+        const end = p.due_date ?? p.start_date ?? new Date().toISOString().slice(0, 10);
+        projSpans.set(p.id, { start, end });
       }
-      projSpans.set(p.id, { start, end });
     }
+
     for (const c of categories) {
       const catProjects = projects.filter((p) => p.category_id === c.id);
-      if (catProjects.length === 0) continue;
-      const allStarts = catProjects
-        .map((p) => projSpans.get(p.id)?.start)
-        .filter((s): s is string => !!s);
-      const allEnds = catProjects
-        .map((p) => projSpans.get(p.id)?.end)
-        .filter((e): e is string => !!e);
-      if (allStarts.length > 0 && allEnds.length > 0) {
-        catSpans.set(c.id, {
-          start: allStarts.reduce((a, s) => (s < a ? s : a)),
-          end: allEnds.reduce((a, e) => (e > a ? e : a)),
-        });
+      const allBars: Bar[] = [];
+      for (const p of catProjects) {
+        const bars = projBars.get(p.id);
+        if (bars) allBars.push(...bars);
+      }
+      if (allBars.length > 0) {
+        catBars.set(c.id, allBars);
+        const start = allBars.reduce((a, b) => (b.start < a ? b.start : a), allBars[0].start);
+        const end = allBars.reduce((a, b) => (b.end > a ? b.end : a), allBars[0].end);
+        catSpans.set(c.id, { start, end });
       }
     }
-    return { projectSpans: projSpans, categorySpans: catSpans };
+    return { projectBars: projBars, categoryBars: catBars, projectSpans: projSpans, categorySpans: catSpans };
   }, [tasks, projects, categories]);
 
   const { rangeStart, rangeEnd, columnWidth, totalWidth, totalColumns } = useMemo(() => {
@@ -304,15 +308,16 @@ export default function GanttChart({
       if (!hasTasks && colCount < 6) colCount = 6;
     }
 
-    const end = viewMode === 'Month'
-      ? addMonths(start, colCount - 1)
-      : viewMode === 'Week'
-      ? addWeeks(start, colCount - 1)
-      : addDays(start, colCount - 1);
+    const rangeEndDate =
+      viewMode === 'Month'
+        ? addMonths(start, colCount)
+        : viewMode === 'Week'
+        ? addWeeks(start, colCount)
+        : addDays(start, colCount);
 
     return {
       rangeStart: start,
-      rangeEnd: end,
+      rangeEnd: rangeEndDate,
       columnWidth: colWidth,
       totalWidth: colCount * colWidth,
       totalColumns: colCount,
@@ -492,6 +497,7 @@ export default function GanttChart({
             if (row.type === 'category') {
               const exp = isExpanded(expanded, 'category', row.category.id);
               const hasChildren = projects.some((p) => p.category_id === row.category.id);
+              const catSpan = categorySpans.get(row.category.id);
               return (
                 <div key={row.id} className="gantt-list-row gantt-row-category">
                   <div className="gantt-row-expand">
@@ -510,14 +516,19 @@ export default function GanttChart({
                     )}
                   </div>
                   <span className="gantt-list-name">{row.category.name}</span>
-                  <span className="gantt-list-date">—</span>
-                  <span className="gantt-list-date">—</span>
+                  <span className="gantt-list-date">
+                    {catSpan ? new Date(catSpan.start).toLocaleDateString() : '—'}
+                  </span>
+                  <span className="gantt-list-date">
+                    {catSpan ? new Date(catSpan.end).toLocaleDateString() : '—'}
+                  </span>
                 </div>
               );
             }
             if (row.type === 'project') {
               const exp = isExpanded(expanded, 'project', row.project.id);
               const hasChildren = tasks.some((t) => t.project_id === row.project.id);
+              const span = projectSpans.get(row.project.id);
               return (
                 <div key={row.id} className="gantt-list-row gantt-row-project">
                   <div className="gantt-row-expand">
@@ -536,8 +547,12 @@ export default function GanttChart({
                     )}
                   </div>
                   <span className="gantt-list-name" style={{ paddingLeft: 8 }}>{row.project.name}</span>
-                  <span className="gantt-list-date">—</span>
-                  <span className="gantt-list-date">—</span>
+                  <span className="gantt-list-date">
+                    {span ? new Date(span.start).toLocaleDateString() : '—'}
+                  </span>
+                  <span className="gantt-list-date">
+                    {span ? new Date(span.end).toLocaleDateString() : '—'}
+                  </span>
                 </div>
               );
             }
@@ -617,32 +632,42 @@ export default function GanttChart({
               )}
               {hierarchicalRows.map((row) => {
                 if (row.type === 'category') {
-                  const span = categorySpans.get(row.category.id);
-                  if (!span) {
+                  const bars = categoryBars.get(row.category.id);
+                  if (!bars || bars.length === 0) {
                     return <div key={row.id} className="gantt-row gantt-row-empty" style={{ height: rowHeight }} />;
                   }
-                  const { x, w } = getSpanLayout(span.start, span.end);
                   return (
                     <div key={row.id} className="gantt-row" style={{ height: rowHeight }}>
-                      <div
-                        className="gantt-bar gantt-bar-summary gantt-bar-category"
-                        style={{ left: x, width: w, backgroundColor: '#475569' }}
-                      />
+                      {bars.map((bar, i) => {
+                        const { x, w } = getSpanLayout(bar.start, bar.end);
+                        return (
+                          <div
+                            key={i}
+                            className="gantt-bar gantt-bar-summary gantt-bar-category"
+                            style={{ left: x, width: w, backgroundColor: '#475569' }}
+                          />
+                        );
+                      })}
                     </div>
                   );
                 }
                 if (row.type === 'project') {
-                  const span = projectSpans.get(row.project.id);
-                  if (!span) {
+                  const bars = projectBars.get(row.project.id);
+                  if (!bars || bars.length === 0) {
                     return <div key={row.id} className="gantt-row gantt-row-empty" style={{ height: rowHeight }} />;
                   }
-                  const { x, w } = getSpanLayout(span.start, span.end);
                   return (
                     <div key={row.id} className="gantt-row" style={{ height: rowHeight }}>
-                      <div
-                        className="gantt-bar gantt-bar-summary gantt-bar-project"
-                        style={{ left: x, width: w, backgroundColor: '#64748b' }}
-                      />
+                      {bars.map((bar, i) => {
+                        const { x, w } = getSpanLayout(bar.start, bar.end);
+                        return (
+                          <div
+                            key={i}
+                            className="gantt-bar gantt-bar-summary gantt-bar-project"
+                            style={{ left: x, width: w, backgroundColor: '#64748b' }}
+                          />
+                        );
+                      })}
                     </div>
                   );
                 }
