@@ -27,6 +27,7 @@ interface Props {
   onIncludeCompletedChange: (v: boolean) => void;
   onTaskChange: (id: number, data: { start_date?: string; end_date?: string; progress?: number }) => void;
   onTaskComplete: (id: number) => void;
+  onTaskUncomplete: (id: number) => void;
   onTaskDelete: (id: number, cascade: boolean) => void;
   onTaskSplit: (task: Task) => void;
   onTaskEdit: (task: Task) => void;
@@ -177,6 +178,7 @@ export default function GanttChart({
   onIncludeCompletedChange,
   onTaskChange: _onTaskChange,
   onTaskComplete,
+  onTaskUncomplete,
   onTaskDelete,
   onTaskSplit,
   onTaskEdit,
@@ -409,6 +411,13 @@ export default function GanttChart({
       setContextMenu(null);
     }
   }, [contextMenu, onTaskComplete]);
+
+  const handleUncompleteTask = useCallback(() => {
+    if (contextMenu) {
+      onTaskUncomplete(contextMenu.task.id);
+      setContextMenu(null);
+    }
+  }, [contextMenu, onTaskUncomplete]);
 
   useEffect(() => {
     const close = () => setContextMenu(null);
@@ -755,8 +764,10 @@ export default function GanttChart({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          {!contextMenu.task.completed && (
+          {!contextMenu.task.completed ? (
             <button onClick={handleCompleteTask}>Mark complete</button>
+          ) : (
+            <button onClick={handleUncompleteTask}>Mark incomplete</button>
           )}
           <button onClick={handleDeleteTask} className="danger">
             Delete
