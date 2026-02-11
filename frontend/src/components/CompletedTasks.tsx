@@ -45,6 +45,7 @@ export default function CompletedTasks({ onClose, onComplete, onDelete }: Props)
                     title="Mark incomplete"
                   >
                     <RotateCcw size={14} />
+                    <span>Uncomplete</span>
                   </button>
                   <button
                     className="btn-sm"

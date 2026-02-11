@@ -218,6 +218,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
             onIncludeCompletedChange={setIncludeCompleted}
             onTaskChange={handleUpdateTask}
             onTaskComplete={(id) => handleUpdateTask(id, { completed: true })}
+            onTaskUncomplete={(id) => handleUpdateTask(id, { completed: false })}
             onTaskDelete={handleDeleteTask}
             onTaskSplit={setSplitTask}
             onTaskEdit={setEditTask}
