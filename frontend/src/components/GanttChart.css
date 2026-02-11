@@ -149,7 +149,7 @@
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: 36px 1fr 90px 90px;
+  grid-template-columns: 36px minmax(180px, 1fr) 70px 70px;
   gap: 6px;
   padding: 0 8px 0 12px;
   align-items: center;
@@ -171,7 +171,7 @@
 
 .gantt-list-row {
   display: grid;
-  grid-template-columns: 36px 1fr 90px 90px;
+  grid-template-columns: 36px minmax(180px, 1fr) 70px 70px;
   gap: 6px;
   padding: 0 8px 0 12px;
   align-items: center;
@@ -185,7 +185,11 @@
 }
 
 .gantt-list-row .gantt-list-name { text-align: left; }
-.gantt-list-row .gantt-list-date { text-align: right; }
+.gantt-list-row .gantt-list-date {
+  text-align: right;
+  font-size: 10px;
+  color: var(--text-muted);
+}
 
 .gantt-row-expand {
   display: flex;

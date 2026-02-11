@@ -379,7 +379,7 @@ export default function GanttChart({
   }
 
   const rowHeight = 36;
-  const listWidth = 340;
+  const listWidth = 420;
 
   return (
     <div className="gantt-chart-wrap">
