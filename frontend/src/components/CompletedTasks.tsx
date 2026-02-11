@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getCompletedTasks } from '../api';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import type { Task } from '../types';
 
 interface Props {
@@ -43,14 +44,14 @@ export default function CompletedTasks({ onClose, onComplete, onDelete }: Props)
                     onClick={() => handleUncomplete(t.id)}
                     title="Mark incomplete"
                   >
-                    ↩
+                    <RotateCcw size={14} />
                   </button>
                   <button
                     className="btn-sm"
                     onClick={() => handleDelete(t.id)}
                     title="Delete"
                   >
-                    ×
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>

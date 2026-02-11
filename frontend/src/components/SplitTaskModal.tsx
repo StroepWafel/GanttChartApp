@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import type { Task } from '../types';
 
 interface Props {
@@ -74,8 +75,8 @@ export default function SplitTaskModal({ task, onClose, onSplit }: Props) {
                 min={st.start_date}
                 onChange={(e) => updateSubtask(i, 'end_date', e.target.value)}
               />
-              <button type="button" onClick={() => removeSubtask(i)} disabled={subtasks.length <= 2}>
-                ×
+              <button type="button" onClick={() => removeSubtask(i)} disabled={subtasks.length <= 2} title="Remove subtask">
+                <X size={14} />
               </button>
             </div>
           ))}

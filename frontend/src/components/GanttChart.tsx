@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import './GanttChart.css';
@@ -456,7 +457,7 @@ export default function GanttChart({
                         title={exp ? 'Collapse' : 'Expand'}
                         aria-label={exp ? 'Collapse' : 'Expand'}
                       >
-                        {exp ? '▼' : '▶'}
+                        {exp ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </button>
                     ) : (
                       <span className="gantt-expand-spacer" />
@@ -482,7 +483,7 @@ export default function GanttChart({
                         title={exp ? 'Collapse' : 'Expand'}
                         aria-label={exp ? 'Collapse' : 'Expand'}
                       >
-                        {exp ? '▼' : '▶'}
+                        {exp ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </button>
                     ) : (
                       <span className="gantt-expand-spacer" />
@@ -511,7 +512,7 @@ export default function GanttChart({
                       title={exp ? 'Collapse' : 'Expand'}
                       aria-label={exp ? 'Collapse' : 'Expand'}
                     >
-                      {exp ? '▼' : '▶'}
+                      {exp ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
                   ) : (
                     <span className="gantt-expand-spacer" />
@@ -616,7 +617,7 @@ export default function GanttChart({
                         title="Edit task"
                         aria-label="Edit task"
                       >
-                        ✎
+                        <Pencil size={12} />
                       </button>
                     </div>
                   </div>

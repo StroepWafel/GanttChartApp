@@ -105,6 +105,13 @@
   flex: 1;
 }
 
+.sidebar-edit,
+.sidebar-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .sidebar-edit {
   padding: 2px 6px;
   font-size: 10px;
@@ -124,7 +131,6 @@
 
 .sidebar-delete {
   padding: 2px 6px;
-  font-size: 12px;
   color: var(--text-muted);
   background: transparent;
   border: none;

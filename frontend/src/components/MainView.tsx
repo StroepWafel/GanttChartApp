@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -109,8 +110,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
           className="sidebar-toggle"
           onClick={() => setSidebarCollapsed((c) => !c)}
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {sidebarCollapsed ? '→' : '←'}
+          {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
         <h1>Gantt Chart</h1>
         <div className="header-actions">
@@ -147,7 +149,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                       title="Edit category"
                       aria-label="Edit category"
                     >
-                      ✎
+                      <Pencil size={12} />
                     </button>
                     <button
                       type="button"
@@ -158,7 +160,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                       title="Delete category"
                       aria-label="Delete category"
                     >
-                      ×
+                      <Trash2 size={12} />
                     </button>
                   </div>
                   {projects.filter((p) => p.category_id === c.id).map((p) => (
@@ -171,7 +173,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         title="Edit project"
                         aria-label="Edit project"
                       >
-                        ✎
+                        <Pencil size={12} />
                       </button>
                       <button
                         type="button"
@@ -183,7 +185,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         title="Delete project"
                         aria-label="Delete project"
                       >
-                        ×
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   ))}
