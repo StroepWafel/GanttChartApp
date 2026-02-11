@@ -80,12 +80,6 @@ function addMonths(d: Date, n: number): Date {
   return x;
 }
 
-function addYears(d: Date, n: number): Date {
-  const x = new Date(d);
-  x.setFullYear(x.getFullYear() + n);
-  return x;
-}
-
 function diffDays(a: Date, b: Date): number {
   return Math.round((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000));
 }
