@@ -166,6 +166,28 @@
   box-sizing: border-box;
 }
 
+@media (max-width: 768px) {
+  .gantt-list-header {
+    grid-template-columns: 44px minmax(100px, 1fr) 52px 52px;
+    gap: 4px;
+    padding: 0 6px 0 8px;
+    font-size: 10px;
+    height: 36px;
+    min-height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .gantt-list-header {
+    grid-template-columns: 44px minmax(60px, 1fr) 44px 44px;
+    gap: 4px;
+    padding: 0 4px 0 6px;
+    font-size: 9px;
+    height: 32px;
+    min-height: 32px;
+  }
+}
+
 .gantt-list-header .gantt-hdr-task { text-align: left; }
 .gantt-list-header .gantt-hdr-from,
 .gantt-list-header .gantt-hdr-to { text-align: right; }
@@ -183,6 +205,28 @@
   height: 36px;
   min-height: 36px;
   box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .gantt-list-row {
+    grid-template-columns: 44px minmax(100px, 1fr) 52px 52px;
+    gap: 4px;
+    padding: 0 6px 0 8px;
+    font-size: 11px;
+    height: 34px;
+    min-height: 34px;
+  }
+}
+
+@media (max-width: 480px) {
+  .gantt-list-row {
+    grid-template-columns: 44px minmax(60px, 1fr) 44px 44px;
+    gap: 4px;
+    padding: 0 4px 0 6px;
+    font-size: 10px;
+    height: 32px;
+    min-height: 32px;
+  }
 }
 
 .gantt-list-row .gantt-list-name { text-align: left; }
@@ -225,6 +269,25 @@
   display: inline-block;
   width: 18px;
   height: 18px;
+}
+
+@media (max-width: 768px) {
+  .gantt-row-expand {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .gantt-expand-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .gantt-expand-spacer {
+    width: 28px;
+    height: 28px;
+  }
 }
 
 .gantt-row-category { background: var(--bg-elevated) !important; font-size: 11px; }
@@ -326,6 +389,7 @@
   cursor: pointer;
   transition: opacity 0.15s;
   z-index: 2;
+  touch-action: manipulation;
 }
 
 .gantt-bar:hover {
@@ -395,6 +459,12 @@
 
 .gantt-bar:hover .gantt-bar-edit {
   opacity: 1;
+}
+
+@media (hover: none) {
+  .gantt-bar .gantt-bar-edit {
+    opacity: 1;
+  }
 }
 
 .gantt-bar-edit:hover {

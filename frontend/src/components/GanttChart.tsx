@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import './GanttChart.css';
 
 type ViewMode = 'Day' | 'Week' | 'Month';
@@ -183,6 +184,7 @@ export default function GanttChart({
   onTaskSplit,
   onTaskEdit,
 }: Props) {
+  const { isMobile, isSmallMobile } = useMediaQuery();
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
@@ -287,7 +289,12 @@ export default function GanttChart({
 
     let start: Date;
     let colCount: number;
-    const colWidth = viewMode === 'Month' ? 80 : viewMode === 'Week' ? 56 : 48;
+    const baseColWidth = viewMode === 'Month' ? 80 : viewMode === 'Week' ? 56 : 48;
+    const colWidth = isSmallMobile
+      ? (viewMode === 'Month' ? 60 : viewMode === 'Week' ? 42 : 36)
+      : isMobile
+      ? (viewMode === 'Month' ? 70 : viewMode === 'Week' ? 48 : 40)
+      : baseColWidth;
 
     const hasTasks = relevantDates.length > 0;
     if (viewMode === 'Day') {
@@ -324,7 +331,7 @@ export default function GanttChart({
       totalWidth: colCount * colWidth,
       totalColumns: colCount,
     };
-  }, [taskRows, projects, viewMode]);
+  }, [taskRows, projects, viewMode, isMobile, isSmallMobile]);
 
   const [scrollState, setScrollState] = useState({ scrollLeft: 0, width: 800 });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -394,8 +401,37 @@ export default function GanttChart({
 
   const handleBarContextMenu = useCallback((e: React.MouseEvent, task: Task) => {
     e.preventDefault();
-    setContextMenu({ task, x: e.clientX, y: e.clientY });
     setTooltip(null);
+    setContextMenu({ task, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleBarTouchStart = useCallback(
+    (e: React.TouchEvent, task: Task) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        setTooltip(null);
+        setContextMenu({ task, x: touch.clientX, y: touch.clientY });
+      }, 500);
+    },
+    []
+  );
+
+  const handleBarTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleBarTouchMove = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
   }, []);
 
   const handleDeleteTask = useCallback(() => {
@@ -438,8 +474,8 @@ export default function GanttChart({
     );
   }
 
-  const rowHeight = 36;
-  const listWidth = 420;
+  const rowHeight = isSmallMobile ? 32 : isMobile ? 34 : 36;
+  const listWidth = isSmallMobile ? 200 : isMobile ? 260 : 420;
 
   return (
     <div className="gantt-chart-wrap">
@@ -708,6 +744,10 @@ export default function GanttChart({
                       onMouseLeave={() => setTooltip(null)}
                       onDoubleClick={() => handleBarDoubleClick(task)}
                       onContextMenu={(e) => handleBarContextMenu(e, task)}
+                      onTouchStart={(e) => handleBarTouchStart(e, task)}
+                      onTouchEnd={handleBarTouchEnd}
+                      onTouchMove={handleBarTouchMove}
+                      onTouchCancel={handleBarTouchEnd}
                     >
                       <div
                         className="gantt-bar-progress"

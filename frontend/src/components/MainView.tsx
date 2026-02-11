@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -7,6 +7,7 @@ import TaskForm from './TaskForm';
 import SplitTaskModal from './SplitTaskModal';
 import CompletedTasks from './CompletedTasks';
 import CategoryProjectForm from './CategoryProjectForm';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import './MainView.css';
 
 interface Props {
@@ -27,7 +28,12 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { isMobile } = useMediaQuery();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 768
+  );
+
+  const isSidebarOverlay = isMobile && !sidebarCollapsed;
 
   const load = useCallback(async () => {
     const [cats, projs, t] = await Promise.all([
@@ -131,21 +137,50 @@ export default function MainView({ authEnabled, onLogout }: Props) {
             className="btn-sm"
             onClick={() => setShowAddTask(true)}
             disabled={projects.length === 0}
-            title={projects.length === 0 ? 'Add a project first' : ''}
+            title={projects.length === 0 ? 'Add a project first' : 'Add task'}
+            aria-label={projects.length === 0 ? 'Add a project first' : 'Add task'}
           >
             + Task
           </button>
-          <button className="btn-sm" onClick={() => setShowCompleted(true)}>Completed</button>
-          <button className="btn-sm" onClick={() => setShowSettings(true)}>Settings</button>
+          <button
+            className="btn-sm btn-sm-completed"
+            onClick={() => setShowCompleted(true)}
+            title="Completed tasks"
+            aria-label="Completed tasks"
+          >
+            <CheckSquare size={16} />
+            <span className="btn-sm-label">Completed</span>
+          </button>
+          <button
+            className="btn-sm btn-sm-settings"
+            onClick={() => setShowSettings(true)}
+            title="Settings"
+            aria-label="Settings"
+          >
+            <Settings size={16} />
+            <span className="btn-sm-label">Settings</span>
+          </button>
           {authEnabled && onLogout && (
-            <button className="btn-sm" onClick={onLogout}>Logout</button>
+            <button className="btn-sm" onClick={onLogout} aria-label="Logout">
+              Logout
+            </button>
           )}
         </div>
       </header>
 
       <div className="main-body">
+        {isSidebarOverlay && (
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setSidebarCollapsed(true)}
+            aria-hidden="true"
+          />
+        )}
         {!sidebarCollapsed && (
-          <aside className="sidebar">
+          <aside
+            className={`sidebar ${isSidebarOverlay ? 'sidebar-overlay' : ''}`}
+            aria-label="Categories and projects"
+          >
             <section className="sidebar-section">
               <h3>Categories</h3>
               {categories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}

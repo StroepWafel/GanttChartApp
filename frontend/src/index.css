@@ -32,6 +32,15 @@ body {
 
 #root {
   min-height: 100vh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
 }
 
 button {
@@ -142,8 +151,8 @@ input, select, textarea {
 }
 
 .completed-modal {
-  max-width: 480px;
-  max-height: 80vh;
+  max-width: min(480px, calc(100vw - 32px));
+  max-height: min(80vh, calc(100vh - 32px));
   overflow: hidden;
   display: flex;
   flex-direction: column;

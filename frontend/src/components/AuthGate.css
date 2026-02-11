@@ -4,11 +4,12 @@
   align-items: center;
   justify-content: center;
   background: var(--bg);
-  padding: 16px;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 
 .auth-form {
-  width: 320px;
+  width: min(320px, calc(100% - 32px));
   padding: 32px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
