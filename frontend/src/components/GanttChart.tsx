@@ -143,9 +143,10 @@ function buildHierarchicalRows(
   for (const cat of sortedCats) {
     const catProjects = projects.filter((p) => p.category_id === cat.id);
     if (catProjects.length === 0) continue;
-    if (!isExpanded(expanded, 'category', cat.id)) continue;
     rows.push({ type: 'category', id: `cat-${cat.id}`, category: cat });
+    if (!isExpanded(expanded, 'category', cat.id)) continue;
     for (const proj of catProjects) {
+      rows.push({ type: 'project', id: `proj-${proj.id}`, project: proj });
       if (!isExpanded(expanded, 'project', proj.id)) continue;
       const projTasks = tasks
         .filter((t) => t.project_id === proj.id)
@@ -157,7 +158,6 @@ function buildHierarchicalRows(
         });
       const topLevel = projTasks.filter((t) => !t.parent_id);
       if (topLevel.length === 0 && projTasks.length === 0) continue;
-      rows.push({ type: 'project', id: `proj-${proj.id}`, project: proj });
       for (const task of topLevel) {
         const children = byParent.get(task.id) ?? [];
         if (children.length > 0) {
@@ -456,12 +456,11 @@ export default function GanttChart({
                         title={exp ? 'Collapse' : 'Expand'}
                         aria-label={exp ? 'Collapse' : 'Expand'}
                       >
-                        {exp ? '−' : '+'}
+                        {exp ? '▼' : '▶'}
                       </button>
                     ) : (
                       <span className="gantt-expand-spacer" />
                     )}
-                    <span className="gantt-icon gantt-icon-folder" aria-hidden>📁</span>
                   </div>
                   <span className="gantt-list-name">{row.category.name}</span>
                   <span className="gantt-list-date">—</span>
@@ -483,12 +482,11 @@ export default function GanttChart({
                         title={exp ? 'Collapse' : 'Expand'}
                         aria-label={exp ? 'Collapse' : 'Expand'}
                       >
-                        {exp ? '−' : '+'}
+                        {exp ? '▼' : '▶'}
                       </button>
                     ) : (
                       <span className="gantt-expand-spacer" />
                     )}
-                    <span className="gantt-icon gantt-icon-folder" aria-hidden>📁</span>
                   </div>
                   <span className="gantt-list-name" style={{ paddingLeft: 8 }}>{row.project.name}</span>
                   <span className="gantt-list-date">—</span>
@@ -513,12 +511,11 @@ export default function GanttChart({
                       title={exp ? 'Collapse' : 'Expand'}
                       aria-label={exp ? 'Collapse' : 'Expand'}
                     >
-                      {exp ? '−' : '+'}
+                      {exp ? '▼' : '▶'}
                     </button>
                   ) : (
                     <span className="gantt-expand-spacer" />
                   )}
-                  <span className="gantt-icon gantt-icon-doc" aria-hidden>📄</span>
                 </div>
                 <span className="gantt-list-name" style={{ paddingLeft: 8 + row.indent * 14 }}>{row.task.name}</span>
                 <span className="gantt-list-date">

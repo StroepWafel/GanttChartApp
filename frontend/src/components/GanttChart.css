@@ -222,11 +222,6 @@
   height: 18px;
 }
 
-.gantt-icon {
-  font-size: 14px;
-  opacity: 0.85;
-}
-
 .gantt-row-category { background: var(--bg-elevated) !important; font-size: 11px; }
 .gantt-row-project { background: var(--bg) !important; font-size: 11px; color: var(--text-muted); }
 .gantt-row-empty { background: var(--bg-panel); }
