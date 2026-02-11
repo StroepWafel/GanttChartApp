@@ -475,7 +475,7 @@ export default function GanttChart({
   }
 
   const rowHeight = isSmallMobile ? 32 : isMobile ? 34 : 36;
-  const listWidth = isSmallMobile ? 200 : isMobile ? 260 : 420;
+  const listWidth = isSmallMobile ? 220 : isMobile ? 300 : 420;
 
   return (
     <div className="gantt-chart-wrap">
@@ -545,7 +545,7 @@ export default function GanttChart({
               const catSpan = categorySpans.get(row.category.id);
               return (
                 <div key={row.id} className="gantt-list-row gantt-row-category">
-                  <div className="gantt-row-expand">
+                  <div className="gantt-row-expand" style={{ paddingLeft: 0 }}>
                     {hasChildren ? (
                       <button
                         type="button"
@@ -576,7 +576,7 @@ export default function GanttChart({
               const span = projectSpans.get(row.project.id);
               return (
                 <div key={row.id} className="gantt-list-row gantt-row-project">
-                  <div className="gantt-row-expand">
+                  <div className="gantt-row-expand" style={{ paddingLeft: 8 }}>
                     {hasChildren ? (
                       <button
                         type="button"
@@ -609,7 +609,7 @@ export default function GanttChart({
                 key={row.task.id}
                 className={`gantt-list-row ${row.task.completed ? 'completed' : ''}`}
               >
-                <div className="gantt-row-expand">
+                <div className="gantt-row-expand" style={{ paddingLeft: 8 + row.indent * 14 }}>
                   {hasChildren ? (
                     <button
                       type="button"

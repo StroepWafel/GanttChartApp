@@ -48,6 +48,12 @@ button {
   cursor: pointer;
 }
 
+/* Icon alignment in buttons */
+button svg {
+  display: block;
+  flex-shrink: 0;
+}
+
 input, select, textarea {
   font-family: var(--font-sans);
   background: var(--bg);

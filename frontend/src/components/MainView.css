@@ -27,6 +27,9 @@
 }
 
 .sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 6px 12px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -50,9 +53,7 @@
 
 .btn-sm-completed,
 .btn-sm-settings {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  justify-content: center;
 }
 
 @media (max-width: 480px) {
@@ -62,6 +63,10 @@
 }
 
 .btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 14px;
   font-size: 12px;
   background: var(--bg);
