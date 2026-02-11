@@ -131,6 +131,23 @@ export async function deleteTask(id: number, cascade = false) {
   return res.json();
 }
 
+export async function getGanttExpanded() {
+  const res = await fetchApi('/gantt-expanded');
+  return res.json();
+}
+
+export async function setGanttExpanded(
+  itemType: 'category' | 'project' | 'task',
+  itemId: number,
+  expanded: boolean
+) {
+  const res = await fetchApi('/gantt-expanded', {
+    method: 'PATCH',
+    body: JSON.stringify({ item_type: itemType, item_id: itemId, expanded }),
+  });
+  return res.json();
+}
+
 export async function clearAllData() {
   const res = await fetchApi('/clear', { method: 'DELETE' });
   return res.json();

@@ -181,6 +181,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
 
       {(showAddTask || editTask) && (
         <TaskForm
+          categories={categories}
           projects={projects}
           task={editTask}
           onClose={() => {

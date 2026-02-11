@@ -9,6 +9,7 @@ import { optionalAuth, isAuthEnabled } from './auth.js';
 import categoriesRouter from './routes/categories.js';
 import projectsRouter from './routes/projects.js';
 import tasksRouter from './routes/tasks.js';
+import ganttExpandedRouter from './routes/gantt-expanded.js';
 import clearRouter from './routes/clear.js';
 import authRouter from './routes/auth.js';
 import apiRouter from './routes/api.js';
@@ -33,6 +34,7 @@ app.use('/api/readonly', apiRouter);
 app.use('/api/categories', optionalAuth, categoriesRouter);
 app.use('/api/projects', optionalAuth, projectsRouter);
 app.use('/api/tasks', optionalAuth, tasksRouter);
+app.use('/api/gantt-expanded', optionalAuth, ganttExpandedRouter);
 app.use('/api/clear', optionalAuth, clearRouter);
 
 // Serve frontend in production

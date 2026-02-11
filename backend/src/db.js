@@ -26,6 +26,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id INTEGER NOT NULL,
     name TEXT NOT NULL,
+    due_date TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
   );
@@ -52,6 +53,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
   CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed);
   CREATE INDEX IF NOT EXISTS idx_projects_category ON projects(category_id);
+
+  CREATE TABLE IF NOT EXISTS gantt_expanded (
+    item_type TEXT NOT NULL,
+    item_id INTEGER NOT NULL,
+    expanded INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (item_type, item_id)
+  );
 `);
+
+// Migration: add due_date to projects if missing (for existing DBs)
+try {
+  const cols = db.prepare("PRAGMA table_info(projects)").all();
+  if (!cols.some((c) => c.name === 'due_date')) {
+    db.exec('ALTER TABLE projects ADD COLUMN due_date TEXT');
+  }
+} catch (_) {}
 
 export default db;

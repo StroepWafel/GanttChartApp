@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import './GanttChart.css';
 
@@ -28,6 +29,17 @@ interface Props {
   onTaskDelete: (id: number, cascade: boolean) => void;
   onTaskSplit: (task: Task) => void;
   onTaskEdit: (task: Task) => void;
+}
+
+interface ExpandedState {
+  category: Record<number, boolean>;
+  project: Record<number, boolean>;
+  task: Record<number, boolean>;
+}
+
+function isExpanded(state: ExpandedState, type: keyof ExpandedState, id: number): boolean {
+  const val = state[type][id];
+  return val === undefined ? true : val;
 }
 
 function toStartOfDay(d: Date): Date {
@@ -117,20 +129,24 @@ type GanttRow =
 function buildHierarchicalRows(
   tasks: Task[],
   projects: Project[],
-  categories: Category[]
+  categories: Category[],
+  expanded: ExpandedState
 ): GanttRow[] {
   const rows: GanttRow[] = [];
-  const taskCount = new Map<number, number>();
-  tasks.forEach((t) => {
-    const pid = t.parent_id ?? 0;
-    taskCount.set(pid, (taskCount.get(pid) ?? 0) + 1);
+  const byParent = new Map<number, Task[]>();
+  tasks.filter((t) => t.parent_id).forEach((t) => {
+    const pid = t.parent_id!;
+    if (!byParent.has(pid)) byParent.set(pid, []);
+    byParent.get(pid)!.push(t);
   });
   const sortedCats = [...categories].sort((a, b) => a.display_order - b.display_order);
   for (const cat of sortedCats) {
     const catProjects = projects.filter((p) => p.category_id === cat.id);
     if (catProjects.length === 0) continue;
+    if (!isExpanded(expanded, 'category', cat.id)) continue;
     rows.push({ type: 'category', id: `cat-${cat.id}`, category: cat });
     for (const proj of catProjects) {
+      if (!isExpanded(expanded, 'project', proj.id)) continue;
       const projTasks = tasks
         .filter((t) => t.project_id === proj.id)
         .sort((a, b) => {
@@ -140,20 +156,16 @@ function buildHierarchicalRows(
           return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
         });
       const topLevel = projTasks.filter((t) => !t.parent_id);
-      const byParent = new Map<number, Task[]>();
-      projTasks.filter((t) => t.parent_id).forEach((t) => {
-        const pid = t.parent_id!;
-        if (!byParent.has(pid)) byParent.set(pid, []);
-        byParent.get(pid)!.push(t);
-      });
       if (topLevel.length === 0 && projTasks.length === 0) continue;
       rows.push({ type: 'project', id: `proj-${proj.id}`, project: proj });
       for (const task of topLevel) {
         const children = byParent.get(task.id) ?? [];
         if (children.length > 0) {
           rows.push({ type: 'task', task, indent: 2 });
-          for (const child of children) {
-            rows.push({ type: 'task', task: child, indent: 3 });
+          if (isExpanded(expanded, 'task', task.id)) {
+            for (const child of children) {
+              rows.push({ type: 'task', task: child, indent: 3 });
+            }
           }
         } else {
           rows.push({ type: 'task', task, indent: 2 });
@@ -179,10 +191,37 @@ export default function GanttChart({
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
+  const [expanded, setExpanded] = useState<ExpandedState>({
+    category: {},
+    project: {},
+    task: {},
+  });
+
+  useEffect(() => {
+    api.getGanttExpanded().then((data) => {
+      setExpanded({
+        category: data.category ?? {},
+        project: data.project ?? {},
+        task: data.task ?? {},
+      });
+    });
+  }, []);
+
+  const toggleExpanded = useCallback(
+    async (type: 'category' | 'project' | 'task', id: number) => {
+      const next = !isExpanded(expanded, type, id);
+      setExpanded((prev) => ({
+        ...prev,
+        [type]: { ...prev[type], [id]: next },
+      }));
+      await api.setGanttExpanded(type, id, next);
+    },
+    [expanded]
+  );
 
   const hierarchicalRows = useMemo(
-    () => buildHierarchicalRows(tasks, projects, categories),
-    [tasks, projects, categories]
+    () => buildHierarchicalRows(tasks, projects, categories, expanded),
+    [tasks, projects, categories, expanded]
   );
   const taskRows = useMemo(
     () => hierarchicalRows.filter((r): r is Extract<GanttRow, { type: 'task' }> => r.type === 'task'),
@@ -397,35 +436,91 @@ export default function GanttChart({
         >
         <div className="gantt-list" style={{ width: listWidth }}>
           <div className="gantt-list-header">
+            <span />
             <span className="gantt-hdr-task">Task</span>
             <span className="gantt-hdr-from">From</span>
             <span className="gantt-hdr-to">To</span>
           </div>
           {hierarchicalRows.map((row) => {
             if (row.type === 'category') {
+              const exp = isExpanded(expanded, 'category', row.category.id);
+              const hasChildren = projects.some((p) => p.category_id === row.category.id);
               return (
                 <div key={row.id} className="gantt-list-row gantt-row-category">
-                  <span className="gantt-list-name" style={{ fontWeight: 600, paddingLeft: 0 }}>{row.category.name}</span>
+                  <div className="gantt-row-expand">
+                    {hasChildren ? (
+                      <button
+                        type="button"
+                        className="gantt-expand-btn"
+                        onClick={() => toggleExpanded('category', row.category.id)}
+                        title={exp ? 'Collapse' : 'Expand'}
+                        aria-label={exp ? 'Collapse' : 'Expand'}
+                      >
+                        {exp ? '−' : '+'}
+                      </button>
+                    ) : (
+                      <span className="gantt-expand-spacer" />
+                    )}
+                    <span className="gantt-icon gantt-icon-folder" aria-hidden>📁</span>
+                  </div>
+                  <span className="gantt-list-name">{row.category.name}</span>
                   <span className="gantt-list-date">—</span>
                   <span className="gantt-list-date">—</span>
                 </div>
               );
             }
             if (row.type === 'project') {
+              const exp = isExpanded(expanded, 'project', row.project.id);
+              const hasChildren = tasks.some((t) => t.project_id === row.project.id);
               return (
                 <div key={row.id} className="gantt-list-row gantt-row-project">
-                  <span className="gantt-list-name" style={{ paddingLeft: 16 }}>{row.project.name}</span>
+                  <div className="gantt-row-expand">
+                    {hasChildren ? (
+                      <button
+                        type="button"
+                        className="gantt-expand-btn"
+                        onClick={() => toggleExpanded('project', row.project.id)}
+                        title={exp ? 'Collapse' : 'Expand'}
+                        aria-label={exp ? 'Collapse' : 'Expand'}
+                      >
+                        {exp ? '−' : '+'}
+                      </button>
+                    ) : (
+                      <span className="gantt-expand-spacer" />
+                    )}
+                    <span className="gantt-icon gantt-icon-folder" aria-hidden>📁</span>
+                  </div>
+                  <span className="gantt-list-name" style={{ paddingLeft: 8 }}>{row.project.name}</span>
                   <span className="gantt-list-date">—</span>
                   <span className="gantt-list-date">—</span>
                 </div>
               );
             }
+            const children = tasks.filter((t) => t.parent_id === row.task.id);
+            const hasChildren = children.length > 0;
+            const exp = hasChildren ? isExpanded(expanded, 'task', row.task.id) : true;
             return (
               <div
                 key={row.task.id}
                 className={`gantt-list-row ${row.task.completed ? 'completed' : ''}`}
               >
-                <span className="gantt-list-name" style={{ paddingLeft: 16 + row.indent * 12 }}>{row.task.name}</span>
+                <div className="gantt-row-expand">
+                  {hasChildren ? (
+                    <button
+                      type="button"
+                      className="gantt-expand-btn"
+                      onClick={() => toggleExpanded('task', row.task.id)}
+                      title={exp ? 'Collapse' : 'Expand'}
+                      aria-label={exp ? 'Collapse' : 'Expand'}
+                    >
+                      {exp ? '−' : '+'}
+                    </button>
+                  ) : (
+                    <span className="gantt-expand-spacer" />
+                  )}
+                  <span className="gantt-icon gantt-icon-doc" aria-hidden>📄</span>
+                </div>
+                <span className="gantt-list-name" style={{ paddingLeft: 8 + row.indent * 14 }}>{row.task.name}</span>
                 <span className="gantt-list-date">
                   {new Date(row.task.start_date).toLocaleDateString()}
                 </span>

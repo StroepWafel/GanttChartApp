@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import type { Project, Task } from '../types';
+import type { Category, Project, Task } from '../types';
 import type { updateTask } from '../api';
 
 interface Props {
+  categories: Category[];
   projects: Project[];
   task?: Task | null;
   onClose: () => void;
@@ -17,10 +18,12 @@ interface Props {
   onUpdate?: (id: number, data: Parameters<typeof updateTask>[1]) => void;
 }
 
-export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }: Props) {
+export default function TaskForm({ categories, projects, task, onClose, onCreate, onUpdate }: Props) {
   const today = new Date().toISOString().slice(0, 10);
   const isEdit = !!task;
-  const [projectId, setProjectId] = useState(projects[0]?.id || 0);
+  const [categoryId, setCategoryId] = useState<number>(categories[0]?.id ?? 0);
+  const projectsInCategory = projects.filter((p) => p.category_id === categoryId);
+  const [projectId, setProjectId] = useState(projectsInCategory[0]?.id ?? 0);
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
@@ -29,6 +32,8 @@ export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }
 
   useEffect(() => {
     if (task) {
+      const proj = projects.find((p) => p.id === task.project_id);
+      if (proj) setCategoryId(proj.category_id);
       setProjectId(task.project_id);
       setName(task.name);
       setStartDate(task.start_date.slice(0, 10));
@@ -36,7 +41,13 @@ export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }
       setDueDate(task.due_date?.slice(0, 10) ?? '');
       setBasePriority(task.base_priority ?? 5);
     }
-  }, [task]);
+  }, [task, projects]);
+
+  useEffect(() => {
+    if (!projectsInCategory.some((p) => p.id === projectId)) {
+      setProjectId(projectsInCategory[0]?.id ?? 0);
+    }
+  }, [categoryId, projectsInCategory, projectId]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,6 +87,19 @@ export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }
         <h3>{isEdit ? 'Edit Task' : 'New Task'}</h3>
         <form onSubmit={handleSubmit}>
           <div className="form-row">
+            <label>Category</label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(Number(e.target.value))}
+              required
+              disabled={isEdit}
+            >
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row">
             <label>Project</label>
             <select
               value={projectId}
@@ -84,7 +108,7 @@ export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }
               disabled={isEdit}
               title={isEdit ? 'Project cannot be changed when editing' : undefined}
             >
-              {projects.map((p) => (
+              {projectsInCategory.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>

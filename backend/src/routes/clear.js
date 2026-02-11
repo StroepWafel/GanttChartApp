@@ -9,6 +9,7 @@ router.delete('/', (req, res) => {
       DELETE FROM tasks;
       DELETE FROM projects;
       DELETE FROM categories;
+      DELETE FROM gantt_expanded;
     `);
     res.json({ ok: true, message: 'All data cleared' });
   } catch (err) {
