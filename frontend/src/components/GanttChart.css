@@ -336,6 +336,18 @@
   opacity: 0.75;
 }
 
+.gantt-bar-summary {
+  opacity: 0.7;
+  height: 16px;
+  top: 10px;
+}
+
+.gantt-bar-summary.gantt-bar-category {
+  opacity: 0.5;
+  height: 12px;
+  top: 12px;
+}
+
 .gantt-bar-progress {
   position: absolute;
   left: 0;

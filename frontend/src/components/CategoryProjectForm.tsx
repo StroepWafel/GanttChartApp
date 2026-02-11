@@ -6,9 +6,9 @@ interface Props {
   editingCategory?: Category | null;
   editingProject?: Project | null;
   onAddCategory: (name: string) => void;
-  onAddProject: (name: string, categoryId: number, dueDate?: string) => void;
+  onAddProject: (name: string, categoryId: number, dueDate?: string, startDate?: string) => void;
   onUpdateCategory: (id: number, name: string) => void;
-  onUpdateProject: (id: number, name: string, categoryId: number, dueDate?: string | null) => void;
+  onUpdateProject: (id: number, name: string, categoryId: number, dueDate?: string | null, startDate?: string | null) => void;
   onDeleteCategory: (id: number) => void;
   onDeleteProject: (id: number) => void;
   onClose: () => void;
@@ -29,6 +29,7 @@ export default function CategoryProjectForm({
   const [mode, setMode] = useState<'category' | 'project'>('category');
   const [catName, setCatName] = useState('');
   const [projName, setProjName] = useState('');
+  const [projStartDate, setProjStartDate] = useState('');
   const [projDueDate, setProjDueDate] = useState('');
   const [catId, setCatId] = useState(categories[0]?.id || 0);
 
@@ -47,6 +48,7 @@ export default function CategoryProjectForm({
       setMode('project');
       setProjName(editingProject.name);
       setCatId(editingProject.category_id);
+      setProjStartDate(editingProject.start_date?.slice(0, 10) ?? '');
       setProjDueDate(editingProject.due_date?.slice(0, 10) ?? '');
     }
   }, [editingProject]);
@@ -54,30 +56,32 @@ export default function CategoryProjectForm({
   function reset() {
     setCatName('');
     setProjName('');
+    setProjStartDate('');
     setProjDueDate('');
     setCatId(categories[0]?.id || 0);
   }
 
-  function handleCategorySubmit(e: React.FormEvent) {
+  async function handleCategorySubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!catName.trim()) return;
     if (isEditCat && editingCategory) {
-      onUpdateCategory(editingCategory.id, catName.trim());
+      await onUpdateCategory(editingCategory.id, catName.trim());
     } else {
-      onAddCategory(catName.trim());
+      await onAddCategory(catName.trim());
     }
     reset();
     onClose();
   }
 
-  function handleProjectSubmit(e: React.FormEvent) {
+  async function handleProjectSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!projName.trim()) return;
+    const start = projStartDate.trim() || undefined;
     const due = projDueDate.trim() || undefined;
     if (isEditProj && editingProject) {
-      onUpdateProject(editingProject.id, projName.trim(), catId, due ?? null);
+      await onUpdateProject(editingProject.id, projName.trim(), catId, due ?? null, start ?? null);
     } else {
-      onAddProject(projName.trim(), catId, due);
+      await onAddProject(projName.trim(), catId, due, start);
     }
     reset();
     onClose();
@@ -159,6 +163,14 @@ export default function CategoryProjectForm({
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
+            </div>
+            <div className="form-row">
+              <label>Start date (optional)</label>
+              <input
+                type="date"
+                value={projStartDate}
+                onChange={(e) => setProjStartDate(e.target.value)}
+              />
             </div>
             <div className="form-row">
               <label>Due date (optional)</label>

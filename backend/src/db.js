@@ -26,6 +26,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id INTEGER NOT NULL,
     name TEXT NOT NULL,
+    start_date TEXT,
     due_date TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
@@ -67,6 +68,9 @@ try {
   const cols = db.prepare("PRAGMA table_info(projects)").all();
   if (!cols.some((c) => c.name === 'due_date')) {
     db.exec('ALTER TABLE projects ADD COLUMN due_date TEXT');
+  }
+  if (!cols.some((c) => c.name === 'start_date')) {
+    db.exec('ALTER TABLE projects ADD COLUMN start_date TEXT');
   }
 } catch (_) {}
 

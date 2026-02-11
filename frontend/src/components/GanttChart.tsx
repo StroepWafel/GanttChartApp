@@ -221,6 +221,41 @@ export default function GanttChart({
     [hierarchicalRows]
   );
 
+  const { projectSpans, categorySpans } = useMemo(() => {
+    const projSpans = new Map<number, { start: string; end: string }>();
+    const catSpans = new Map<number, { start: string; end: string }>();
+    for (const p of projects) {
+      const projTasks = tasks.filter((t) => t.project_id === p.id);
+      let start: string;
+      let end: string;
+      if (projTasks.length > 0) {
+        start = projTasks.reduce((a, t) => (t.start_date < a ? t.start_date : a), projTasks[0].start_date);
+        end = projTasks.reduce((a, t) => (t.end_date > a ? t.end_date : a), projTasks[0].end_date);
+      } else {
+        start = p.start_date ?? p.due_date ?? new Date().toISOString().slice(0, 10);
+        end = p.due_date ?? p.start_date ?? new Date().toISOString().slice(0, 10);
+      }
+      projSpans.set(p.id, { start, end });
+    }
+    for (const c of categories) {
+      const catProjects = projects.filter((p) => p.category_id === c.id);
+      if (catProjects.length === 0) continue;
+      const allStarts = catProjects
+        .map((p) => projSpans.get(p.id)?.start)
+        .filter((s): s is string => !!s);
+      const allEnds = catProjects
+        .map((p) => projSpans.get(p.id)?.end)
+        .filter((e): e is string => !!e);
+      if (allStarts.length > 0 && allEnds.length > 0) {
+        catSpans.set(c.id, {
+          start: allStarts.reduce((a, s) => (s < a ? s : a)),
+          end: allEnds.reduce((a, e) => (e > a ? e : a)),
+        });
+      }
+    }
+    return { projectSpans: projSpans, categorySpans: catSpans };
+  }, [tasks, projects, categories]);
+
   const { rangeStart, rangeEnd, columnWidth, totalWidth, totalColumns } = useMemo(() => {
     const allTasks = taskRows.map((r) => r.task);
     const allStarts = allTasks.map((t: Task) => new Date(t.start_date));
@@ -230,6 +265,11 @@ export default function GanttChart({
       if (t.due_date) relevantDates.push(new Date(t.due_date));
       const proj = projects.find((p) => p.id === t.project_id);
       if (proj?.due_date) relevantDates.push(new Date(proj.due_date));
+      if (proj?.start_date) allStarts.push(new Date(proj.start_date));
+    }
+    for (const p of projects) {
+      if (p.start_date) allStarts.push(new Date(p.start_date));
+      if (p.due_date) relevantDates.push(new Date(p.due_date));
     }
     const minDate = allStarts.length
       ? new Date(Math.min(...allStarts.map((d: Date) => d.getTime())))
@@ -315,6 +355,14 @@ export default function GanttChart({
   function getBarLayout(task: Task) {
     const start = new Date(task.start_date);
     const end = new Date(task.end_date);
+    const x = dateToX(start);
+    const w = Math.max(24, dateToX(end) - x);
+    return { x, w };
+  }
+
+  function getSpanLayout(startStr: string, endStr: string) {
+    const start = new Date(startStr);
+    const end = new Date(endStr);
     const x = dateToX(start);
     const w = Math.max(24, dateToX(end) - x);
     return { x, w };
@@ -568,8 +616,35 @@ export default function GanttChart({
                 />
               )}
               {hierarchicalRows.map((row) => {
-                if (row.type !== 'task') {
-                  return <div key={row.id} className="gantt-row gantt-row-empty" style={{ height: rowHeight }} />;
+                if (row.type === 'category') {
+                  const span = categorySpans.get(row.category.id);
+                  if (!span) {
+                    return <div key={row.id} className="gantt-row gantt-row-empty" style={{ height: rowHeight }} />;
+                  }
+                  const { x, w } = getSpanLayout(span.start, span.end);
+                  return (
+                    <div key={row.id} className="gantt-row" style={{ height: rowHeight }}>
+                      <div
+                        className="gantt-bar gantt-bar-summary gantt-bar-category"
+                        style={{ left: x, width: w, backgroundColor: '#475569' }}
+                      />
+                    </div>
+                  );
+                }
+                if (row.type === 'project') {
+                  const span = projectSpans.get(row.project.id);
+                  if (!span) {
+                    return <div key={row.id} className="gantt-row gantt-row-empty" style={{ height: rowHeight }} />;
+                  }
+                  const { x, w } = getSpanLayout(span.start, span.end);
+                  return (
+                    <div key={row.id} className="gantt-row" style={{ height: rowHeight }}>
+                      <div
+                        className="gantt-bar gantt-bar-summary gantt-bar-project"
+                        style={{ left: x, width: w, backgroundColor: '#64748b' }}
+                      />
+                    </div>
+                  );
                 }
                 const { task } = row;
                 const { x, w } = getBarLayout(task);

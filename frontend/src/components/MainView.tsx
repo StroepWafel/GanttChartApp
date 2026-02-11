@@ -46,60 +46,71 @@ export default function MainView({ authEnabled, onLogout }: Props) {
 
   async function handleCreateCategory(name: string) {
     await api.createCategory(name);
-    load();
+    await load();
   }
 
-  async function handleCreateProject(name: string, categoryId: number, dueDate?: string) {
-    await api.createProject(name, categoryId, dueDate);
-    load();
+  async function handleCreateProject(name: string, categoryId: number, dueDate?: string, startDate?: string) {
+    await api.createProject(name, categoryId, dueDate, startDate);
+    await load();
   }
 
   async function handleDeleteCategory(id: number) {
     await api.deleteCategory(id);
-    load();
+    await load();
   }
 
   async function handleDeleteProject(id: number) {
     await api.deleteProject(id);
-    load();
+    await load();
   }
 
   async function handleUpdateCategory(id: number, name: string) {
     await api.updateCategory(id, { name });
-    load();
+    await load();
   }
 
-  async function handleUpdateProject(id: number, name: string, categoryId: number, dueDate?: string | null) {
-    await api.updateProject(id, { name, category_id: categoryId, due_date: dueDate ?? undefined });
-    load();
+  async function handleUpdateProject(
+    id: number,
+    name: string,
+    categoryId: number,
+    dueDate?: string | null,
+    startDate?: string | null
+  ) {
+    await api.updateProject(id, {
+      name,
+      category_id: categoryId,
+      due_date: dueDate ?? undefined,
+      start_date: startDate ?? undefined,
+    });
+    await load();
   }
 
   async function handleCreateTask(data: Parameters<typeof api.createTask>[0]) {
     await api.createTask(data);
-    load();
+    await load();
     setShowAddTask(false);
   }
 
   async function handleUpdateTask(id: number, data: Parameters<typeof api.updateTask>[1]) {
     await api.updateTask(id, data);
-    load();
+    await load();
   }
 
   async function handleDeleteTask(id: number, cascade: boolean) {
     await api.deleteTask(id, cascade);
-    load();
+    await load();
   }
 
   async function handleSplitTask(id: number, subtasks: { name: string; start_date: string; end_date: string }[]) {
     await api.splitTask(id, subtasks);
-    load();
+    await load();
     setSplitTask(null);
   }
 
   async function handleClearAll() {
     if (!confirm('Delete all tasks, projects, and categories? This cannot be undone.')) return;
     await api.clearAllData();
-    load();
+    await load();
     setShowSettings(false);
   }
 
