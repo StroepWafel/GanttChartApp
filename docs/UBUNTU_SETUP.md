@@ -1,12 +1,13 @@
 # Gantt Chart App - Ubuntu Server Setup
 
-This guide covers deploying the Gantt Chart app on a fresh Ubuntu 22.04 LTS server, with PM2 for process management and Nginx as a reverse proxy.
+This guide covers deploying the Gantt Chart app on a fresh Ubuntu 22.04 LTS server, with PM2 for process management and cloudflared (Cloudflare Tunnel) for secure external access. No public IP, port forwarding, or Nginx required.
 
 ## Prerequisites
 
 - Ubuntu 22.04 LTS server
 - Root or sudo access
-- Domain (optional, for SSL)
+- For **Quick Tunnel**: Nothing else (get a free `*.trycloudflare.com` URL)
+- For **Named Tunnel**: Cloudflare account and a domain added to Cloudflare
 
 ---
 
@@ -16,10 +17,10 @@ This guide covers deploying the Gantt Chart app on a fresh Ubuntu 22.04 LTS serv
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y ufw
 sudo ufw allow 22
-sudo ufw allow 80
-sudo ufw allow 443
 sudo ufw --force enable
 ```
+
+Note: Ports 80/443 are not needed—cloudflared tunnels traffic directly to your local app.
 
 Create a non-root user (optional but recommended):
 
@@ -145,64 +146,97 @@ pm2 logs gantt-api
 
 ---
 
-## 7. Nginx Reverse Proxy
+## 7. Install and Configure Cloudflared
 
-Install Nginx:
-
-```bash
-sudo apt install -y nginx
-```
-
-Create a config file:
+Install cloudflared:
 
 ```bash
-sudo nano /etc/nginx/sites-available/gantt
+wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared-linux-amd64.deb
+rm cloudflared-linux-amd64.deb
 ```
 
-Add:
+### Option A: Quick Tunnel (no account, instant URL)
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;  # or your server IP
-
-    location / {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Enable the site:
+Get a temporary `*.trycloudflare.com` URL in one command. **Note:** URL changes each time you restart; limit ~200 concurrent requests.
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/gantt /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+cloudflared tunnel --url http://127.0.0.1:3001
+```
+
+Or run as a service with PM2:
+
+```bash
+pm2 start cloudflared --name gantt-tunnel -- tunnel --url http://127.0.0.1:3001
+pm2 save
+```
+
+The terminal or PM2 logs will show a URL like `https://random-words.trycloudflare.com`.
+
+### Option B: Named Tunnel (persistent custom domain)
+
+Requires a Cloudflare account and a domain in your Cloudflare dashboard.
+
+**1. Log in to Cloudflare:**
+
+```bash
+cloudflared tunnel login
+```
+
+Visit the URL shown, select your domain, and authorize.
+
+**2. Create a named tunnel:**
+
+```bash
+cloudflared tunnel create gantt-app
+```
+
+Note the tunnel ID from the output.
+
+**3. Create config file:**
+
+```bash
+mkdir -p ~/.cloudflared
+nano ~/.cloudflared/config.yml
+```
+
+Add (replace `YOUR_TUNNEL_ID` with the tunnel ID from step 2; the matching `.json` credentials file will be in `~/.cloudflared/`):
+
+```yaml
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /home/YOUR_USERNAME/.cloudflared/YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: gantt.yourdomain.com
+    service: http://127.0.0.1:3001
+  - service: http_status:404
+```
+
+**4. Route DNS:**
+
+```bash
+cloudflared tunnel route dns gantt-app gantt.yourdomain.com
+```
+
+**5. Run the tunnel:**
+
+```bash
+cloudflared tunnel run gantt-app
+```
+
+Or as a systemd service for auto-start on boot:
+
+```bash
+sudo cloudflared service install
 ```
 
 ---
 
-## 8. SSL with Let's Encrypt (Optional)
+## 8. Verify Deployment
 
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
-```
-
-Follow the prompts. Certbot will update the Nginx config to use HTTPS.
-
----
-
-## 9. Verify Deployment
-
-- Open `http://your-domain.com` (or `http://your-server-ip`)
+- **Quick Tunnel**: Open the `https://xxx.trycloudflare.com` URL shown in the cloudflared output
+- **Named Tunnel**: Open `https://gantt.yourdomain.com` (or your configured hostname)
+- HTTPS is provided by Cloudflare automatically—no certificate setup needed
 - If auth is enabled, you should see the login page
 - If auth is disabled, you should see the Gantt chart
 
@@ -228,7 +262,7 @@ Example endpoints:
 
 ---
 
-## 10. Maintenance
+## 9. Maintenance
 
 Restart the app:
 
@@ -250,4 +284,10 @@ git pull
 npm run install:all
 npm run build:frontend
 pm2 restart gantt-api
+```
+
+If using cloudflared with PM2:
+
+```bash
+pm2 restart gantt-tunnel
 ```

@@ -57,7 +57,7 @@ Copy `.env.example` to `.env` and configure:
 
 ## Deployment
 
-See [docs/UBUNTU_SETUP.md](docs/UBUNTU_SETUP.md) for Ubuntu server deployment with PM2 and Nginx.
+See [docs/UBUNTU_SETUP.md](docs/UBUNTU_SETUP.md) for Ubuntu server deployment with PM2 and cloudflared (Cloudflare Tunnel).
 
 ## Read-Only API
 
