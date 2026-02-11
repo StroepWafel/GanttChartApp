@@ -45,6 +45,17 @@ export default function GanttChart({
       .map((t) => toGanttTask(t, projects));
   }, [tasks, projects]);
 
+  // gantt-task-react crashes with empty tasks—show placeholder
+  if (ganttTasks.length === 0) {
+    return (
+      <div className="gantt-chart-wrap">
+        <div className="gantt-empty">
+          No tasks yet. Add a category, then a project, then create a task.
+        </div>
+      </div>
+    );
+  }
+
   function handleDateChange(task: GanttTask) {
     onTaskChange(Number(task.id), {
       start_date: task.start.toISOString().slice(0, 10),

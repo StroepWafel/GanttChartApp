@@ -1,3 +1,9 @@
+.gantt-empty {
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .gantt-chart-wrap {
   flex: 1;
   min-height: 0;
