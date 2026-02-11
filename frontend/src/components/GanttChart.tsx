@@ -90,8 +90,6 @@ function diffDays(a: Date, b: Date): number {
   return Math.round((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000));
 }
 
-const YEARS_AHEAD = 12;
-
 function getColumnForIndex(
   rangeStart: Date,
   i: number,
@@ -232,38 +230,44 @@ export default function GanttChart({
   const { rangeStart, rangeEnd, columnWidth, totalWidth, totalColumns } = useMemo(() => {
     const allTasks = taskRows.map((r) => r.task);
     const allStarts = allTasks.map((t: Task) => new Date(t.start_date));
-    const allEnds = allTasks.map((t: Task) => new Date(t.end_date));
+    const relevantDates: Date[] = [];
+    for (const t of allTasks) {
+      relevantDates.push(new Date(t.end_date));
+      if (t.due_date) relevantDates.push(new Date(t.due_date));
+      const proj = projects.find((p) => p.id === t.project_id);
+      if (proj?.due_date) relevantDates.push(new Date(proj.due_date));
+    }
     const minDate = allStarts.length
       ? new Date(Math.min(...allStarts.map((d: Date) => d.getTime())))
       : new Date();
-    const maxTaskEnd = allEnds.length
-      ? new Date(Math.max(...allEnds.map((d: Date) => d.getTime())))
+    const latestRelevant = relevantDates.length
+      ? new Date(Math.max(...relevantDates.map((d: Date) => d.getTime())))
       : addDays(new Date(), 14);
-    const horizon = addYears(new Date(), YEARS_AHEAD);
-    const maxDate = maxTaskEnd.getTime() > horizon.getTime() ? maxTaskEnd : horizon;
+    const maxDate = addDays(latestRelevant, 7);
 
     let start: Date;
     let colCount: number;
     const colWidth = viewMode === 'Month' ? 80 : viewMode === 'Week' ? 56 : 48;
 
+    const hasTasks = relevantDates.length > 0;
     if (viewMode === 'Day') {
       start = toStartOfDay(minDate);
       start.setDate(start.getDate() - 7);
       const end = toStartOfDay(maxDate);
-      colCount = diffDays(end, start) + 14;
-      if (colCount < 365) colCount = 365;
+      colCount = diffDays(end, start) + 1;
+      if (!hasTasks && colCount < 60) colCount = 60;
     } else if (viewMode === 'Week') {
       start = toStartOfWeek(minDate);
       start.setDate(start.getDate() - 14);
       const end = toStartOfWeek(maxDate);
-      colCount = Math.ceil(diffDays(end, start) / 7) + 8;
-      if (colCount < 52) colCount = 52;
+      colCount = Math.ceil(diffDays(end, start) / 7) + 1;
+      if (!hasTasks && colCount < 12) colCount = 12;
     } else {
       start = toStartOfMonth(minDate);
       start.setMonth(start.getMonth() - 1);
       const end = toStartOfMonth(maxDate);
-      colCount = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 3;
-      if (colCount < 24) colCount = 24;
+      colCount = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+      if (!hasTasks && colCount < 6) colCount = 6;
     }
 
     const end = viewMode === 'Month'
@@ -279,7 +283,7 @@ export default function GanttChart({
       totalWidth: colCount * colWidth,
       totalColumns: colCount,
     };
-  }, [taskRows, viewMode]);
+  }, [taskRows, projects, viewMode]);
 
   const [scrollState, setScrollState] = useState({ scrollLeft: 0, width: 800 });
   const scrollRef = useRef<HTMLDivElement>(null);
