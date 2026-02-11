@@ -8,18 +8,19 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 12px;
+  padding: 10px 20px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .sidebar-toggle {
-  padding: 4px 8px;
-  background: transparent;
+  padding: 6px 12px;
+  background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
   font-size: 12px;
+  border-radius: var(--radius-sm);
 }
 
 .main-header h1 {
@@ -35,15 +36,17 @@
 }
 
 .btn-sm {
-  padding: 4px 10px;
+  padding: 6px 14px;
   font-size: 12px;
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
 }
 
 .btn-sm:hover:not(:disabled) {
-  background: var(--border);
+  background: var(--bg-elevated);
 }
 
 .btn-sm:disabled {
@@ -58,11 +61,11 @@
 }
 
 .sidebar {
-  width: 180px;
+  width: 200px;
   flex-shrink: 0;
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
-  padding: 10px;
+  padding: 16px;
   overflow-y: auto;
 }
 
@@ -103,7 +106,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  padding: 16px;
 }
 
 .chart-legend {
@@ -130,7 +133,8 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -140,8 +144,10 @@
 .modal {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  padding: 20px;
-  min-width: 280px;
+  padding: 24px;
+  min-width: 300px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
 .modal h3 {
@@ -155,4 +161,5 @@
   color: white;
   font-weight: 600;
   margin-right: 8px;
+  border-radius: var(--radius-sm);
 }

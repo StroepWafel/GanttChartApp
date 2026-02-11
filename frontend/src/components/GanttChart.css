@@ -1,7 +1,8 @@
 .gantt-empty {
-  padding: 24px;
+  padding: 32px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
+  text-align: center;
 }
 
 .gantt-chart-wrap {
@@ -9,20 +10,31 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg);
+  padding: 16px;
 }
 
 .gantt-toolbar {
   display: flex;
-  gap: 4px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .gantt-toolbar button {
-  padding: 4px 10px;
-  font-size: 11px;
-  background: var(--bg-panel);
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+
+.gantt-toolbar button:hover {
+  background: var(--bg-elevated);
 }
 
 .gantt-toolbar button.active {
@@ -33,15 +45,37 @@
 
 .gantt-container {
   flex: 1;
-  min-height: 300px;
+  min-height: 320px;
   overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--bg);
 }
 
-/* Override gantt-task-react styles for dark theme & space efficiency */
-.gantt-container ._2WnBO {
+/* Override gantt-task-react for dark theme and cleaner grid */
+.gantt-container [class*="wrapper"] {
+  font-family: var(--font-sans) !important;
+}
+
+.gantt-container [class*="grid"] {
   background: var(--bg) !important;
 }
 
-.gantt-container [class*="wrapper"] {
-  font-family: var(--font-sans) !important;
+.gantt-container [class*="ganttTable"] {
+  background: var(--bg-panel) !important;
+}
+
+.gantt-container [class*="taskListTableRow"] {
+  border-radius: 4px;
+}
+
+/* Task bars - ensure rounded corners are visible */
+.gantt-container [class*="barWrapper"],
+.gantt-container [class*="barBackground"] {
+  border-radius: 8px !important;
+}
+
+.gantt-container [class*="calendarTop"],
+.gantt-container [class*="calendarHeader"] {
+  background: var(--bg-panel) !important;
+  border-radius: 8px 8px 0 0;
 }

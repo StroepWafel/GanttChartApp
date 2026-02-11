@@ -138,7 +138,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
               />
               Show completed in chart
             </label>
-            <span className="legend-note">Tasks ordered by priority (highest first)</span>
+            <span className="legend-note">Tasks ordered by priority (highest first). Bar colors: gray = low, red = high.</span>
           </div>
           <GanttChart
             tasks={tasks}

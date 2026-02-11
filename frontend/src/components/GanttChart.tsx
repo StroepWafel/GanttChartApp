@@ -14,18 +14,35 @@ interface Props {
   onTaskSplit: (task: Task) => void;
 }
 
+const PRIORITY_COLORS: Record<number, { bg: string; progress: string }> = {
+  1: { bg: '#64748b', progress: '#94a3b8' },
+  2: { bg: '#64748b', progress: '#94a3b8' },
+  3: { bg: '#6366f1', progress: '#818cf8' },
+  4: { bg: '#6366f1', progress: '#818cf8' },
+  5: { bg: '#0ea5e9', progress: '#38bdf8' },
+  6: { bg: '#0ea5e9', progress: '#38bdf8' },
+  7: { bg: '#22c55e', progress: '#4ade80' },
+  8: { bg: '#eab308', progress: '#facc15' },
+  9: { bg: '#f97316', progress: '#fb923c' },
+  10: { bg: '#ef4444', progress: '#f87171' },
+};
+
 function toGanttTask(t: Task, projects: Project[]): GanttTask {
   const project = projects.find((p) => p.id === t.project_id);
-  const type = t.parent_id ? 'task' : 'task';
+  const tier = Math.max(1, Math.min(10, t.base_priority ?? 5)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  const colors = PRIORITY_COLORS[tier];
   return {
     id: String(t.id),
     name: t.name,
     start: new Date(t.start_date),
     end: new Date(t.end_date),
     progress: t.completed ? 100 : t.progress,
-    type,
+    type: 'task',
     project: project?.name || t.project_name || '',
     isDisabled: t.completed,
+    styles: t.completed
+      ? { backgroundColor: '#475569', progressColor: '#64748b' }
+      : { backgroundColor: colors.bg, progressColor: colors.progress },
   };
 }
 
@@ -108,14 +125,17 @@ export default function GanttChart({
           onDelete={handleDelete}
           onDoubleClick={handleDoubleClick}
           onClick={() => {}}
-          listCellWidth="180"
-          columnWidth={50}
-          rowHeight={28}
-          barFill={70}
-          barCornerRadius={2}
-          barProgressColor="#3b82f6"
-          barBackgroundColor="#374151"
-          fontSize="12px"
+          listCellWidth="200"
+          columnWidth={52}
+          rowHeight={36}
+          barFill={75}
+          barCornerRadius={8}
+          barProgressColor="#818cf8"
+          barBackgroundColor="#6366f1"
+          barProgressSelectedColor="#a5b4fc"
+          barBackgroundSelectedColor="#818cf8"
+          todayColor="rgba(99, 102, 241, 0.12)"
+          fontSize="13px"
           fontFamily="var(--font-sans)"
         />
       </div>
