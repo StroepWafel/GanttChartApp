@@ -11,6 +11,30 @@ This guide covers deploying the Gantt Chart app on a fresh Ubuntu 22.04 LTS serv
 
 ---
 
+## 0. Local Development (testing on your machine)
+
+To run the app locally before deploying:
+
+```bash
+cd GanttChartApp
+npm run install:all
+npm run dev
+```
+
+This starts both the backend and frontend. Open **http://localhost:5173** in your browser (the frontend). The API runs at http://localhost:3001.
+
+To run them separately (e.g. in different terminals):
+```bash
+# Terminal 1 - backend
+npm run dev:backend
+
+# Terminal 2 - frontend
+npm run dev:frontend
+```
+Then open http://localhost:5173.
+
+---
+
 ## 1. Initial Server Setup
 
 ```bash
@@ -66,7 +90,7 @@ Install dependencies:
 npm run install:all
 ```
 
-Build the frontend:
+Build the frontend (static files go to `frontend/dist/`; the backend serves these in production—no separate frontend process):
 
 ```bash
 npm run build:frontend
