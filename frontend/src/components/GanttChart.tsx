@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import type { Category, Project, Task } from '../types';
 import './GanttChart.css';
 
@@ -27,6 +27,7 @@ interface Props {
   onTaskComplete: (id: number) => void;
   onTaskDelete: (id: number, cascade: boolean) => void;
   onTaskSplit: (task: Task) => void;
+  onTaskEdit: (task: Task) => void;
 }
 
 function toStartOfDay(d: Date): Date {
@@ -66,8 +67,46 @@ function addMonths(d: Date, n: number): Date {
   return x;
 }
 
+function addYears(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setFullYear(x.getFullYear() + n);
+  return x;
+}
+
 function diffDays(a: Date, b: Date): number {
   return Math.round((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+const YEARS_AHEAD = 12;
+
+function getColumnForIndex(
+  rangeStart: Date,
+  i: number,
+  viewMode: ViewMode
+): { date: Date; label: string; subLabel: string } {
+  let d: Date;
+  if (viewMode === 'Hour' || viewMode === 'Day') {
+    d = addDays(rangeStart, i);
+    return {
+      date: d,
+      label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      subLabel: d.getDate().toString(),
+    };
+  }
+  if (viewMode === 'Week') {
+    d = addWeeks(rangeStart, i);
+    return {
+      date: d,
+      label: `W${Math.ceil(d.getDate() / 7)}`,
+      subLabel: d.toLocaleDateString('en-US', { month: 'short' }),
+    };
+  }
+  d = addMonths(rangeStart, i);
+  return {
+    date: d,
+    label: d.toLocaleDateString('en-US', { month: 'short' }),
+    subLabel: d.getFullYear().toString(),
+  };
 }
 
 export default function GanttChart({
@@ -79,6 +118,7 @@ export default function GanttChart({
   onTaskComplete,
   onTaskDelete,
   onTaskSplit,
+  onTaskEdit,
 }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
@@ -93,87 +133,82 @@ export default function GanttChart({
     });
   }, [tasks]);
 
-  const { columns, rangeStart, rangeEnd, columnWidth, totalWidth } = useMemo(() => {
+  const { rangeStart, rangeEnd, columnWidth, totalWidth, totalColumns } = useMemo(() => {
     const allStarts = sortedTasks.map((t) => new Date(t.start_date));
     const allEnds = sortedTasks.map((t) => new Date(t.end_date));
     const minDate = allStarts.length
       ? new Date(Math.min(...allStarts.map((d) => d.getTime())))
       : new Date();
-    const maxDate = allEnds.length
+    const maxTaskEnd = allEnds.length
       ? new Date(Math.max(...allEnds.map((d) => d.getTime())))
       : addDays(new Date(), 14);
+    const horizon = addYears(new Date(), YEARS_AHEAD);
+    const maxDate = maxTaskEnd.getTime() > horizon.getTime() ? maxTaskEnd : horizon;
 
     let start: Date;
-    let end: Date;
-    let cols: { date: Date; label: string; subLabel?: string }[] = [];
+    let colCount: number;
+    const colWidth = viewMode === 'Month' ? 80 : viewMode === 'Week' ? 56 : 48;
 
-    if (viewMode === 'Hour') {
+    if (viewMode === 'Hour' || viewMode === 'Day') {
       start = toStartOfDay(minDate);
-      start.setDate(start.getDate() - 2);
-      end = toStartOfDay(maxDate);
-      end.setDate(end.getDate() + 5);
-      const days = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-      for (let i = 0; i < days; i++) {
-        const d = addDays(start, i);
-        cols.push({
-          date: d,
-          label: d.toLocaleDateString('en-US', { weekday: 'short' }),
-          subLabel: d.getDate().toString(),
-        });
-      }
-    } else if (viewMode === 'Day') {
-      start = toStartOfDay(minDate);
-      start.setDate(start.getDate() - 2);
-      end = toStartOfDay(maxDate);
-      end.setDate(end.getDate() + 5);
-      const days = diffDays(end, start);
-      for (let i = 0; i < days; i++) {
-        const d = addDays(start, i);
-        cols.push({
-          date: d,
-          label: d.toLocaleDateString('en-US', { weekday: 'short' }),
-          subLabel: d.getDate().toString(),
-        });
-      }
+      start.setDate(start.getDate() - 7);
+      const end = toStartOfDay(maxDate);
+      colCount = diffDays(end, start) + 14;
+      if (colCount < 365) colCount = 365;
     } else if (viewMode === 'Week') {
       start = toStartOfWeek(minDate);
       start.setDate(start.getDate() - 14);
-      end = toStartOfWeek(maxDate);
-      end.setDate(end.getDate() + 28);
-      const weeks = Math.ceil(diffDays(end, start) / 7);
-      for (let i = 0; i < weeks; i++) {
-        const d = addWeeks(start, i);
-        cols.push({
-          date: d,
-          label: `W${Math.ceil(d.getDate() / 7)}`,
-          subLabel: d.toLocaleDateString('en-US', { month: 'short' }),
-        });
-      }
+      const end = toStartOfWeek(maxDate);
+      colCount = Math.ceil(diffDays(end, start) / 7) + 8;
+      if (colCount < 52) colCount = 52;
     } else {
       start = toStartOfMonth(minDate);
       start.setMonth(start.getMonth() - 1);
-      end = toStartOfMonth(maxDate);
-      end.setMonth(end.getMonth() + 2);
-      let d = new Date(start);
-      while (d.getTime() <= end.getTime()) {
-        cols.push({
-          date: new Date(d),
-          label: d.toLocaleDateString('en-US', { month: 'short' }),
-          subLabel: d.getFullYear().toString(),
-        });
-        d = addMonths(d, 1);
-      }
+      const end = toStartOfMonth(maxDate);
+      colCount = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 3;
+      if (colCount < 24) colCount = 24;
     }
 
-    const colWidth = viewMode === 'Month' ? 80 : viewMode === 'Week' ? 56 : 48;
+    const end = viewMode === 'Month'
+      ? addMonths(start, colCount - 1)
+      : viewMode === 'Week'
+      ? addWeeks(start, colCount - 1)
+      : addDays(start, colCount - 1);
+
     return {
-      columns: cols,
       rangeStart: start,
-      rangeEnd: cols.length ? cols[cols.length - 1].date : end,
+      rangeEnd: end,
       columnWidth: colWidth,
-      totalWidth: cols.length * colWidth,
+      totalWidth: colCount * colWidth,
+      totalColumns: colCount,
     };
   }, [sortedTasks, viewMode]);
+
+  const [scrollState, setScrollState] = useState({ scrollLeft: 0, width: 800 });
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setScrollState({ scrollLeft: el.scrollLeft, width: el.clientWidth });
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => handleScroll());
+    ro.observe(el);
+    handleScroll();
+    return () => ro.disconnect();
+  }, [handleScroll]);
+
+  const BUFFER = 5;
+  const firstVisible = Math.max(0, Math.floor(scrollState.scrollLeft / columnWidth) - BUFFER);
+  const lastVisible = Math.min(
+    totalColumns - 1,
+    Math.ceil((scrollState.scrollLeft + scrollState.width) / columnWidth) + BUFFER
+  );
+  const visibleColumnCount = Math.max(0, lastVisible - firstVisible + 1);
 
   const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
 
@@ -195,6 +230,16 @@ export default function GanttChart({
       if (!task.completed) onTaskSplit(task);
     },
     [onTaskSplit]
+  );
+
+  const handleEditClick = useCallback(
+    (e: React.MouseEvent, task: Task) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setTooltip(null);
+      onTaskEdit(task);
+    },
+    [onTaskEdit]
   );
 
   const handleBarContextMenu = useCallback((e: React.MouseEvent, task: Task) => {
@@ -284,7 +329,11 @@ export default function GanttChart({
         ))}
       </div>
 
-      <div className="gantt-main">
+      <div
+        ref={scrollRef}
+        className="gantt-main"
+        onScroll={handleScroll}
+      >
         <div
           className="gantt-inner"
           style={{ minWidth: listWidth + totalWidth, minHeight: 40 + sortedTasks.length * rowHeight }}
@@ -316,16 +365,29 @@ export default function GanttChart({
         <div className="gantt-timeline-wrap" style={{ minWidth: totalWidth }}>
           <div className="gantt-timeline" style={{ width: totalWidth, minWidth: '100%' }}>
             <div className="gantt-header" style={{ width: totalWidth }}>
-              {columns.map((col, i) => (
+              {firstVisible > 0 && (
+                <div style={{ width: firstVisible * columnWidth, flexShrink: 0 }} aria-hidden />
+              )}
+              {Array.from({ length: visibleColumnCount }, (_, k) => {
+                const i = firstVisible + k;
+                const col = getColumnForIndex(rangeStart, i, viewMode);
+                return (
+                  <div
+                    key={i}
+                    className="gantt-header-cell"
+                    style={{ width: columnWidth }}
+                  >
+                    <span className="gantt-header-label">{col.label}</span>
+                    <span className="gantt-header-sublabel">{col.subLabel}</span>
+                  </div>
+                );
+              })}
+              {lastVisible < totalColumns - 1 && (
                 <div
-                  key={i}
-                  className="gantt-header-cell"
-                  style={{ width: columnWidth }}
-                >
-                  <span className="gantt-header-label">{col.label}</span>
-                  <span className="gantt-header-sublabel">{col.subLabel}</span>
-                </div>
-              ))}
+                  style={{ width: (totalColumns - 1 - lastVisible) * columnWidth, flexShrink: 0 }}
+                  aria-hidden
+                />
+              )}
             </div>
 
             <div className="gantt-rows">
@@ -376,6 +438,15 @@ export default function GanttChart({
                         }}
                       />
                       <span className="gantt-bar-label">{task.name}</span>
+                      <button
+                        type="button"
+                        className="gantt-bar-edit"
+                        onClick={(e) => handleEditClick(e, task)}
+                        title="Edit task"
+                        aria-label="Edit task"
+                      >
+                        ✎
+                      </button>
                     </div>
                   </div>
                 );

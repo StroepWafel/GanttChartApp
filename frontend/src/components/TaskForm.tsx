@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import type { Project } from '../types';
+import { useState, useEffect } from 'react';
+import type { Project, Task } from '../types';
+import type { updateTask } from '../api';
 
 interface Props {
   projects: Project[];
+  task?: Task | null;
   onClose: () => void;
   onCreate: (data: {
     project_id: number;
@@ -12,10 +14,12 @@ interface Props {
     due_date?: string;
     base_priority?: number;
   }) => void;
+  onUpdate?: (id: number, data: Parameters<typeof updateTask>[1]) => void;
 }
 
-export default function TaskForm({ projects, onClose, onCreate }: Props) {
+export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }: Props) {
   const today = new Date().toISOString().slice(0, 10);
+  const isEdit = !!task;
   const [projectId, setProjectId] = useState(projects[0]?.id || 0);
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState(today);
@@ -23,23 +27,45 @@ export default function TaskForm({ projects, onClose, onCreate }: Props) {
   const [dueDate, setDueDate] = useState('');
   const [basePriority, setBasePriority] = useState(5);
 
+  useEffect(() => {
+    if (task) {
+      setProjectId(task.project_id);
+      setName(task.name);
+      setStartDate(task.start_date.slice(0, 10));
+      setEndDate(task.end_date.slice(0, 10));
+      setDueDate(task.due_date?.slice(0, 10) ?? '');
+      setBasePriority(task.base_priority ?? 5);
+    }
+  }, [task]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!projectId || !name || !startDate || !endDate) return;
-    onCreate({
-      project_id: projectId,
-      name,
-      start_date: startDate,
-      end_date: endDate,
-      due_date: dueDate || undefined,
-      base_priority: basePriority,
-    });
+    if (isEdit && task && onUpdate) {
+      onUpdate(task.id, {
+        name,
+        start_date: startDate,
+        end_date: endDate,
+        due_date: dueDate || undefined,
+        base_priority: basePriority,
+      });
+    } else {
+      onCreate({
+        project_id: projectId,
+        name,
+        start_date: startDate,
+        end_date: endDate,
+        due_date: dueDate || undefined,
+        base_priority: basePriority,
+      });
+    }
+    onClose();
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal task-form" onClick={(e) => e.stopPropagation()}>
-        <h3>New Task</h3>
+        <h3>{isEdit ? 'Edit Task' : 'New Task'}</h3>
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <label>Project</label>
@@ -47,6 +73,8 @@ export default function TaskForm({ projects, onClose, onCreate }: Props) {
               value={projectId}
               onChange={(e) => setProjectId(Number(e.target.value))}
               required
+              disabled={isEdit}
+              title={isEdit ? 'Project cannot be changed when editing' : undefined}
             >
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -105,7 +133,7 @@ export default function TaskForm({ projects, onClose, onCreate }: Props) {
             </div>
           </div>
           <div className="form-actions">
-            <button type="submit">Create</button>
+            <button type="submit">{isEdit ? 'Update' : 'Create'}</button>
             <button type="button" onClick={onClose}>Cancel</button>
           </div>
         </form>

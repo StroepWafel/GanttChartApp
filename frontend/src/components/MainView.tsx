@@ -22,6 +22,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [showSettings, setShowSettings] = useState(false);
   const [showCatProj, setShowCatProj] = useState(false);
   const [splitTask, setSplitTask] = useState<Task | null>(null);
+  const [editTask, setEditTask] = useState<Task | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -139,15 +140,21 @@ export default function MainView({ authEnabled, onLogout }: Props) {
             onTaskComplete={(id) => handleUpdateTask(id, { completed: true })}
             onTaskDelete={handleDeleteTask}
             onTaskSplit={setSplitTask}
+            onTaskEdit={setEditTask}
           />
         </main>
       </div>
 
-      {showAddTask && (
+      {(showAddTask || editTask) && (
         <TaskForm
           projects={projects}
-          onClose={() => setShowAddTask(false)}
+          task={editTask}
+          onClose={() => {
+            setShowAddTask(false);
+            setEditTask(null);
+          }}
           onCreate={handleCreateTask}
+          onUpdate={editTask ? handleUpdateTask : undefined}
         />
       )}
 
