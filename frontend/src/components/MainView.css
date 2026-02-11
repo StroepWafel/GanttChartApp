@@ -122,6 +122,24 @@
   background: var(--bg-elevated);
 }
 
+.sidebar-delete {
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.sidebar-delete:hover {
+  opacity: 1;
+  color: var(--danger);
+  background: var(--bg-elevated);
+}
+
 .btn-link {
   display: block;
   margin-top: 6px;

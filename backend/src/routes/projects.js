@@ -26,12 +26,13 @@ router.get('/', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
-    const { name, category_id } = req.body;
+    const { name, category_id, due_date } = req.body;
     if (!category_id) return res.status(400).json({ error: 'category_id required' });
     const result = db.prepare(`
-      INSERT INTO projects (name, category_id) VALUES (?, ?)
-    `).run(name || 'New Project', category_id);
-    res.status(201).json({ id: result.lastInsertRowid, name: name || 'New Project', category_id });
+      INSERT INTO projects (name, category_id, due_date) VALUES (?, ?, ?)
+    `).run(name || 'New Project', category_id, due_date || null);
+    const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -40,11 +41,12 @@ router.post('/', (req, res) => {
 router.patch('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category_id } = req.body;
+    const { name, category_id, due_date } = req.body;
     const updates = [];
     const params = [];
     if (name !== undefined) { updates.push('name = ?'); params.push(name); }
     if (category_id !== undefined) { updates.push('category_id = ?'); params.push(category_id); }
+    if (due_date !== undefined) { updates.push('due_date = ?'); params.push(due_date || null); }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
     params.push(id);
     db.prepare(`UPDATE projects SET ${updates.join(', ')} WHERE id = ?`).run(...params);

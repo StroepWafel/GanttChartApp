@@ -9,6 +9,7 @@ export interface Project {
   id: number;
   category_id: number;
   name: string;
+  due_date?: string | null;
   category_name?: string;
   created_at?: string;
 }

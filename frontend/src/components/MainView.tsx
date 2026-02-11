@@ -48,8 +48,18 @@ export default function MainView({ authEnabled, onLogout }: Props) {
     load();
   }
 
-  async function handleCreateProject(name: string, categoryId: number) {
-    await api.createProject(name, categoryId);
+  async function handleCreateProject(name: string, categoryId: number, dueDate?: string) {
+    await api.createProject(name, categoryId, dueDate);
+    load();
+  }
+
+  async function handleDeleteCategory(id: number) {
+    await api.deleteCategory(id);
+    load();
+  }
+
+  async function handleDeleteProject(id: number) {
+    await api.deleteProject(id);
     load();
   }
 
@@ -58,8 +68,8 @@ export default function MainView({ authEnabled, onLogout }: Props) {
     load();
   }
 
-  async function handleUpdateProject(id: number, name: string, categoryId: number) {
-    await api.updateProject(id, { name, category_id: categoryId });
+  async function handleUpdateProject(id: number, name: string, categoryId: number, dueDate?: string | null) {
+    await api.updateProject(id, { name, category_id: categoryId, due_date: dueDate ?? undefined });
     load();
   }
 
@@ -139,6 +149,17 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                     >
                       ✎
                     </button>
+                    <button
+                      type="button"
+                      className="sidebar-delete"
+                      onClick={() => {
+                        if (confirm(`Delete "${c.name}" and all its projects and tasks?`)) handleDeleteCategory(c.id);
+                      }}
+                      title="Delete category"
+                      aria-label="Delete category"
+                    >
+                      ×
+                    </button>
                   </div>
                   {projects.filter((p) => p.category_id === c.id).map((p) => (
                     <div key={p.id} className="proj-item">
@@ -151,6 +172,18 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         aria-label="Edit project"
                       >
                         ✎
+                      </button>
+                      <button
+                        type="button"
+                        className="sidebar-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete "${p.name}" and all its tasks?`)) handleDeleteProject(p.id);
+                        }}
+                        title="Delete project"
+                        aria-label="Delete project"
+                      >
+                        ×
                       </button>
                     </div>
                   ))}
@@ -218,6 +251,8 @@ export default function MainView({ authEnabled, onLogout }: Props) {
           onAddProject={handleCreateProject}
           onUpdateCategory={handleUpdateCategory}
           onUpdateProject={handleUpdateProject}
+          onDeleteCategory={handleDeleteCategory}
+          onDeleteProject={handleDeleteProject}
           onClose={() => { setShowCatProj(false); setEditCategory(null); setEditProject(null); }}
         />
       )}

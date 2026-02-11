@@ -6,9 +6,11 @@ interface Props {
   editingCategory?: Category | null;
   editingProject?: Project | null;
   onAddCategory: (name: string) => void;
-  onAddProject: (name: string, categoryId: number) => void;
+  onAddProject: (name: string, categoryId: number, dueDate?: string) => void;
   onUpdateCategory: (id: number, name: string) => void;
-  onUpdateProject: (id: number, name: string, categoryId: number) => void;
+  onUpdateProject: (id: number, name: string, categoryId: number, dueDate?: string | null) => void;
+  onDeleteCategory: (id: number) => void;
+  onDeleteProject: (id: number) => void;
   onClose: () => void;
 }
 
@@ -20,11 +22,14 @@ export default function CategoryProjectForm({
   onAddProject,
   onUpdateCategory,
   onUpdateProject,
+  onDeleteCategory,
+  onDeleteProject,
   onClose,
 }: Props) {
   const [mode, setMode] = useState<'category' | 'project'>('category');
   const [catName, setCatName] = useState('');
   const [projName, setProjName] = useState('');
+  const [projDueDate, setProjDueDate] = useState('');
   const [catId, setCatId] = useState(categories[0]?.id || 0);
 
   const isEditCat = !!editingCategory;
@@ -42,12 +47,14 @@ export default function CategoryProjectForm({
       setMode('project');
       setProjName(editingProject.name);
       setCatId(editingProject.category_id);
+      setProjDueDate(editingProject.due_date?.slice(0, 10) ?? '');
     }
   }, [editingProject]);
 
   function reset() {
     setCatName('');
     setProjName('');
+    setProjDueDate('');
     setCatId(categories[0]?.id || 0);
   }
 
@@ -66,12 +73,27 @@ export default function CategoryProjectForm({
   function handleProjectSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!projName.trim()) return;
+    const due = projDueDate.trim() || undefined;
     if (isEditProj && editingProject) {
-      onUpdateProject(editingProject.id, projName.trim(), catId);
+      onUpdateProject(editingProject.id, projName.trim(), catId, due ?? null);
     } else {
-      onAddProject(projName.trim(), catId);
+      onAddProject(projName.trim(), catId, due);
     }
     reset();
+    onClose();
+  }
+
+  function handleDeleteCategory() {
+    if (!editingCategory) return;
+    if (!confirm(`Delete category "${editingCategory.name}" and all its projects and tasks?`)) return;
+    onDeleteCategory(editingCategory.id);
+    onClose();
+  }
+
+  function handleDeleteProject() {
+    if (!editingProject) return;
+    if (!confirm(`Delete project "${editingProject.name}" and all its tasks?`)) return;
+    onDeleteProject(editingProject.id);
     onClose();
   }
 
@@ -106,6 +128,11 @@ export default function CategoryProjectForm({
             </div>
             <div className="form-actions">
               <button type="submit">{isEditCat ? 'Update' : 'Add'}</button>
+              {isEditCat && (
+                <button type="button" className="btn-danger" onClick={handleDeleteCategory}>
+                  Delete
+                </button>
+              )}
               <button type="button" onClick={onClose}>Cancel</button>
             </div>
           </form>
@@ -133,8 +160,21 @@ export default function CategoryProjectForm({
                 ))}
               </select>
             </div>
+            <div className="form-row">
+              <label>Due date (optional)</label>
+              <input
+                type="date"
+                value={projDueDate}
+                onChange={(e) => setProjDueDate(e.target.value)}
+              />
+            </div>
             <div className="form-actions">
               <button type="submit">{isEditProj ? 'Update' : 'Add'}</button>
+              {isEditProj && (
+                <button type="button" className="btn-danger" onClick={handleDeleteProject}>
+                  Delete
+                </button>
+              )}
               <button type="button" onClick={onClose}>Cancel</button>
             </div>
           </form>

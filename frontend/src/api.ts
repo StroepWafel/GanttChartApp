@@ -54,24 +54,34 @@ export async function updateCategory(id: number, data: { name?: string; display_
   return res.json();
 }
 
+export async function deleteCategory(id: number) {
+  const res = await fetchApi(`/categories/${id}`, { method: 'DELETE' });
+  return res.json();
+}
+
 export async function getProjects() {
   const res = await fetchApi('/projects');
   return res.json();
 }
 
-export async function createProject(name: string, categoryId: number) {
+export async function createProject(name: string, categoryId: number, dueDate?: string) {
   const res = await fetchApi('/projects', {
     method: 'POST',
-    body: JSON.stringify({ name, category_id: categoryId }),
+    body: JSON.stringify({ name, category_id: categoryId, due_date: dueDate || null }),
   });
   return res.json();
 }
 
-export async function updateProject(id: number, data: { name?: string; category_id?: number }) {
+export async function updateProject(id: number, data: { name?: string; category_id?: number; due_date?: string | null }) {
   const res = await fetchApi(`/projects/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
+  return res.json();
+}
+
+export async function deleteProject(id: number) {
+  const res = await fetchApi(`/projects/${id}`, { method: 'DELETE' });
   return res.json();
 }
 
