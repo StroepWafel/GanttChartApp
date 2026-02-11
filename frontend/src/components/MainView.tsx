@@ -23,6 +23,8 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [showCatProj, setShowCatProj] = useState(false);
   const [splitTask, setSplitTask] = useState<Task | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [editCategory, setEditCategory] = useState<Category | null>(null);
+  const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -48,6 +50,16 @@ export default function MainView({ authEnabled, onLogout }: Props) {
 
   async function handleCreateProject(name: string, categoryId: number) {
     await api.createProject(name, categoryId);
+    load();
+  }
+
+  async function handleUpdateCategory(id: number, name: string) {
+    await api.updateCategory(id, { name });
+    load();
+  }
+
+  async function handleUpdateProject(id: number, name: string, categoryId: number) {
+    await api.updateProject(id, { name, category_id: categoryId });
     load();
   }
 
@@ -115,14 +127,36 @@ export default function MainView({ authEnabled, onLogout }: Props) {
               <h3>Categories</h3>
               {categories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
               {categories.map((c) => (
-                <div key={c.id} className="cat-item">
-                  <span>{c.name}</span>
+                <div key={c.id} className="cat-block">
+                  <div className="cat-item">
+                    <span className="cat-name">{c.name}</span>
+                    <button
+                      type="button"
+                      className="sidebar-edit"
+                      onClick={() => { setEditCategory(c); setEditProject(null); setShowCatProj(true); }}
+                      title="Edit category"
+                      aria-label="Edit category"
+                    >
+                      ✎
+                    </button>
+                  </div>
                   {projects.filter((p) => p.category_id === c.id).map((p) => (
-                    <div key={p.id} className="proj-item">{p.name}</div>
+                    <div key={p.id} className="proj-item">
+                      <span>{p.name}</span>
+                      <button
+                        type="button"
+                        className="sidebar-edit"
+                        onClick={(e) => { e.stopPropagation(); setEditProject(p); setEditCategory(null); setShowCatProj(true); }}
+                        title="Edit project"
+                        aria-label="Edit project"
+                      >
+                        ✎
+                      </button>
+                    </div>
                   ))}
                 </div>
               ))}
-              <button className="btn-link" onClick={() => setShowCatProj(true)}>
+              <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
                 + Category / Project
               </button>
             </section>
@@ -177,9 +211,13 @@ export default function MainView({ authEnabled, onLogout }: Props) {
       {showCatProj && (
         <CategoryProjectForm
           categories={categories}
+          editingCategory={editCategory}
+          editingProject={editProject}
           onAddCategory={handleCreateCategory}
           onAddProject={handleCreateProject}
-          onClose={() => setShowCatProj(false)}
+          onUpdateCategory={handleUpdateCategory}
+          onUpdateProject={handleUpdateProject}
+          onClose={() => { setShowCatProj(false); setEditCategory(null); setEditProject(null); }}
         />
       )}
 

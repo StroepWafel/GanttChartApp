@@ -46,6 +46,14 @@ export async function createCategory(name: string) {
   return res.json();
 }
 
+export async function updateCategory(id: number, data: { name?: string; display_order?: number }) {
+  const res = await fetchApi(`/categories/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
 export async function getProjects() {
   const res = await fetchApi('/projects');
   return res.json();
@@ -55,6 +63,14 @@ export async function createProject(name: string, categoryId: number) {
   const res = await fetchApi('/projects', {
     method: 'POST',
     body: JSON.stringify({ name, category_id: categoryId }),
+  });
+  return res.json();
+}
+
+export async function updateProject(id: number, data: { name?: string; category_id?: number }) {
+  const res = await fetchApi(`/projects/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   });
   return res.json();
 }

@@ -41,6 +41,14 @@ export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!projectId || !name || !startDate || !endDate) return;
+    if (endDate < startDate) {
+      alert('End date cannot be before start date');
+      return;
+    }
+    if (dueDate && dueDate < startDate) {
+      alert('Due date cannot be before start date');
+      return;
+    }
     if (isEdit && task && onUpdate) {
       onUpdate(task.id, {
         name,
@@ -96,7 +104,11 @@ export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                if (endDate && e.target.value > endDate) setEndDate(e.target.value);
+                if (dueDate && e.target.value > dueDate) setDueDate('');
+              }}
               required
             />
           </div>
@@ -105,7 +117,12 @@ export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setEndDate(v);
+                if (dueDate && v < dueDate) setDueDate(v);
+              }}
+              min={startDate}
               required
             />
           </div>
@@ -115,6 +132,7 @@ export default function TaskForm({ projects, task, onClose, onCreate, onUpdate }
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              min={startDate}
             />
           </div>
           <div className="form-row">

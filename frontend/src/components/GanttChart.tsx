@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import type { Category, Project, Task } from '../types';
 import './GanttChart.css';
 
-type ViewMode = 'Hour' | 'Day' | 'Week' | 'Month';
+type ViewMode = 'Day' | 'Week' | 'Month';
 
 const PRIORITY_COLORS: Record<number, { bg: string; progress: string }> = {
   1: { bg: '#64748b', progress: '#94a3b8' },
@@ -85,7 +85,7 @@ function getColumnForIndex(
   viewMode: ViewMode
 ): { date: Date; label: string; subLabel: string } {
   let d: Date;
-  if (viewMode === 'Hour' || viewMode === 'Day') {
+  if (viewMode === 'Day') {
     d = addDays(rangeStart, i);
     return {
       date: d,
@@ -109,9 +109,65 @@ function getColumnForIndex(
   };
 }
 
+type GanttRow =
+  | { type: 'category'; id: string; category: Category }
+  | { type: 'project'; id: string; project: Project }
+  | { type: 'task'; task: Task; indent: number };
+
+function buildHierarchicalRows(
+  tasks: Task[],
+  projects: Project[],
+  categories: Category[]
+): GanttRow[] {
+  const rows: GanttRow[] = [];
+  const taskCount = new Map<number, number>();
+  tasks.forEach((t) => {
+    const pid = t.parent_id ?? 0;
+    taskCount.set(pid, (taskCount.get(pid) ?? 0) + 1);
+  });
+  const sortedCats = [...categories].sort((a, b) => a.display_order - b.display_order);
+  for (const cat of sortedCats) {
+    const catProjects = projects.filter((p) => p.category_id === cat.id);
+    if (catProjects.length === 0) continue;
+    rows.push({ type: 'category', id: `cat-${cat.id}`, category: cat });
+    for (const proj of catProjects) {
+      const projTasks = tasks
+        .filter((t) => t.project_id === proj.id)
+        .sort((a, b) => {
+          const uA = (a as Task & { urgency?: number }).urgency ?? 0;
+          const uB = (b as Task & { urgency?: number }).urgency ?? 0;
+          if (uB !== uA) return uB - uA;
+          return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+        });
+      const topLevel = projTasks.filter((t) => !t.parent_id);
+      const byParent = new Map<number, Task[]>();
+      projTasks.filter((t) => t.parent_id).forEach((t) => {
+        const pid = t.parent_id!;
+        if (!byParent.has(pid)) byParent.set(pid, []);
+        byParent.get(pid)!.push(t);
+      });
+      if (topLevel.length === 0 && projTasks.length === 0) continue;
+      rows.push({ type: 'project', id: `proj-${proj.id}`, project: proj });
+      for (const task of topLevel) {
+        const children = byParent.get(task.id) ?? [];
+        if (children.length > 0) {
+          rows.push({ type: 'task', task, indent: 2 });
+          for (const child of children) {
+            rows.push({ type: 'task', task: child, indent: 3 });
+          }
+        } else {
+          rows.push({ type: 'task', task, indent: 2 });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
 export default function GanttChart({
   tasks,
-  projects: _projects,
+  projects,
+  categories,
   includeCompleted,
   onIncludeCompletedChange,
   onTaskChange: _onTaskChange,
@@ -124,23 +180,24 @@ export default function GanttChart({
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
 
-  const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => {
-      const uA = (a as Task & { urgency?: number }).urgency ?? 0;
-      const uB = (b as Task & { urgency?: number }).urgency ?? 0;
-      if (uB !== uA) return uB - uA;
-      return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
-    });
-  }, [tasks]);
+  const hierarchicalRows = useMemo(
+    () => buildHierarchicalRows(tasks, projects, categories),
+    [tasks, projects, categories]
+  );
+  const taskRows = useMemo(
+    () => hierarchicalRows.filter((r): r is Extract<GanttRow, { type: 'task' }> => r.type === 'task'),
+    [hierarchicalRows]
+  );
 
   const { rangeStart, rangeEnd, columnWidth, totalWidth, totalColumns } = useMemo(() => {
-    const allStarts = sortedTasks.map((t) => new Date(t.start_date));
-    const allEnds = sortedTasks.map((t) => new Date(t.end_date));
+    const allTasks = taskRows.map((r) => r.task);
+    const allStarts = allTasks.map((t: Task) => new Date(t.start_date));
+    const allEnds = allTasks.map((t: Task) => new Date(t.end_date));
     const minDate = allStarts.length
-      ? new Date(Math.min(...allStarts.map((d) => d.getTime())))
+      ? new Date(Math.min(...allStarts.map((d: Date) => d.getTime())))
       : new Date();
     const maxTaskEnd = allEnds.length
-      ? new Date(Math.max(...allEnds.map((d) => d.getTime())))
+      ? new Date(Math.max(...allEnds.map((d: Date) => d.getTime())))
       : addDays(new Date(), 14);
     const horizon = addYears(new Date(), YEARS_AHEAD);
     const maxDate = maxTaskEnd.getTime() > horizon.getTime() ? maxTaskEnd : horizon;
@@ -149,7 +206,7 @@ export default function GanttChart({
     let colCount: number;
     const colWidth = viewMode === 'Month' ? 80 : viewMode === 'Week' ? 56 : 48;
 
-    if (viewMode === 'Hour' || viewMode === 'Day') {
+    if (viewMode === 'Day') {
       start = toStartOfDay(minDate);
       start.setDate(start.getDate() - 7);
       const end = toStartOfDay(maxDate);
@@ -182,7 +239,7 @@ export default function GanttChart({
       totalWidth: colCount * colWidth,
       totalColumns: colCount,
     };
-  }, [sortedTasks, viewMode]);
+  }, [taskRows, viewMode]);
 
   const [scrollState, setScrollState] = useState({ scrollLeft: 0, width: 800 });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -271,7 +328,7 @@ export default function GanttChart({
   const todayX = dateToX(new Date());
   const todayInRange = todayX >= 0 && todayX <= totalWidth;
 
-  if (sortedTasks.length === 0) {
+  if (taskRows.length === 0 && hierarchicalRows.length === 0) {
     return (
       <div className="gantt-chart-wrap">
         <div className="gantt-empty">
@@ -282,7 +339,7 @@ export default function GanttChart({
   }
 
   const rowHeight = 36;
-  const listWidth = 200;
+  const listWidth = 340;
 
   return (
     <div className="gantt-chart-wrap">
@@ -318,7 +375,7 @@ export default function GanttChart({
       </div>
 
       <div className="gantt-toolbar">
-        {(['Hour', 'Day', 'Week', 'Month'] as const).map((m) => (
+        {(['Day', 'Week', 'Month'] as const).map((m) => (
           <button
             key={m}
             className={viewMode === m ? 'active' : ''}
@@ -336,26 +393,44 @@ export default function GanttChart({
       >
         <div
           className="gantt-inner"
-          style={{ minWidth: listWidth + totalWidth, minHeight: 40 + sortedTasks.length * rowHeight }}
+          style={{ minWidth: listWidth + totalWidth, minHeight: 40 + hierarchicalRows.length * rowHeight }}
         >
         <div className="gantt-list" style={{ width: listWidth }}>
           <div className="gantt-list-header">
-            <span>Task</span>
-            <span>From</span>
-            <span>To</span>
+            <span className="gantt-hdr-task">Task</span>
+            <span className="gantt-hdr-from">From</span>
+            <span className="gantt-hdr-to">To</span>
           </div>
-          {sortedTasks.map((task) => {
+          {hierarchicalRows.map((row) => {
+            if (row.type === 'category') {
+              return (
+                <div key={row.id} className="gantt-list-row gantt-row-category">
+                  <span className="gantt-list-name" style={{ fontWeight: 600, paddingLeft: 0 }}>{row.category.name}</span>
+                  <span className="gantt-list-date">—</span>
+                  <span className="gantt-list-date">—</span>
+                </div>
+              );
+            }
+            if (row.type === 'project') {
+              return (
+                <div key={row.id} className="gantt-list-row gantt-row-project">
+                  <span className="gantt-list-name" style={{ paddingLeft: 16 }}>{row.project.name}</span>
+                  <span className="gantt-list-date">—</span>
+                  <span className="gantt-list-date">—</span>
+                </div>
+              );
+            }
             return (
               <div
-                key={task.id}
-                className={`gantt-list-row ${task.completed ? 'completed' : ''}`}
+                key={row.task.id}
+                className={`gantt-list-row ${row.task.completed ? 'completed' : ''}`}
               >
-                <span className="gantt-list-name">{task.name}</span>
+                <span className="gantt-list-name" style={{ paddingLeft: 16 + row.indent * 12 }}>{row.task.name}</span>
                 <span className="gantt-list-date">
-                  {new Date(task.start_date).toLocaleDateString()}
+                  {new Date(row.task.start_date).toLocaleDateString()}
                 </span>
                 <span className="gantt-list-date">
-                  {new Date(task.end_date).toLocaleDateString()}
+                  {new Date(row.task.end_date).toLocaleDateString()}
                 </span>
               </div>
             );
@@ -397,11 +472,15 @@ export default function GanttChart({
                   style={{
                     left: todayX,
                     top: 0,
-                    height: sortedTasks.length * rowHeight,
+                    height: hierarchicalRows.length * rowHeight,
                   }}
                 />
               )}
-              {sortedTasks.map((task) => {
+              {hierarchicalRows.map((row) => {
+                if (row.type !== 'task') {
+                  return <div key={row.id} className="gantt-row gantt-row-empty" style={{ height: rowHeight }} />;
+                }
+                const { task } = row;
                 const { x, w } = getBarLayout(task);
                 const tier = Math.max(1, Math.min(10, task.base_priority ?? 5));
                 const colors = task.completed

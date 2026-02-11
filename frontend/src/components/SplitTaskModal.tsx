@@ -24,6 +24,8 @@ export default function SplitTaskModal({ task, onClose, onSplit }: Props) {
     setSubtasks((s) => {
       const n = [...s];
       n[i] = { ...n[i], [field]: value };
+      if (field === 'start_date' && n[i].end_date < value) n[i].end_date = value;
+      if (field === 'end_date' && n[i].start_date > value) n[i].start_date = value;
       return n;
     });
   }
@@ -37,6 +39,11 @@ export default function SplitTaskModal({ task, onClose, onSplit }: Props) {
     const valid = subtasks.filter((st) => st.name && st.start_date && st.end_date);
     if (valid.length < 2) {
       alert('Need at least 2 subtasks with names and dates');
+      return;
+    }
+    const bad = valid.some((st) => st.end_date < st.start_date);
+    if (bad) {
+      alert('End date cannot be before start date for any subtask');
       return;
     }
     onSplit(task.id, valid);
@@ -64,6 +71,7 @@ export default function SplitTaskModal({ task, onClose, onSplit }: Props) {
               <input
                 type="date"
                 value={st.end_date}
+                min={st.start_date}
                 onChange={(e) => updateSubtask(i, 'end_date', e.target.value)}
               />
               <button type="button" onClick={() => removeSubtask(i)} disabled={subtasks.length <= 2}>

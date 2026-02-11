@@ -76,14 +76,50 @@
   color: var(--text-muted);
 }
 
-.cat-item, .proj-item {
+.cat-block {
+  margin-bottom: 4px;
+}
+
+.cat-item {
   padding: 2px 0;
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cat-item .cat-name {
+  flex: 1;
 }
 
 .proj-item {
-  padding-left: 12px;
+  padding: 2px 0 2px 12px;
+  font-size: 12px;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.proj-item span {
+  flex: 1;
+}
+
+.sidebar-edit {
+  padding: 2px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.sidebar-edit:hover {
+  opacity: 1;
+  background: var(--bg-elevated);
 }
 
 .btn-link {
