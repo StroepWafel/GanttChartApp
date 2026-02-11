@@ -11,6 +11,6 @@ module.exports = {
     env: {
       NODE_ENV: 'production',
     },
-    env_file: path.join(__dirname, 'backend/.env'),
+    env_file: path.join(__dirname, '.env'),
   }],
 };

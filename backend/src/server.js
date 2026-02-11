@@ -1,10 +1,6 @@
-import dotenv from 'dotenv';
+import './load-env.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '../../.env') });
-dotenv.config({ path: path.join(__dirname, '../.env') });
 import express from 'express';
 import cors from 'cors';
 
@@ -17,6 +13,7 @@ import clearRouter from './routes/clear.js';
 import authRouter from './routes/auth.js';
 import apiRouter from './routes/api.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
 
 // Frontend dist: when running from backend/, it's ../frontend/dist

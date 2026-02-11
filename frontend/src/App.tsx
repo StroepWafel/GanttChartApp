@@ -8,7 +8,9 @@ export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('gantt_token'));
 
   useEffect(() => {
-    getAuthStatus().then((d) => setAuthEnabled(d.enabled));
+    getAuthStatus()
+      .then((d) => setAuthEnabled(d.enabled))
+      .catch(() => setAuthEnabled(false));
   }, []);
 
   if (authEnabled === null) {

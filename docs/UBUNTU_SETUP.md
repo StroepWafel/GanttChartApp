@@ -315,3 +315,18 @@ If using cloudflared with PM2:
 ```bash
 pm2 restart gantt-tunnel
 ```
+
+---
+
+## Troubleshooting
+
+**Gray / blank screen when visiting the app**
+- Ensure you ran `npm run build:frontend` (or `npm run build`) before starting. The backend serves the built frontend from `frontend/dist/`. If that folder is empty or missing, the app will not load.
+- Check the browser console (F12 → Console) for errors. Common: 404 on `/assets/...` (rebuild frontend), or CORS/network errors (check backend is running).
+
+**Auth shows "disabled" despite AUTH_ENABLED=true**
+- The `.env` file must be in the **project root** (same folder as `package.json` and `ecosystem.config.cjs`), not in `backend/`.
+- After changing `.env`, restart PM2: `pm2 restart gantt-api`
+
+**API returns 401 or blank**
+- If auth is enabled, you must log in first. Visit the app URL and use the credentials from `.env`.
