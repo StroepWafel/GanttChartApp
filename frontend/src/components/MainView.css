@@ -61,6 +61,13 @@
   .btn-sm-label {
     display: none;
   }
+
+  .btn-sm-completed,
+  .btn-sm-settings {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 12px;
+  }
 }
 
 .btn-sm {

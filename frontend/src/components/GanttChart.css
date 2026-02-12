@@ -148,6 +148,13 @@
   box-shadow: 4px 0 8px rgba(0, 0, 0, 0.2);
 }
 
+@media (max-width: 768px) {
+  .gantt-list {
+    position: relative;
+    box-shadow: none;
+  }
+}
+
 .gantt-list-header {
   position: sticky;
   top: 0;
@@ -283,18 +290,20 @@
   .gantt-row-expand {
     min-width: 44px;
     min-height: 44px;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
   }
 
   .gantt-expand-btn {
     width: 28px;
     height: 28px;
+    flex-shrink: 0;
   }
 
   .gantt-expand-spacer {
     width: 28px;
     height: 28px;
+    flex-shrink: 0;
   }
 }
 
