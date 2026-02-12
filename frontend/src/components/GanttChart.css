@@ -92,6 +92,9 @@
   flex: 1;
   min-height: 200px;
   overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--bg);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -169,8 +172,8 @@
 @media (max-width: 768px) {
   .gantt-list-header {
     position: relative;
-    grid-template-columns: 44px minmax(140px, 1fr) 52px 52px;
-    gap: 4px;
+    grid-template-columns: 68px minmax(100px, 1fr) 58px 58px;
+    gap: 6px;
     padding: 0 6px 0 8px;
     font-size: 10px;
     height: 36px;
@@ -180,7 +183,7 @@
 
 @media (max-width: 480px) {
   .gantt-list-header {
-    grid-template-columns: 44px minmax(100px, 1fr) 44px 44px;
+    grid-template-columns: 68px minmax(60px, 1fr) 52px 52px;
     gap: 4px;
     padding: 0 4px 0 6px;
     font-size: 9px;
@@ -210,8 +213,8 @@
 
 @media (max-width: 768px) {
   .gantt-list-row {
-    grid-template-columns: 44px minmax(140px, 1fr) 52px 52px;
-    gap: 4px;
+    grid-template-columns: 68px minmax(100px, 1fr) 58px 58px;
+    gap: 6px;
     padding: 0 6px 0 8px;
     font-size: 11px;
     height: 34px;
@@ -221,7 +224,7 @@
 
 @media (max-width: 480px) {
   .gantt-list-row {
-    grid-template-columns: 44px minmax(100px, 1fr) 44px 44px;
+    grid-template-columns: 68px minmax(60px, 1fr) 52px 52px;
     gap: 4px;
     padding: 0 4px 0 6px;
     font-size: 10px;
@@ -235,6 +238,10 @@
   text-align: right;
   font-size: 10px;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .gantt-row-expand {

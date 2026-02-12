@@ -30,6 +30,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
   padding: 6px 12px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -69,11 +70,16 @@
   gap: 6px;
   padding: 6px 14px;
   font-size: 12px;
+  line-height: 1;
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: var(--radius-sm);
   transition: background 0.15s ease;
+}
+
+.btn-sm svg {
+  vertical-align: middle;
 }
 
 .btn-sm:hover:not(:disabled) {

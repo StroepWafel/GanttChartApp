@@ -185,6 +185,15 @@ export default function GanttChart({
   onTaskEdit,
 }: Props) {
   const { isMobile, isSmallMobile } = useMediaQuery();
+
+  const formatDate = useCallback(
+    (d: Date) => {
+      if (isSmallMobile) return d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' });
+      if (isMobile) return d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: '2-digit' });
+      return d.toLocaleDateString();
+    },
+    [isMobile, isSmallMobile]
+  );
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
@@ -475,7 +484,7 @@ export default function GanttChart({
   }
 
   const rowHeight = isSmallMobile ? 32 : isMobile ? 34 : 36;
-  const listWidth = isSmallMobile ? 220 : isMobile ? 300 : 420;
+  const listWidth = isSmallMobile ? 260 : isMobile ? 360 : 420;
 
   return (
     <div className="gantt-chart-wrap">
@@ -562,10 +571,10 @@ export default function GanttChart({
                   </div>
                   <span className="gantt-list-name">{row.category.name}</span>
                   <span className="gantt-list-date">
-                    {catSpan ? new Date(catSpan.start).toLocaleDateString() : '—'}
+                    {catSpan ? formatDate(new Date(catSpan.start)) : '—'}
                   </span>
                   <span className="gantt-list-date">
-                    {catSpan ? new Date(catSpan.end).toLocaleDateString() : '—'}
+                    {catSpan ? formatDate(new Date(catSpan.end)) : '—'}
                   </span>
                 </div>
               );
@@ -593,10 +602,10 @@ export default function GanttChart({
                   </div>
                   <span className="gantt-list-name" style={{ paddingLeft: 8 }}>{row.project.name}</span>
                   <span className="gantt-list-date">
-                    {span ? new Date(span.start).toLocaleDateString() : '—'}
+                    {span ? formatDate(new Date(span.start)) : '—'}
                   </span>
                   <span className="gantt-list-date">
-                    {span ? new Date(span.end).toLocaleDateString() : '—'}
+                    {span ? formatDate(new Date(span.end)) : '—'}
                   </span>
                 </div>
               );
@@ -626,10 +635,10 @@ export default function GanttChart({
                 </div>
                 <span className="gantt-list-name" style={{ paddingLeft: 8 + row.indent * 14 }}>{row.task.name}</span>
                 <span className="gantt-list-date">
-                  {new Date(row.task.start_date).toLocaleDateString()}
+                  {formatDate(new Date(row.task.start_date))}
                 </span>
                 <span className="gantt-list-date">
-                  {new Date(row.task.end_date).toLocaleDateString()}
+                  {formatDate(new Date(row.task.end_date))}
                 </span>
               </div>
             );
