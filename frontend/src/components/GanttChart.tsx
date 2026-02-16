@@ -302,10 +302,10 @@ export default function GanttChart({
     const minDate = allStarts.length
       ? new Date(Math.min(...allStarts.map((d: Date) => d.getTime())))
       : new Date();
-    const latestRelevant = relevantDates.length
+    const furthestDue = relevantDates.length
       ? new Date(Math.max(...relevantDates.map((d: Date) => d.getTime())))
       : addDays(new Date(), 14);
-    const maxDate = addDays(latestRelevant, 7);
+    const maxDate = addDays(furthestDue, 7);
 
     let start: Date;
     let colCount: number;
@@ -386,11 +386,13 @@ export default function GanttChart({
     return Math.max(0, (ms / rangeMs) * totalWidth);
   }
 
+  const MIN_BAR_WIDTH = 90;
+
   function getBarLayout(task: Task) {
     const start = new Date(task.start_date);
     const end = new Date(task.end_date);
     const x = dateToX(start);
-    const w = Math.max(24, dateToX(end) - x);
+    const w = Math.max(MIN_BAR_WIDTH, dateToX(end) - x);
     return { x, w };
   }
 

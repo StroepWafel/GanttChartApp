@@ -11,6 +11,7 @@ import projectsRouter from './routes/projects.js';
 import tasksRouter from './routes/tasks.js';
 import ganttExpandedRouter from './routes/gantt-expanded.js';
 import clearRouter from './routes/clear.js';
+import backupRouter from './routes/backup.js';
 import authRouter from './routes/auth.js';
 import apiRouter from './routes/api.js';
 
@@ -36,6 +37,7 @@ app.use('/api/projects', optionalAuth, projectsRouter);
 app.use('/api/tasks', optionalAuth, tasksRouter);
 app.use('/api/gantt-expanded', optionalAuth, ganttExpandedRouter);
 app.use('/api/clear', optionalAuth, clearRouter);
+app.use('/api/backup', optionalAuth, backupRouter);
 
 // Serve frontend in production
 app.use(express.static(frontendDist));

@@ -33,6 +33,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [deleteCategoryConfirm, setDeleteCategoryConfirm] = useState<Category | null>(null);
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<Project | null>(null);
+  const [restoreConfirmData, setRestoreConfirmData] = useState<Record<string, unknown> | null>(null);
   const { isMobile } = useMediaQuery();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
@@ -123,6 +124,52 @@ export default function MainView({ authEnabled, onLogout }: Props) {
     await load();
     setShowSettings(false);
     setShowClearAllConfirm(false);
+  }
+
+  async function handleDownloadBackup() {
+    try {
+      const blob = await api.downloadBackup();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gantt-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to download backup');
+    }
+  }
+
+  function handleRestoreFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string) as Record<string, unknown>;
+        if (!Array.isArray(data.categories) || !Array.isArray(data.projects) || !Array.isArray(data.tasks)) {
+          alert('Invalid backup file');
+          return;
+        }
+        setRestoreConfirmData(data);
+      } catch {
+        alert('Invalid backup file');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleConfirmRestore() {
+    if (!restoreConfirmData) return;
+    try {
+      await api.restoreBackup(restoreConfirmData);
+      await load();
+      setRestoreConfirmData(null);
+      setShowSettings(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to restore backup');
+    }
   }
 
   return (
@@ -313,15 +360,47 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Settings</h3>
-            <button
-              className="btn-danger"
-              onClick={() => setShowClearAllConfirm(true)}
-            >
-              Clear all data
-            </button>
+            <div className="settings-section">
+              <h4>Backup</h4>
+              <div className="settings-actions">
+                <button className="btn-sm" onClick={handleDownloadBackup}>
+                  Download backup
+                </button>
+                <label className="btn-sm btn-sm-restore">
+                  Restore backup
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleRestoreFileSelect}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="settings-section">
+              <h4>Danger zone</h4>
+              <button
+                className="btn-danger"
+                onClick={() => setShowClearAllConfirm(true)}
+              >
+                Clear all data
+              </button>
+            </div>
             <button className="btn-sm" onClick={() => setShowSettings(false)}>Close</button>
           </div>
         </div>
+      )}
+
+      {restoreConfirmData && (
+        <ConfirmModal
+          title="Restore backup"
+          message="This will replace all current data with the backup. This cannot be undone. Continue?"
+          confirmLabel="Restore"
+          cancelLabel="Cancel"
+          onConfirm={handleConfirmRestore}
+          onCancel={() => setRestoreConfirmData(null)}
+          variant="danger"
+        />
       )}
 
       {showClearAllConfirm && (

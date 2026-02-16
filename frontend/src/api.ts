@@ -163,3 +163,20 @@ export async function clearAllData() {
   const res = await fetchApi('/clear', { method: 'DELETE' });
   return res.json();
 }
+
+export async function downloadBackup(): Promise<Blob> {
+  const res = await fetchApi('/backup');
+  if (!res.ok) throw new Error('Failed to download backup');
+  return res.blob();
+}
+
+export async function restoreBackup(data: Record<string, unknown>): Promise<void> {
+  const res = await fetchApi('/backup', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to restore backup');
+  }
+}
