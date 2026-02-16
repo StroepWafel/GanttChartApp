@@ -458,6 +458,10 @@
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
+.gantt-bar-narrow .gantt-bar-label {
+  padding-right: 10px;
+}
+
 .gantt-bar-actions {
   position: absolute;
   right: 6px;
@@ -563,4 +567,59 @@
 
 .gantt-context-menu button.danger {
   color: var(--danger);
+}
+
+/* Hover actions for narrow task bars */
+.gantt-hover-actions {
+  position: fixed;
+  z-index: 1001;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 160px;
+}
+
+.gantt-hover-actions-name {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-hover-actions-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gantt-hover-actions-btns button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  min-width: 28px;
+  height: 28px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.gantt-hover-actions-btns button:hover {
+  background: var(--bg-elevated);
+}
+
+.gantt-hover-actions-btns button.danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
 }

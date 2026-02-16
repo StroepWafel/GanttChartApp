@@ -10,6 +10,12 @@ import CategoryProjectForm from './CategoryProjectForm';
 import ClearAllConfirmModal from './ClearAllConfirmModal';
 import ConfirmModal from './ConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import {
+  loadPriorityColors,
+  savePriorityColors,
+  DEFAULT_PRIORITY_COLORS,
+  type PriorityColors,
+} from '../priorityColors';
 import './MainView.css';
 
 interface Props {
@@ -34,6 +40,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [deleteCategoryConfirm, setDeleteCategoryConfirm] = useState<Category | null>(null);
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<Project | null>(null);
   const [restoreConfirmData, setRestoreConfirmData] = useState<Record<string, unknown> | null>(null);
+  const [priorityColors, setPriorityColors] = useState<PriorityColors>(() => loadPriorityColors());
   const { isMobile } = useMediaQuery();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
@@ -158,6 +165,22 @@ export default function MainView({ authEnabled, onLogout }: Props) {
       }
     };
     reader.readAsText(file);
+  }
+
+  function handlePriorityColorChange(priorities: number[], field: 'bg' | 'progress', value: string) {
+    setPriorityColors((prev) => {
+      const next = { ...prev };
+      for (const p of priorities) {
+        next[p] = { ...(next[p] ?? DEFAULT_PRIORITY_COLORS[p]), [field]: value };
+      }
+      savePriorityColors(next);
+      return next;
+    });
+  }
+
+  function handleResetPriorityColors() {
+    setPriorityColors({ ...DEFAULT_PRIORITY_COLORS });
+    savePriorityColors(DEFAULT_PRIORITY_COLORS);
   }
 
   async function handleConfirmRestore() {
@@ -299,6 +322,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
             tasks={tasks}
             projects={projects}
             categories={categories}
+            priorityColors={priorityColors}
             includeCompleted={includeCompleted}
             onIncludeCompletedChange={setIncludeCompleted}
             onTaskChange={handleUpdateTask}
@@ -360,6 +384,51 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Settings</h3>
+            <div className="settings-section">
+              <h4>Priority colors</h4>
+              <p className="settings-desc">Customize the colors used for task priority (1 low → 10 high).</p>
+              <div className="priority-colors-grid">
+                {[
+                  [1, 2],
+                  [3, 4],
+                  [5, 6],
+                  [7],
+                  [8],
+                  [9],
+                  [10],
+                ].map((priorities) => {
+                  const p = priorities[0];
+                  const colors = priorityColors[p] ?? DEFAULT_PRIORITY_COLORS[p];
+                  const label = priorities.length > 1 ? `${priorities[0]}-${priorities[1]}` : String(p);
+                  return (
+                    <div key={label} className="priority-color-row">
+                      <span className="priority-color-label">{label}</span>
+                      <input
+                        type="color"
+                        value={colors.bg}
+                        onChange={(e) => handlePriorityColorChange(priorities, 'bg', e.target.value)}
+                        title={`Background ${label}`}
+                      />
+                      <input
+                        type="color"
+                        value={colors.progress}
+                        onChange={(e) => handlePriorityColorChange(priorities, 'progress', e.target.value)}
+                        title={`Progress ${label}`}
+                      />
+                      <span
+                        className="priority-color-preview"
+                        style={{
+                          background: `linear-gradient(to right, ${colors.progress} 0%, ${colors.bg} 100%)`,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <button type="button" className="btn-sm btn-sm-muted" onClick={handleResetPriorityColors}>
+                Reset to defaults
+              </button>
+            </div>
             <div className="settings-section">
               <h4>Backup</h4>
               <div className="settings-actions">

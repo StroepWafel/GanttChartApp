@@ -3,28 +3,19 @@ import { ChevronDown, ChevronRight, Pencil, Split, Trash2 } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
+import type { PriorityColors } from '../priorityColors';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import './GanttChart.css';
 
 type ViewMode = 'Day' | 'Week' | 'Month';
 
-const PRIORITY_COLORS: Record<number, { bg: string; progress: string }> = {
-  1: { bg: '#64748b', progress: '#94a3b8' },
-  2: { bg: '#64748b', progress: '#94a3b8' },
-  3: { bg: '#6366f1', progress: '#818cf8' },
-  4: { bg: '#6366f1', progress: '#818cf8' },
-  5: { bg: '#0ea5e9', progress: '#38bdf8' },
-  6: { bg: '#0ea5e9', progress: '#38bdf8' },
-  7: { bg: '#22c55e', progress: '#4ade80' },
-  8: { bg: '#eab308', progress: '#facc15' },
-  9: { bg: '#f97316', progress: '#fb923c' },
-  10: { bg: '#ef4444', progress: '#f87171' },
-};
+import { DEFAULT_PRIORITY_COLORS } from '../priorityColors';
 
 interface Props {
   tasks: Task[];
   projects: Project[];
   categories: Category[];
+  priorityColors?: PriorityColors;
   includeCompleted: boolean;
   onIncludeCompletedChange: (v: boolean) => void;
   onTaskChange: (id: number, data: { start_date?: string; end_date?: string; progress?: number }) => void;
@@ -181,6 +172,7 @@ export default function GanttChart({
   tasks,
   projects,
   categories,
+  priorityColors = DEFAULT_PRIORITY_COLORS,
   includeCompleted,
   onIncludeCompletedChange,
   onTaskChange: _onTaskChange,
@@ -204,6 +196,8 @@ export default function GanttChart({
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<Task | null>(null);
+  const [hoverActions, setHoverActions] = useState<{ task: Task; x: number; y: number } | null>(null);
+  const hoverLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expanded, setExpanded] = useState<ExpandedState>({
     category: {},
     project: {},
@@ -386,13 +380,13 @@ export default function GanttChart({
     return Math.max(0, (ms / rangeMs) * totalWidth);
   }
 
-  const MIN_BAR_WIDTH = 90;
+  const BAR_ACTIONS_THRESHOLD = 85;
 
   function getBarLayout(task: Task) {
     const start = new Date(task.start_date);
     const end = new Date(task.end_date);
     const x = dateToX(start);
-    const w = Math.max(MIN_BAR_WIDTH, dateToX(end) - x);
+    const w = Math.max(24, dateToX(end) - x);
     return { x, w };
   }
 
@@ -527,21 +521,26 @@ export default function GanttChart({
         <div className="priority-strip">
           <span className="priority-label">Priority:</span>
           {[
-            [1, 2, '#64748b'],
-            [3, 4, '#6366f1'],
-            [5, 6, '#0ea5e9'],
-            [7, 7, '#22c55e'],
-            [8, 8, '#eab308'],
-            [9, 9, '#f97316'],
-            [10, 10, '#ef4444'],
-          ].map(([lo, hi, color]) => (
-            <span
-              key={String(lo)}
-              className="priority-swatch"
-              style={{ backgroundColor: color as string }}
-              title={`${lo}-${hi}`}
-            />
-          ))}
+            [1, 2],
+            [3, 4],
+            [5, 6],
+            [7],
+            [8],
+            [9],
+            [10],
+          ].map((priorities) => {
+            const p = priorities[0];
+            const colors = priorityColors[p] ?? DEFAULT_PRIORITY_COLORS[p];
+            const label = priorities.length > 1 ? `${p}-${priorities[1]}` : String(p);
+            return (
+              <span
+                key={label}
+                className="priority-swatch"
+                style={{ backgroundColor: colors.bg }}
+                title={label}
+              />
+            );
+          })}
           <span className="priority-range">1 low → 10 high</span>
         </div>
       </div>
@@ -754,10 +753,11 @@ export default function GanttChart({
                 }
                 const { task } = row;
                 const { x, w } = getBarLayout(task);
+                const showInlineActions = w >= BAR_ACTIONS_THRESHOLD;
                 const tier = Math.max(1, Math.min(10, task.base_priority ?? 5));
                 const colors = task.completed
                   ? { bg: '#475569', progress: '#64748b' }
-                  : PRIORITY_COLORS[tier];
+                  : (priorityColors[tier] ?? DEFAULT_PRIORITY_COLORS[tier]);
                 const progressW = (task.progress / 100) * w;
 
                 return (
@@ -767,7 +767,7 @@ export default function GanttChart({
                     style={{ height: rowHeight }}
                   >
                     <div
-                      className={`gantt-bar ${task.completed ? 'completed' : ''}`}
+                      className={`gantt-bar ${task.completed ? 'completed' : ''} ${!showInlineActions ? 'gantt-bar-narrow' : ''}`}
                       style={{
                         left: x,
                         width: w,
@@ -775,9 +775,22 @@ export default function GanttChart({
                       }}
                       onMouseEnter={(e) => {
                         const rect = (e.target as HTMLElement).getBoundingClientRect();
-                        setTooltip({ task, x: rect.left + rect.width / 2, y: rect.top });
+                        if (hoverLeaveTimerRef.current) {
+                          clearTimeout(hoverLeaveTimerRef.current);
+                          hoverLeaveTimerRef.current = null;
+                        }
+                        if (showInlineActions) {
+                          setTooltip({ task, x: rect.left + rect.width / 2, y: rect.top });
+                          setHoverActions(null);
+                        } else {
+                          setTooltip(null);
+                          setHoverActions({ task, x: rect.left + rect.width / 2, y: rect.top });
+                        }
                       }}
-                      onMouseLeave={() => setTooltip(null)}
+                      onMouseLeave={() => {
+                        setTooltip(null);
+                        hoverLeaveTimerRef.current = setTimeout(() => setHoverActions(null), 150);
+                      }}
                       onContextMenu={(e) => handleBarContextMenu(e, task)}
                       onTouchStart={(e) => handleBarTouchStart(e, task)}
                       onTouchEnd={handleBarTouchEnd}
@@ -792,36 +805,38 @@ export default function GanttChart({
                         }}
                       />
                       <span className="gantt-bar-label">{task.name}</span>
-                      <div className="gantt-bar-actions">
-                        <button
-                          type="button"
-                          className="gantt-bar-btn"
-                          onClick={(e) => handleSplitClick(e, task)}
-                          title="Split task"
-                          aria-label="Split task"
-                          disabled={task.completed}
-                        >
-                          <Split size={12} />
-                        </button>
-                        <button
-                          type="button"
-                          className="gantt-bar-btn"
-                          onClick={(e) => handleEditClick(e, task)}
-                          title="Edit task"
-                          aria-label="Edit task"
-                        >
-                          <Pencil size={12} />
-                        </button>
-                        <button
-                          type="button"
-                          className="gantt-bar-btn gantt-bar-btn-danger"
-                          onClick={(e) => handleDeleteClick(e, task)}
-                          title="Delete task"
-                          aria-label="Delete task"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
+                      {showInlineActions && (
+                        <div className="gantt-bar-actions">
+                          <button
+                            type="button"
+                            className="gantt-bar-btn"
+                            onClick={(e) => handleSplitClick(e, task)}
+                            title="Split task"
+                            aria-label="Split task"
+                            disabled={task.completed}
+                          >
+                            <Split size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="gantt-bar-btn"
+                            onClick={(e) => handleEditClick(e, task)}
+                            title="Edit task"
+                            aria-label="Edit task"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="gantt-bar-btn gantt-bar-btn-danger"
+                            onClick={(e) => handleDeleteClick(e, task)}
+                            title="Delete task"
+                            aria-label="Delete task"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -865,6 +880,71 @@ export default function GanttChart({
           ) : (
             <button onClick={handleUncompleteTask}>Mark incomplete</button>
           )}
+          <button onClick={() => { onTaskEdit(contextMenu.task); setContextMenu(null); }}>
+            Edit
+          </button>
+          {!contextMenu.task.completed && (
+            <button onClick={() => { onTaskSplit(contextMenu.task); setContextMenu(null); }}>
+              Split
+            </button>
+          )}
+          <button onClick={() => { setDeleteConfirmTask(contextMenu.task); setContextMenu(null); }} className="danger">
+            Delete
+          </button>
+        </div>
+      )}
+
+      {hoverActions && (
+        <div
+          className="gantt-hover-actions"
+          style={{
+            left: hoverActions.x,
+            top: hoverActions.y - 8,
+            transform: 'translate(-50%, -100%)',
+          }}
+          onMouseEnter={() => {
+            if (hoverLeaveTimerRef.current) {
+              clearTimeout(hoverLeaveTimerRef.current);
+              hoverLeaveTimerRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            hoverLeaveTimerRef.current = setTimeout(() => setHoverActions(null), 100);
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="gantt-hover-actions-name">{hoverActions.task.name}</div>
+          <div className="gantt-hover-actions-btns">
+            {!hoverActions.task.completed && (
+              <button
+                type="button"
+                onClick={(e) => { handleSplitClick(e, hoverActions.task); setHoverActions(null); }}
+                title="Split task"
+              >
+                <Split size={14} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => { handleEditClick(e, hoverActions.task); setHoverActions(null); }}
+              title="Edit task"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              type="button"
+              className="danger"
+              onClick={(e) => { handleDeleteClick(e, hoverActions.task); setHoverActions(null); }}
+              title="Delete task"
+            >
+              <Trash2 size={14} />
+            </button>
+            {!hoverActions.task.completed ? (
+              <button type="button" onClick={() => { onTaskComplete(hoverActions.task.id); setHoverActions(null); }}>Complete</button>
+            ) : (
+              <button type="button" onClick={() => { onTaskUncomplete(hoverActions.task.id); setHoverActions(null); }}>Incomplete</button>
+            )}
+          </div>
         </div>
       )}
 

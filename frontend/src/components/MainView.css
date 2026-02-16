@@ -300,6 +300,57 @@
   margin: 0;
 }
 
+.settings-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.priority-colors-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.priority-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.priority-color-label {
+  font-size: 12px;
+  min-width: 28px;
+  color: var(--text-muted);
+}
+
+.priority-color-row input[type="color"] {
+  width: 36px;
+  height: 28px;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.priority-color-preview {
+  width: 48px;
+  height: 20px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.btn-sm-muted {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.btn-sm-muted:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
