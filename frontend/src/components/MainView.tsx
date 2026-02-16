@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -41,6 +41,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<Project | null>(null);
   const [restoreConfirmData, setRestoreConfirmData] = useState<Record<string, unknown> | null>(null);
   const [priorityColors, setPriorityColors] = useState<PriorityColors>(() => loadPriorityColors());
+  const [showPriorityColors, setShowPriorityColors] = useState(false);
   const { isMobile } = useMediaQuery();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
@@ -384,50 +385,66 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Settings</h3>
-            <div className="settings-section">
-              <h4>Priority colors</h4>
-              <p className="settings-desc">Customize the colors used for task priority (1 low → 10 high).</p>
-              <div className="priority-colors-grid">
-                {[
-                  [1, 2],
-                  [3, 4],
-                  [5, 6],
-                  [7],
-                  [8],
-                  [9],
-                  [10],
-                ].map((priorities) => {
-                  const p = priorities[0];
-                  const colors = priorityColors[p] ?? DEFAULT_PRIORITY_COLORS[p];
-                  const label = priorities.length > 1 ? `${priorities[0]}-${priorities[1]}` : String(p);
-                  return (
-                    <div key={label} className="priority-color-row">
-                      <span className="priority-color-label">{label}</span>
-                      <input
-                        type="color"
-                        value={colors.bg}
-                        onChange={(e) => handlePriorityColorChange(priorities, 'bg', e.target.value)}
-                        title={`Background ${label}`}
-                      />
-                      <input
-                        type="color"
-                        value={colors.progress}
-                        onChange={(e) => handlePriorityColorChange(priorities, 'progress', e.target.value)}
-                        title={`Progress ${label}`}
-                      />
-                      <span
-                        className="priority-color-preview"
-                        style={{
-                          background: `linear-gradient(to right, ${colors.progress} 0%, ${colors.bg} 100%)`,
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <button type="button" className="btn-sm btn-sm-muted" onClick={handleResetPriorityColors}>
-                Reset to defaults
+            <div className="settings-section settings-dropdown">
+              <button
+                type="button"
+                className={`settings-dropdown-trigger ${showPriorityColors ? 'expanded' : ''}`}
+                onClick={() => setShowPriorityColors((v) => !v)}
+                aria-expanded={showPriorityColors}
+              >
+                <span>Priority colors</span>
+                <ChevronDown size={16} className={showPriorityColors ? 'rotated' : ''} />
               </button>
+              {showPriorityColors && (
+                <div className="settings-dropdown-content">
+                  <p className="settings-desc">Customize colors for each priority level (1 low → 10 high).</p>
+                  <div className="priority-colors-panel">
+                    <div className="priority-colors-header">
+                      <span className="priority-color-label">Level</span>
+                      <span className="priority-color-col-label">Fill</span>
+                      <span className="priority-color-col-label">Progress</span>
+                      <span className="priority-color-preview-label">Preview</span>
+                    </div>
+                    <div className="priority-colors-grid">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((p) => {
+                        const colors = priorityColors[p] ?? DEFAULT_PRIORITY_COLORS[p];
+                        return (
+                          <div key={p} className="priority-color-row">
+                            <span className="priority-color-label">{p}</span>
+                            <label className="priority-color-input-wrap">
+                              <input
+                                type="color"
+                                value={colors.bg}
+                                onChange={(e) => handlePriorityColorChange([p], 'bg', e.target.value)}
+                                title={`Background priority ${p}`}
+                              />
+                              <span className="priority-color-swatch" style={{ backgroundColor: colors.bg }} />
+                            </label>
+                            <label className="priority-color-input-wrap">
+                              <input
+                                type="color"
+                                value={colors.progress}
+                                onChange={(e) => handlePriorityColorChange([p], 'progress', e.target.value)}
+                                title={`Progress priority ${p}`}
+                              />
+                              <span className="priority-color-swatch" style={{ backgroundColor: colors.progress }} />
+                            </label>
+                            <span
+                              className="priority-color-preview"
+                              style={{
+                                background: `linear-gradient(to right, ${colors.progress} 0%, ${colors.bg} 100%)`,
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <button type="button" className="btn-sm btn-sm-muted" onClick={handleResetPriorityColors}>
+                      Reset to defaults
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="settings-section">
               <h4>Backup</h4>

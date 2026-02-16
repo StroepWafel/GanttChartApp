@@ -520,24 +520,14 @@ export default function GanttChart({
         </label>
         <div className="priority-strip">
           <span className="priority-label">Priority:</span>
-          {[
-            [1, 2],
-            [3, 4],
-            [5, 6],
-            [7],
-            [8],
-            [9],
-            [10],
-          ].map((priorities) => {
-            const p = priorities[0];
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((p) => {
             const colors = priorityColors[p] ?? DEFAULT_PRIORITY_COLORS[p];
-            const label = priorities.length > 1 ? `${p}-${priorities[1]}` : String(p);
             return (
               <span
-                key={label}
+                key={p}
                 className="priority-swatch"
                 style={{ backgroundColor: colors.bg }}
-                title={label}
+                title={String(p)}
               />
             );
           })}
