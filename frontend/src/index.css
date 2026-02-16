@@ -217,3 +217,14 @@ input, select, textarea {
   border-color: var(--accent);
   color: white;
 }
+
+.confirm-modal-message {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.confirm-modal-message strong {
+  color: var(--text);
+}

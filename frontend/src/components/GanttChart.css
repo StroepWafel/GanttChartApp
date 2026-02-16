@@ -447,7 +447,7 @@
   position: relative;
   z-index: 1;
   display: block;
-  padding: 0 10px;
+  padding: 0 82px 0 10px;
   font-size: 11px;
   font-weight: 500;
   color: white;
@@ -458,12 +458,30 @@
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
-.gantt-bar-edit {
+.gantt-bar-actions {
   position: absolute;
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.gantt-bar:hover .gantt-bar-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .gantt-bar .gantt-bar-actions {
+    opacity: 1;
+  }
+}
+
+.gantt-bar-btn {
   width: 22px;
   height: 22px;
   padding: 0;
@@ -476,22 +494,20 @@
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  transition: background 0.15s;
 }
 
-.gantt-bar:hover .gantt-bar-edit {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .gantt-bar .gantt-bar-edit {
-    opacity: 1;
-  }
-}
-
-.gantt-bar-edit:hover {
+.gantt-bar-btn:hover:not(:disabled) {
   background: rgba(0, 0, 0, 0.5);
+}
+
+.gantt-bar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gantt-bar-btn-danger:hover:not(:disabled) {
+  background: var(--danger);
 }
 
 /* Tooltip */

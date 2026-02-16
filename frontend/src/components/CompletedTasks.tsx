@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getCompletedTasks } from '../api';
 import { RotateCcw, Trash2 } from 'lucide-react';
 import type { Task } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface Props {
   onClose: () => void;
@@ -11,6 +12,7 @@ interface Props {
 
 export default function CompletedTasks({ onClose, onComplete, onDelete }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [deleteConfirmTask, setDeleteConfirmTask] = useState<Task | null>(null);
 
   useEffect(() => {
     getCompletedTasks().then(setTasks);
@@ -21,9 +23,12 @@ export default function CompletedTasks({ onClose, onComplete, onDelete }: Props)
     setTasks((t) => t.filter((x) => x.id !== id));
   }
 
-  function handleDelete(id: number) {
-    onDelete(id, true);
-    setTasks((t) => t.filter((x) => x.id !== id));
+  function handleConfirmDelete() {
+    if (deleteConfirmTask) {
+      onDelete(deleteConfirmTask.id, true);
+      setTasks((t) => t.filter((x) => x.id !== deleteConfirmTask.id));
+      setDeleteConfirmTask(null);
+    }
   }
 
   return (
@@ -49,7 +54,7 @@ export default function CompletedTasks({ onClose, onComplete, onDelete }: Props)
                   </button>
                   <button
                     className="btn-sm"
-                    onClick={() => handleDelete(t.id)}
+                    onClick={() => setDeleteConfirmTask(t)}
                     title="Delete"
                   >
                     <Trash2 size={14} />
@@ -61,6 +66,22 @@ export default function CompletedTasks({ onClose, onComplete, onDelete }: Props)
         </div>
         <button className="btn-sm" onClick={onClose}>Close</button>
       </div>
+
+      {deleteConfirmTask && (
+        <ConfirmModal
+          title="Delete task"
+          message={
+            <>
+              Delete <strong>{deleteConfirmTask.name}</strong>? This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteConfirmTask(null)}
+          variant="danger"
+        />
+      )}
     </div>
   );
 }

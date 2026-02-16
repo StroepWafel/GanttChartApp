@@ -7,6 +7,8 @@ import TaskForm from './TaskForm';
 import SplitTaskModal from './SplitTaskModal';
 import CompletedTasks from './CompletedTasks';
 import CategoryProjectForm from './CategoryProjectForm';
+import ClearAllConfirmModal from './ClearAllConfirmModal';
+import ConfirmModal from './ConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import './MainView.css';
 
@@ -28,6 +30,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  const [deleteCategoryConfirm, setDeleteCategoryConfirm] = useState<Category | null>(null);
+  const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<Project | null>(null);
   const { isMobile } = useMediaQuery();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
@@ -114,10 +119,10 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   }
 
   async function handleClearAll() {
-    if (!confirm('Delete all tasks, projects, and categories? This cannot be undone.')) return;
     await api.clearAllData();
     await load();
     setShowSettings(false);
+    setShowClearAllConfirm(false);
   }
 
   return (
@@ -200,9 +205,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                     <button
                       type="button"
                       className="sidebar-delete"
-                      onClick={() => {
-                        if (confirm(`Delete "${c.name}" and all its projects and tasks?`)) handleDeleteCategory(c.id);
-                      }}
+                      onClick={() => setDeleteCategoryConfirm(c)}
                       title="Delete category"
                       aria-label="Delete category"
                     >
@@ -226,7 +229,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         className="sidebar-delete"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Delete "${p.name}" and all its tasks?`)) handleDeleteProject(p.id);
+                          setDeleteProjectConfirm(p);
                         }}
                         title="Delete project"
                         aria-label="Delete project"
@@ -310,10 +313,60 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Settings</h3>
-            <button className="btn-danger" onClick={handleClearAll}>Clear all data</button>
+            <button
+              className="btn-danger"
+              onClick={() => setShowClearAllConfirm(true)}
+            >
+              Clear all data
+            </button>
             <button className="btn-sm" onClick={() => setShowSettings(false)}>Close</button>
           </div>
         </div>
+      )}
+
+      {showClearAllConfirm && (
+        <ClearAllConfirmModal
+          onConfirm={handleClearAll}
+          onCancel={() => setShowClearAllConfirm(false)}
+        />
+      )}
+
+      {deleteCategoryConfirm && (
+        <ConfirmModal
+          title="Delete category"
+          message={
+            <>
+              Delete <strong>{deleteCategoryConfirm.name}</strong> and all its projects and tasks? This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={() => {
+            handleDeleteCategory(deleteCategoryConfirm.id);
+            setDeleteCategoryConfirm(null);
+          }}
+          onCancel={() => setDeleteCategoryConfirm(null)}
+          variant="danger"
+        />
+      )}
+
+      {deleteProjectConfirm && (
+        <ConfirmModal
+          title="Delete project"
+          message={
+            <>
+              Delete <strong>{deleteProjectConfirm.name}</strong> and all its tasks? This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={() => {
+            handleDeleteProject(deleteProjectConfirm.id);
+            setDeleteProjectConfirm(null);
+          }}
+          onCancel={() => setDeleteProjectConfirm(null)}
+          variant="danger"
+        />
       )}
     </div>
   );

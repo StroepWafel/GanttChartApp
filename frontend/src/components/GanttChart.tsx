@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Split, Trash2 } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -202,6 +203,7 @@ export default function GanttChart({
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
+  const [deleteConfirmTask, setDeleteConfirmTask] = useState<Task | null>(null);
   const [expanded, setExpanded] = useState<ExpandedState>({
     category: {},
     project: {},
@@ -400,11 +402,25 @@ export default function GanttChart({
     return { x, w };
   }
 
-  const handleBarDoubleClick = useCallback(
-    (task: Task) => {
+  const handleSplitClick = useCallback(
+    (e: React.MouseEvent, task: Task) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setTooltip(null);
       if (!task.completed) onTaskSplit(task);
     },
     [onTaskSplit]
+  );
+
+  const handleDeleteClick = useCallback(
+    (e: React.MouseEvent, task: Task) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setTooltip(null);
+      setContextMenu(null);
+      setDeleteConfirmTask(task);
+    },
+    []
   );
 
   const handleEditClick = useCallback(
@@ -452,12 +468,12 @@ export default function GanttChart({
     }
   }, []);
 
-  const handleDeleteTask = useCallback(() => {
-    if (contextMenu) {
-      onTaskDelete(contextMenu.task.id, true);
-      setContextMenu(null);
+  const handleConfirmDeleteTask = useCallback(() => {
+    if (deleteConfirmTask) {
+      onTaskDelete(deleteConfirmTask.id, true);
+      setDeleteConfirmTask(null);
     }
-  }, [contextMenu, onTaskDelete]);
+  }, [deleteConfirmTask, onTaskDelete]);
 
   const handleCompleteTask = useCallback(() => {
     if (contextMenu) {
@@ -760,7 +776,6 @@ export default function GanttChart({
                         setTooltip({ task, x: rect.left + rect.width / 2, y: rect.top });
                       }}
                       onMouseLeave={() => setTooltip(null)}
-                      onDoubleClick={() => handleBarDoubleClick(task)}
                       onContextMenu={(e) => handleBarContextMenu(e, task)}
                       onTouchStart={(e) => handleBarTouchStart(e, task)}
                       onTouchEnd={handleBarTouchEnd}
@@ -775,15 +790,36 @@ export default function GanttChart({
                         }}
                       />
                       <span className="gantt-bar-label">{task.name}</span>
-                      <button
-                        type="button"
-                        className="gantt-bar-edit"
-                        onClick={(e) => handleEditClick(e, task)}
-                        title="Edit task"
-                        aria-label="Edit task"
-                      >
-                        <Pencil size={12} />
-                      </button>
+                      <div className="gantt-bar-actions">
+                        <button
+                          type="button"
+                          className="gantt-bar-btn"
+                          onClick={(e) => handleSplitClick(e, task)}
+                          title="Split task"
+                          aria-label="Split task"
+                          disabled={task.completed}
+                        >
+                          <Split size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          className="gantt-bar-btn"
+                          onClick={(e) => handleEditClick(e, task)}
+                          title="Edit task"
+                          aria-label="Edit task"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          className="gantt-bar-btn gantt-bar-btn-danger"
+                          onClick={(e) => handleDeleteClick(e, task)}
+                          title="Delete task"
+                          aria-label="Delete task"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -827,10 +863,26 @@ export default function GanttChart({
           ) : (
             <button onClick={handleUncompleteTask}>Mark incomplete</button>
           )}
-          <button onClick={handleDeleteTask} className="danger">
-            Delete
-          </button>
         </div>
+      )}
+
+      {deleteConfirmTask && (
+        <ConfirmModal
+          title="Delete task"
+          message={
+            <>
+              Delete <strong>{deleteConfirmTask.name}</strong>?
+              {tasks.some((t) => t.parent_id === deleteConfirmTask.id) && (
+                <> This will also delete any subtasks.</>
+              )}
+            </>
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleConfirmDeleteTask}
+          onCancel={() => setDeleteConfirmTask(null)}
+          variant="danger"
+        />
       )}
     </div>
   );
