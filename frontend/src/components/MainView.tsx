@@ -16,6 +16,7 @@ import {
   DEFAULT_PRIORITY_COLORS,
   type PriorityColors,
 } from '../priorityColors';
+import { getSettingsForBackup, applySettingsFromBackup, type BackupSettings } from '../settingsBackup';
 import './MainView.css';
 
 interface Props {
@@ -136,7 +137,11 @@ export default function MainView({ authEnabled, onLogout }: Props) {
 
   async function handleDownloadBackup() {
     try {
-      const blob = await api.downloadBackup();
+      const data = await api.getBackupData();
+      data.settings = getSettingsForBackup();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -188,6 +193,8 @@ export default function MainView({ authEnabled, onLogout }: Props) {
     if (!restoreConfirmData) return;
     try {
       await api.restoreBackup(restoreConfirmData);
+      applySettingsFromBackup(restoreConfirmData.settings as BackupSettings | undefined);
+      setPriorityColors(() => loadPriorityColors());
       await load();
       setRestoreConfirmData(null);
       setShowSettings(false);

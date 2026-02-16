@@ -164,10 +164,10 @@ export async function clearAllData() {
   return res.json();
 }
 
-export async function downloadBackup(): Promise<Blob> {
+export async function getBackupData(): Promise<Record<string, unknown>> {
   const res = await fetchApi('/backup');
-  if (!res.ok) throw new Error('Failed to download backup');
-  return res.blob();
+  if (!res.ok) throw new Error('Failed to fetch backup');
+  return res.json();
 }
 
 export async function restoreBackup(data: Record<string, unknown>): Promise<void> {
