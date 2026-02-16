@@ -62,6 +62,7 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
     }
     if (isEdit && task && onUpdate) {
       onUpdate(task.id, {
+        project_id: projectId,
         name,
         start_date: startDate,
         end_date: endDate,
@@ -92,7 +93,6 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
               value={categoryId}
               onChange={(e) => setCategoryId(Number(e.target.value))}
               required
-              disabled={isEdit}
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -105,8 +105,6 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
               value={projectId}
               onChange={(e) => setProjectId(Number(e.target.value))}
               required
-              disabled={isEdit}
-              title={isEdit ? 'Project cannot be changed when editing' : undefined}
             >
               {projectsInCategory.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>

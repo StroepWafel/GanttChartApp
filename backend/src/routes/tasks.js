@@ -128,9 +128,10 @@ router.post('/split/:id', (req, res) => {
 router.patch('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { name, start_date, end_date, due_date, progress, completed, base_priority } = req.body;
+    const { project_id, name, start_date, end_date, due_date, progress, completed, base_priority } = req.body;
     const updates = [];
     const params = [];
+    if (project_id !== undefined) { updates.push('project_id = ?'); params.push(project_id); }
     if (name !== undefined) { updates.push('name = ?'); params.push(name); }
     if (start_date !== undefined) { updates.push('start_date = ?'); params.push(start_date); }
     if (end_date !== undefined) { updates.push('end_date = ?'); params.push(end_date); }

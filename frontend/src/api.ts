@@ -113,6 +113,7 @@ export async function createTask(data: {
 }
 
 export async function updateTask(id: number, data: Partial<{
+  project_id: number;
   name: string;
   start_date: string;
   end_date: string;

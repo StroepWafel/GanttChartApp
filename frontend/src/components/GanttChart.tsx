@@ -125,7 +125,8 @@ function buildHierarchicalRows(
   tasks: Task[],
   projects: Project[],
   categories: Category[],
-  expanded: ExpandedState
+  expanded: ExpandedState,
+  includeCompleted: boolean
 ): GanttRow[] {
   const rows: GanttRow[] = [];
   const byParent = new Map<number, Task[]>();
@@ -136,13 +137,14 @@ function buildHierarchicalRows(
   });
   const sortedCats = [...categories].sort((a, b) => a.display_order - b.display_order);
   for (const cat of sortedCats) {
-    const catProjects = projects.filter((p) => p.category_id === cat.id);
+    let catProjects = projects.filter((p) => p.category_id === cat.id);
+    if (!includeCompleted) {
+      catProjects = catProjects.filter((p) => tasks.some((t) => t.project_id === p.id));
+    }
     if (catProjects.length === 0) continue;
     rows.push({ type: 'category', id: `cat-${cat.id}`, category: cat });
     if (!isExpanded(expanded, 'category', cat.id)) continue;
     for (const proj of catProjects) {
-      rows.push({ type: 'project', id: `proj-${proj.id}`, project: proj });
-      if (!isExpanded(expanded, 'project', proj.id)) continue;
       const projTasks = tasks
         .filter((t) => t.project_id === proj.id)
         .sort((a, b) => {
@@ -151,6 +153,9 @@ function buildHierarchicalRows(
           if (uB !== uA) return uB - uA;
           return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
         });
+      if (!includeCompleted && projTasks.length === 0) continue;
+      rows.push({ type: 'project', id: `proj-${proj.id}`, project: proj });
+      if (!isExpanded(expanded, 'project', proj.id)) continue;
       const topLevel = projTasks.filter((t) => !t.parent_id);
       if (topLevel.length === 0 && projTasks.length === 0) continue;
       for (const task of topLevel) {
@@ -226,8 +231,8 @@ export default function GanttChart({
   );
 
   const hierarchicalRows = useMemo(
-    () => buildHierarchicalRows(tasks, projects, categories, expanded),
-    [tasks, projects, categories, expanded]
+    () => buildHierarchicalRows(tasks, projects, categories, expanded, includeCompleted),
+    [tasks, projects, categories, expanded, includeCompleted]
   );
   const taskRows = useMemo(
     () => hierarchicalRows.filter((r): r is Extract<GanttRow, { type: 'task' }> => r.type === 'task'),
@@ -241,7 +246,11 @@ export default function GanttChart({
     const projSpans = new Map<number, { start: string; end: string }>();
     const catSpans = new Map<number, { start: string; end: string }>();
 
-    for (const p of projects) {
+    const visibleProjects = includeCompleted
+      ? projects
+      : projects.filter((p) => tasks.some((t) => t.project_id === p.id));
+
+    for (const p of visibleProjects) {
       const projTasks = tasks.filter((t) => t.project_id === p.id);
       if (projTasks.length > 0) {
         const bars: Bar[] = projTasks.map((t) => ({ start: t.start_date, end: t.end_date }));
@@ -257,7 +266,7 @@ export default function GanttChart({
     }
 
     for (const c of categories) {
-      const catProjects = projects.filter((p) => p.category_id === c.id);
+      const catProjects = visibleProjects.filter((p) => p.category_id === c.id);
       const allBars: Bar[] = [];
       for (const p of catProjects) {
         const bars = projBars.get(p.id);
@@ -271,7 +280,7 @@ export default function GanttChart({
       }
     }
     return { projectBars: projBars, categoryBars: catBars, projectSpans: projSpans, categorySpans: catSpans };
-  }, [tasks, projects, categories]);
+  }, [tasks, projects, categories, includeCompleted]);
 
   const { rangeStart, rangeEnd, columnWidth, totalWidth, totalColumns } = useMemo(() => {
     const allTasks = taskRows.map((r) => r.task);
