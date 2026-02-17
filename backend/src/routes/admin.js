@@ -1,42 +1,56 @@
 import express from 'express';
-import db from '../db.js';
+import db, { runUserIdMigrations } from '../db.js';
 import { optionalAuth, requireAdmin } from '../auth.js';
 
 const router = express.Router();
 router.use(optionalAuth, requireAdmin);
 
+function fetchFullBackup() {
+  const users = db.prepare(`
+    SELECT id, username, password_hash, is_admin, api_key, created_at FROM users ORDER BY id
+  `).all();
+  const userPrefs = db.prepare(`
+    SELECT user_id, key, value FROM user_preferences
+  `).all();
+  const categories = db.prepare(`
+    SELECT id, user_id, name, display_order, created_at FROM categories ORDER BY id
+  `).all();
+  const projects = db.prepare(`
+    SELECT id, user_id, category_id, name, start_date, due_date, created_at FROM projects ORDER BY id
+  `).all();
+  const tasks = db.prepare(`
+    SELECT id, user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, created_at, updated_at FROM tasks ORDER BY id
+  `).all();
+  const ganttExpanded = db.prepare(`
+    SELECT user_id, item_type, item_id, expanded FROM gantt_expanded
+  `).all();
+
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    users,
+    user_preferences: userPrefs,
+    categories,
+    projects,
+    tasks,
+    gantt_expanded: ganttExpanded,
+  };
+}
+
 /** Admin full backup: all users and data (excluding password hashes as plaintext) */
 router.get('/full-backup', (req, res) => {
   try {
-    const users = db.prepare(`
-      SELECT id, username, password_hash, is_admin, api_key, created_at FROM users ORDER BY id
-    `).all();
-    const userPrefs = db.prepare(`
-      SELECT user_id, key, value FROM user_preferences
-    `).all();
-    const categories = db.prepare(`
-      SELECT id, user_id, name, display_order, created_at FROM categories ORDER BY id
-    `).all();
-    const projects = db.prepare(`
-      SELECT id, user_id, category_id, name, start_date, due_date, created_at FROM projects ORDER BY id
-    `).all();
-    const tasks = db.prepare(`
-      SELECT id, user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, created_at, updated_at FROM tasks ORDER BY id
-    `).all();
-    const ganttExpanded = db.prepare(`
-      SELECT user_id, item_type, item_id, expanded FROM gantt_expanded
-    `).all();
-
-    const backup = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      users,
-      user_preferences: userPrefs,
-      categories,
-      projects,
-      tasks,
-      gantt_expanded: ganttExpanded,
-    };
+    let backup;
+    try {
+      backup = fetchFullBackup();
+    } catch (err) {
+      if (err.message?.includes('user_id')) {
+        runUserIdMigrations();
+        backup = fetchFullBackup();
+      } else {
+        throw err;
+      }
+    }
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="gantt-full-backup.json"');

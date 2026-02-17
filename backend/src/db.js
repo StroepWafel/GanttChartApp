@@ -88,13 +88,44 @@ db.exec(`
 
 // Migration: add user_id to existing tables if missing (for DBs created before multi-user)
 // Must run BEFORE creating indexes on user_id columns
+// Use plain INTEGER (no REFERENCES) for max SQLite compatibility
 function migrateAddUserId(table) {
   try {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all();
     if (!cols.some((c) => c.name === 'user_id')) {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN user_id INTEGER REFERENCES users(id)`);
+      db.exec(`ALTER TABLE ${table} ADD COLUMN user_id INTEGER`);
     }
-  } catch (_) {}
+  } catch (e) {
+    console.error(`Migration failed for ${table}:`, e.message);
+  }
+}
+
+// user_preferences has user_id in PK - requires table rebuild if missing
+function migrateUserPreferences() {
+  try {
+    const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_preferences'").get();
+    if (!exists) return;
+    const cols = db.prepare('PRAGMA table_info(user_preferences)').all();
+    if (cols.some((c) => c.name === 'user_id')) return;
+    const adminRow = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
+    const adminId = adminRow ? adminRow.id : 1;
+    const oldRows = db.prepare('SELECT key, value FROM user_preferences').all();
+    db.exec(`
+      CREATE TABLE user_preferences_new (
+        user_id INTEGER NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT,
+        PRIMARY KEY (user_id, key),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    const ins = db.prepare('INSERT INTO user_preferences_new (user_id, key, value) VALUES (?, ?, ?)');
+    for (const r of oldRows) ins.run(adminId, r.key, r.value);
+    db.exec('DROP TABLE user_preferences');
+    db.exec('ALTER TABLE user_preferences_new RENAME TO user_preferences');
+  } catch (e) {
+    console.error('Migration failed for user_preferences:', e.message);
+  }
 }
 
 try {
@@ -109,6 +140,7 @@ try {
   migrateAddUserId('categories');
   migrateAddUserId('projects');
   migrateAddUserId('tasks');
+  migrateUserPreferences();
 
   const userCols = db.prepare("PRAGMA table_info(users)").all();
   if (!userCols.some((c) => c.name === 'is_active')) {
@@ -137,18 +169,30 @@ try {
     db.exec('DROP TABLE gantt_expanded');
     db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
   }
-} catch (_) {}
+} catch (e) {
+  console.error('Startup migration error:', e?.message || e);
+}
 
-// Create indexes (after migrations ensure user_id exists)
+// Create indexes (after migrations; skip user_id indexes if column missing)
+function createIndexIfColumnExists(table, column, indexName, indexDef) {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!cols.some((c) => c.name === column)) return;
+    db.exec(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${table}${indexDef}`);
+  } catch (e) {
+    console.error(`Index ${indexName} failed:`, e.message);
+  }
+}
+
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
   CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
   CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed);
   CREATE INDEX IF NOT EXISTS idx_projects_category ON projects(category_id);
-  CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id);
-  CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
-  CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id);
 `);
+createIndexIfColumnExists('categories', 'user_id', 'idx_categories_user', '(user_id)');
+createIndexIfColumnExists('projects', 'user_id', 'idx_projects_user', '(user_id)');
+createIndexIfColumnExists('tasks', 'user_id', 'idx_tasks_user', '(user_id)');
 
 // Migration: assign user_id to orphan rows (existing data before multi-user)
 function assignOrphanRowsToAdmin() {
@@ -191,5 +235,43 @@ function seedAdminUser() {
 }
 
 seedAdminUser();
+
+/** Run user_id migrations on-demand (e.g. when a route gets "no such column: user_id") */
+export function runUserIdMigrations() {
+  migrateAddUserId('categories');
+  migrateAddUserId('projects');
+  migrateAddUserId('tasks');
+  migrateUserPreferences();
+  const ganttExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gantt_expanded'").get();
+  if (!ganttExists) {
+    assignOrphanRowsToAdmin();
+    return;
+  }
+  const ganttCols = db.prepare('PRAGMA table_info(gantt_expanded)').all();
+  if (!ganttCols.some((c) => c.name === 'user_id')) {
+    try {
+      const oldRows = db.prepare('SELECT item_type, item_id, expanded FROM gantt_expanded').all();
+      db.exec(`
+        CREATE TABLE gantt_expanded_new (
+          user_id INTEGER NOT NULL,
+          item_type TEXT NOT NULL,
+          item_id INTEGER NOT NULL,
+          expanded INTEGER NOT NULL DEFAULT 1,
+          PRIMARY KEY (user_id, item_type, item_id),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+      const adminRow = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
+      const adminId = adminRow ? adminRow.id : 1;
+      const ins = db.prepare('INSERT INTO gantt_expanded_new (user_id, item_type, item_id, expanded) VALUES (?, ?, ?, ?)');
+      for (const r of oldRows) ins.run(adminId, r.item_type, r.item_id, r.expanded);
+      db.exec('DROP TABLE gantt_expanded');
+      db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
+    } catch (e) {
+      console.error('On-demand gantt_expanded migration failed:', e.message);
+    }
+  }
+  assignOrphanRowsToAdmin();
+}
 
 export default db;

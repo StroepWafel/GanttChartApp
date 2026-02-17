@@ -111,7 +111,10 @@ export async function masquerade(userId: number) {
 
 export async function getAdminFullBackup(): Promise<Blob> {
   const res = await fetchApi('/admin/full-backup');
-  if (!res.ok) throw new Error('Failed to fetch full backup');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Failed to fetch full backup (${res.status})`);
+  }
   return res.blob();
 }
 

@@ -1,35 +1,49 @@
 import express from 'express';
-import db from '../db.js';
+import db, { runUserIdMigrations } from '../db.js';
 
 const router = express.Router();
+
+function fetchUserBackup(userId) {
+  const categories = db.prepare(`
+    SELECT id, name, display_order, created_at FROM categories WHERE user_id = ? ORDER BY id
+  `).all(userId);
+  const projects = db.prepare(`
+    SELECT id, category_id, name, start_date, due_date, created_at FROM projects WHERE user_id = ? ORDER BY id
+  `).all(userId);
+  const tasks = db.prepare(`
+    SELECT id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, created_at, updated_at
+    FROM tasks WHERE user_id = ? ORDER BY id
+  `).all(userId);
+  const ganttExpanded = db.prepare(`
+    SELECT item_type, item_id, expanded FROM gantt_expanded WHERE user_id = ?
+  `).all(userId);
+
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    categories,
+    projects,
+    tasks,
+    gantt_expanded: ganttExpanded,
+  };
+}
 
 router.get('/', (req, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
-    const categories = db.prepare(`
-      SELECT id, name, display_order, created_at FROM categories WHERE user_id = ? ORDER BY id
-    `).all(userId);
-    const projects = db.prepare(`
-      SELECT id, category_id, name, start_date, due_date, created_at FROM projects WHERE user_id = ? ORDER BY id
-    `).all(userId);
-    const tasks = db.prepare(`
-      SELECT id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, created_at, updated_at
-      FROM tasks WHERE user_id = ? ORDER BY id
-    `).all(userId);
-    const ganttExpanded = db.prepare(`
-      SELECT item_type, item_id, expanded FROM gantt_expanded WHERE user_id = ?
-    `).all(userId);
-
-    const backup = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      categories,
-      projects,
-      tasks,
-      gantt_expanded: ganttExpanded,
-    };
+    let backup;
+    try {
+      backup = fetchUserBackup(userId);
+    } catch (err) {
+      if (err.message?.includes('user_id')) {
+        runUserIdMigrations();
+        backup = fetchUserBackup(userId);
+      } else {
+        throw err;
+      }
+    }
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="gantt-backup.json"');
