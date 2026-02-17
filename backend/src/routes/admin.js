@@ -25,15 +25,28 @@ function fetchFullBackup() {
     SELECT user_id, item_type, item_id, expanded FROM gantt_expanded
   `).all();
 
+  // Structure: each user -> preferences + categories + projects + tasks + gantt_expanded
+  const usersWithData = users.map((u) => {
+    const uid = u.id;
+    const prefs = userPrefs
+      .filter((p) => p.user_id === uid)
+      .reduce((acc, p) => ({ ...acc, [p.key]: p.value }), {});
+    return {
+      ...u,
+      preferences: prefs,
+      categories: categories.filter((c) => c.user_id === uid).map(({ user_id, ...c }) => c),
+      projects: projects.filter((p) => p.user_id === uid).map(({ user_id, ...p }) => p),
+      tasks: tasks.filter((t) => t.user_id === uid).map(({ user_id, ...t }) => t),
+      gantt_expanded: ganttExpanded
+        .filter((e) => e.user_id === uid)
+        .map(({ user_id, ...e }) => e),
+    };
+  });
+
   return {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
-    users,
-    user_preferences: userPrefs,
-    categories,
-    projects,
-    tasks,
-    gantt_expanded: ganttExpanded,
+    users: usersWithData,
   };
 }
 
@@ -68,7 +81,47 @@ router.post('/full-restore', (req, res) => {
       return res.status(400).json({ error: 'Invalid backup payload' });
     }
 
-    const { users: usersData, user_preferences: prefsData, categories: catData, projects: projData, tasks: taskData, gantt_expanded: ganttData } = body;
+    // Normalize: version 2 has users with nested data; version 1 has flat arrays
+    let usersData, prefsData, catData, projData, taskData, ganttData;
+    const isV2 = body.version === 2 && Array.isArray(body.users) && body.users.length > 0 && 'preferences' in body.users[0];
+    if (isV2) {
+      // Version 2: users array with nested preferences, categories, projects, tasks, gantt_expanded
+      usersData = body.users.map(({ preferences, categories, projects, tasks, gantt_expanded, ...u }) => u);
+      prefsData = [];
+      catData = [];
+      projData = [];
+      taskData = [];
+      ganttData = [];
+      for (const u of body.users) {
+        const uid = u.id;
+        if (u.preferences && typeof u.preferences === 'object') {
+          for (const [key, value] of Object.entries(u.preferences)) {
+            const valStr = value === null || value === undefined ? '' : (typeof value === 'string' ? value : JSON.stringify(value));
+            prefsData.push({ user_id: uid, key, value: valStr });
+          }
+        }
+        for (const c of u.categories || []) {
+          catData.push({ ...c, user_id: uid });
+        }
+        for (const p of u.projects || []) {
+          projData.push({ ...p, user_id: uid });
+        }
+        for (const t of u.tasks || []) {
+          taskData.push({ ...t, user_id: uid });
+        }
+        for (const e of u.gantt_expanded || []) {
+          ganttData.push({ ...e, user_id: uid });
+        }
+      }
+    } else {
+      // Version 1 (legacy): flat arrays at top level
+      usersData = body.users;
+      prefsData = body.user_preferences;
+      catData = body.categories;
+      projData = body.projects;
+      taskData = body.tasks;
+      ganttData = body.gantt_expanded;
+    }
 
     db.exec('BEGIN TRANSACTION');
     try {
@@ -136,7 +189,8 @@ router.post('/full-restore', (req, res) => {
         for (const e of ganttData) {
           insertExp.run(e.user_id, e.item_type, e.item_id, e.expanded ? 1 : 0);
         }
-      } else if (ganttData && typeof ganttData === 'object') {
+      } else if (ganttData && typeof ganttData === 'object' && !Array.isArray(ganttData) && ganttData.user_id === undefined) {
+        // Legacy nested format: gantt_expanded: { category: { 1: true }, ... }
         const insertExp = db.prepare(`
           INSERT INTO gantt_expanded (user_id, item_type, item_id, expanded) VALUES (?, ?, ?, ?)
         `);

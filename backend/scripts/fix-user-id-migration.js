@@ -1,15 +1,28 @@
 #!/usr/bin/env node
 /**
  * One-time recovery script for "no such column: user_id" and "table gantt_expanded_new already exists".
- * Run: cd backend && node scripts/fix-user-id-migration.js
- * Then: pm2 restart gantt-api
+ * Run from project root: node backend/scripts/fix-user-id-migration.js
+ * Or: cd backend && node scripts/fix-user-id-migration.js
+ * Uses DB_PATH from .env (same as the app). Default: ./data/gantt.db (relative to project root).
  */
 import Database from 'better-sqlite3';
-import { dirname, join } from 'path';
+import { readFileSync, existsSync } from 'fs';
+import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = process.env.DB_PATH || join(__dirname, '../data/gantt.db');
+const projectRoot = resolve(__dirname, '../..');
+// Load .env from project root (same as pm2)
+const envPath = join(projectRoot, '.env');
+if (existsSync(envPath)) {
+  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m) process.env[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, '');
+  }
+}
+
+const rawPath = process.env.DB_PATH || './data/gantt.db';
+const DB_PATH = rawPath.startsWith('/') ? rawPath : resolve(projectRoot, rawPath);
 
 console.log('Opening database:', DB_PATH);
 const db = new Database(DB_PATH);
