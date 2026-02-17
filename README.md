@@ -1,6 +1,6 @@
 # Gantt Chart Web App
 
-A full-stack Gantt chart application with optional auth, persistent storage, task splitting, priority escalation, and a read-only IoT API.
+A full-stack Gantt chart application with optional multi-user auth, persistent storage, task splitting, priority escalation, and a read-only IoT API.
 
 ## Features
 
@@ -8,8 +8,11 @@ A full-stack Gantt chart application with optional auth, persistent storage, tas
 - Split one task into many sub-tasks
 - Categorize projects (row groupings)
 - Priority escalation as due dates approach
-- Optional email/password authentication
-- Read-only API for IoT integration
+- **Multi-user accounts** with optional username/password auth
+- Admin: create users, masquerade, revoke access, revoke API keys, full backup
+- Per-user data isolation (each user sees only their categories, projects, tasks)
+- Read-only IoT API with per-user API keys
+- Server-side user preferences (e.g. priority colors)
 - Clear all data option
 
 ## Tech Stack
@@ -91,25 +94,46 @@ npm start
 
 Copy `.env.example` to `.env` and configure:
 
-- `AUTH_ENABLED=true` - Enable email/password login
-- `AUTH_EMAIL` - Login email
-- `AUTH_PASSWORD` - Login password (plain, hashed at startup)
-- `API_KEY` - Optional key for read-only API (`X-API-Key` header)
+| Variable | Description |
+|----------|-------------|
+| `AUTH_ENABLED` | Set to `true` to enable username/password login |
+| `AUTH_USERNAME` | Admin username (used when creating first user) |
+| `AUTH_PASSWORD` | Admin password (plain, hashed at startup) |
+| `AUTH_PASSWORD_HASH` | Optional: pre-computed bcrypt hash (avoids plaintext in .env) |
+| `JWT_SECRET` | Secret for signing JWTs (change in production!) |
+| `DB_PATH` | Path to SQLite database (default: `./data/gantt.db`) |
+
+When auth is enabled, the first user (admin) is created from `AUTH_USERNAME` and `AUTH_PASSWORD` if the users table is empty. Each user gets their own API key from **Settings → Account** for the read-only IoT API.
 
 ## Deployment
 
 See [docs/UBUNTU_SETUP.md](docs/UBUNTU_SETUP.md) for Ubuntu server deployment with PM2 and cloudflared (Cloudflare Tunnel).
 
-## Read-Only API
+## Read-Only IoT API
 
-Endpoints under `/api/readonly/` (optional `X-API-Key` when configured):
+Endpoints under `/api/readonly/*` require **per-user** authentication. Each user has their own API key (view in Settings → Account). Use both headers:
 
-- `GET /tasks` - All tasks
-- `GET /most-important-task` - Highest urgency incomplete task
-- `GET /stats` - Total, completed, todo, efficiency
-- `GET /efficiency` - Efficiency ratio
-- `GET /by-category` - Task counts per category
-- `GET /overdue` - Overdue tasks
-- `GET /upcoming?days=7` - Upcoming due tasks
-- `GET /projects` - Projects with task counts
-- `GET /categories` - Categories with counts
+- `X-API-Username` - Your username
+- `X-API-Key` - Your API key
+
+Or as query params: `?username=...&api_key=...`
+
+Data returned is scoped to the authenticated user only.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /tasks` | All tasks |
+| `GET /most-important-task` | Highest urgency incomplete task |
+| `GET /stats` | Total, completed, todo, efficiency |
+| `GET /efficiency` | Efficiency ratio |
+| `GET /by-category` | Task counts per category |
+| `GET /overdue` | Overdue tasks |
+| `GET /upcoming?days=7` | Upcoming due tasks |
+| `GET /projects` | Projects with task counts |
+| `GET /categories` | Categories with counts |
+
+See [docs/API.md](docs/API.md) for full details and examples.
+
+## Migrating to Multi-User
+
+If you're upgrading from an older version with a single admin or shared data, see [docs/MIGRATION.md](docs/MIGRATION.md) for step-by-step migration instructions.

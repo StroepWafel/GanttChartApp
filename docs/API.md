@@ -16,25 +16,40 @@ http://localhost:3001/api/readonly
 
 ## Authentication
 
-When `API_KEY` is set in your server environment, all requests must include the API key in the header:
+The read-only API uses **per-user** authentication. Each user has their own username and API key (visible in the app under **Settings → Account** when logged in). All requests must include both:
 
+**Headers:**
 ```
-X-API-Key: your_api_key_here
+X-API-Username: your_username
+X-API-Key: your_api_key
 ```
 
-**Example with curl:**
+**Or as query parameters:**
+```
+?username=your_username&api_key=your_api_key
+```
 
+**Example with curl (headers):**
 ```bash
-curl -H "X-API-Key: your_api_key" https://your-domain.com/api/readonly/stats
+curl -H "X-API-Username: admin" -H "X-API-Key: your_api_key" https://your-domain.com/api/readonly/stats
 ```
 
-If `API_KEY` is not configured, the API is publicly accessible (no auth required).
+**Example with curl (query):**
+```bash
+curl "https://your-domain.com/api/readonly/stats?username=admin&api_key=your_api_key"
+```
 
-**401 response** when API key is invalid or missing (when required):
+**Data scope:** All endpoints return only data belonging to the authenticated user. Each user’s categories, projects, and tasks are isolated.
 
+**401 responses** when credentials are invalid or missing:
 ```json
 {
-  "error": "Invalid API key"
+  "error": "X-API-Username and X-API-Key (or username and api_key query) required"
+}
+```
+```json
+{
+  "error": "Invalid API credentials"
 }
 ```
 
@@ -344,7 +359,7 @@ All errors return JSON with an `error` field:
 
 | Status | When |
 |--------|------|
-| 401 | Invalid or missing API key (when `API_KEY` is set) |
+| 401 | Missing or invalid username/API key |
 | 500 | Server error (with error message) |
 
 ---
@@ -354,13 +369,13 @@ All errors return JSON with an `error` field:
 ### Display most important task on an e-ink screen
 
 ```bash
-curl -s -H "X-API-Key: $API_KEY" https://your-server/api/readonly/most-important-task | jq -r '.name'
+curl -s -H "X-API-Username: $API_USER" -H "X-API-Key: $API_KEY" https://your-server/api/readonly/most-important-task | jq -r '.name'
 ```
 
 ### Light an LED when overdue tasks exist
 
 ```bash
-OVERDUE=$(curl -s -H "X-API-Key: $API_KEY" https://your-server/api/readonly/overdue)
+OVERDUE=$(curl -s -H "X-API-Username: $API_USER" -H "X-API-Key: $API_KEY" https://your-server/api/readonly/overdue)
 if [ "$(echo $OVERDUE | jq length)" -gt 0 ]; then
   # Turn on warning LED
   echo 1 > /sys/class/gpio/gpio17/value
@@ -372,7 +387,7 @@ fi
 ### Show efficiency on a 7-segment display (0–99)
 
 ```bash
-curl -s -H "X-API-Key: $API_KEY" https://your-server/api/readonly/stats | jq -r '.efficiency'
+curl -s -H "X-API-Username: $API_USER" -H "X-API-Key: $API_KEY" https://your-server/api/readonly/stats | jq -r '.efficiency'
 ```
 
 ### ESP32/Arduino (pseudo-code)
@@ -381,6 +396,7 @@ curl -s -H "X-API-Key: $API_KEY" https://your-server/api/readonly/stats | jq -r 
 void loop() {
   HTTPClient http;
   http.begin("https://your-server/api/readonly/most-important-task");
+  http.addHeader("X-API-Username", "your_username");
   http.addHeader("X-API-Key", "your_api_key");
   int code = http.GET();
   if (code == 200) {

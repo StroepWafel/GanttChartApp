@@ -112,21 +112,25 @@ Example configuration:
 ```env
 PORT=3001
 AUTH_ENABLED=true
-AUTH_EMAIL=admin@yourdomain.com
+AUTH_USERNAME=admin
 AUTH_PASSWORD=your_secure_password
-API_KEY=your_optional_api_key_for_iot
+JWT_SECRET=your_secret_change_in_production
 DB_PATH=./data/gantt.db
 ```
 
-- **AUTH_ENABLED**: Set to `true` to protect the app with email/password.
+- **AUTH_ENABLED**: Set to `true` to protect the app with username/password login.
+- **AUTH_USERNAME**: Admin username (used when seeding the first user).
 - **AUTH_PASSWORD**: Plain password (hashed at startup). For production, consider using `AUTH_PASSWORD_HASH` with a pre-computed bcrypt hash.
-- **API_KEY**: Optional. When set, the read-only API at `/api/readonly/*` requires `X-API-Key: your_key` header. Leave empty for no API key auth.
+- **JWT_SECRET**: Secret for signing JWTs—change in production!
+- **API keys**: Each user has their own API key (visible in the app under Settings → Account). The read-only API at `/api/readonly/*` requires `X-API-Username` and `X-API-Key` headers. See [docs/API.md](API.md).
 
 Ensure the data directory exists:
 
 ```bash
 mkdir -p backend/data
 ```
+
+**Upgrading from an older version?** See [MIGRATION.md](MIGRATION.md) for migration steps.
 
 ---
 
@@ -266,9 +270,10 @@ sudo cloudflared service install
 
 ### Read-Only API (for IoT)
 
-When `API_KEY` is set, include the header:
+Each user has their own API key in **Settings → Account**. Include both headers:
 
 ```
+X-API-Username: your_username
 X-API-Key: your_api_key
 ```
 
@@ -327,6 +332,11 @@ pm2 restart gantt-tunnel
 **Auth shows "disabled" despite AUTH_ENABLED=true**
 - The `.env` file must be in the **project root** (same folder as `package.json` and `ecosystem.config.cjs`), not in `backend/`.
 - After changing `.env`, restart PM2: `pm2 restart gantt-api`
+- Ensure `AUTH_USERNAME` (or `AUTH_EMAIL` for legacy) and `AUTH_PASSWORD` are set.
 
 **API returns 401 or blank**
-- If auth is enabled, you must log in first. Visit the app URL and use the credentials from `.env`.
+- If auth is enabled, log in to the app and get your API key from **Settings → Account**.
+- Use both `X-API-Username` and `X-API-Key` headers (the old single `X-API-Key` is no longer used).
+
+**Upgrading from an older version?**
+- See [docs/MIGRATION.md](MIGRATION.md) for migration steps to the multi-user accounts system.
