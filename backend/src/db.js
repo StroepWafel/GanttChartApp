@@ -148,26 +148,36 @@ try {
   }
 
   const ganttCols = db.prepare("PRAGMA table_info(gantt_expanded)").all();
+  const ganttNewExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gantt_expanded_new'").get();
   if (!ganttCols.some((c) => c.name === 'user_id')) {
-    const oldRows = db.prepare('SELECT item_type, item_id, expanded FROM gantt_expanded').all();
-    db.exec(`
-      CREATE TABLE gantt_expanded_new (
-        user_id INTEGER NOT NULL,
-        item_type TEXT NOT NULL,
-        item_id INTEGER NOT NULL,
-        expanded INTEGER NOT NULL DEFAULT 1,
-        PRIMARY KEY (user_id, item_type, item_id),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-    const adminRow = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
-    const adminId = adminRow ? adminRow.id : 1;
-    const ins = db.prepare('INSERT INTO gantt_expanded_new (user_id, item_type, item_id, expanded) VALUES (?, ?, ?, ?)');
-    for (const r of oldRows) {
-      ins.run(adminId, r.item_type, r.item_id, r.expanded);
+    if (ganttNewExists) {
+      // Leftover from failed migration: complete it by swapping tables
+      db.exec('DROP TABLE gantt_expanded');
+      db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
+    } else {
+      const oldRows = db.prepare('SELECT item_type, item_id, expanded FROM gantt_expanded').all();
+      db.exec(`DROP TABLE IF EXISTS gantt_expanded_new`);
+      db.exec(`
+        CREATE TABLE gantt_expanded_new (
+          user_id INTEGER NOT NULL,
+          item_type TEXT NOT NULL,
+          item_id INTEGER NOT NULL,
+          expanded INTEGER NOT NULL DEFAULT 1,
+          PRIMARY KEY (user_id, item_type, item_id),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+      const adminRow = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
+      const adminId = adminRow ? adminRow.id : 1;
+      const ins = db.prepare('INSERT INTO gantt_expanded_new (user_id, item_type, item_id, expanded) VALUES (?, ?, ?, ?)');
+      for (const r of oldRows) {
+        ins.run(adminId, r.item_type, r.item_id, r.expanded);
+      }
+      db.exec('DROP TABLE gantt_expanded');
+      db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
     }
-    db.exec('DROP TABLE gantt_expanded');
-    db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
+  } else if (ganttNewExists) {
+    db.exec('DROP TABLE gantt_expanded_new');
   }
 } catch (e) {
   console.error('Startup migration error:', e?.message || e);
@@ -248,28 +258,39 @@ export function runUserIdMigrations() {
     return;
   }
   const ganttCols = db.prepare('PRAGMA table_info(gantt_expanded)').all();
+  const ganttNewExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gantt_expanded_new'").get();
   if (!ganttCols.some((c) => c.name === 'user_id')) {
     try {
-      const oldRows = db.prepare('SELECT item_type, item_id, expanded FROM gantt_expanded').all();
-      db.exec(`
-        CREATE TABLE gantt_expanded_new (
-          user_id INTEGER NOT NULL,
-          item_type TEXT NOT NULL,
-          item_id INTEGER NOT NULL,
-          expanded INTEGER NOT NULL DEFAULT 1,
-          PRIMARY KEY (user_id, item_type, item_id),
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-      `);
-      const adminRow = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
-      const adminId = adminRow ? adminRow.id : 1;
-      const ins = db.prepare('INSERT INTO gantt_expanded_new (user_id, item_type, item_id, expanded) VALUES (?, ?, ?, ?)');
-      for (const r of oldRows) ins.run(adminId, r.item_type, r.item_id, r.expanded);
-      db.exec('DROP TABLE gantt_expanded');
-      db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
+      if (ganttNewExists) {
+        db.exec('DROP TABLE gantt_expanded');
+        db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
+      } else {
+        const oldRows = db.prepare('SELECT item_type, item_id, expanded FROM gantt_expanded').all();
+        db.exec('DROP TABLE IF EXISTS gantt_expanded_new');
+        db.exec(`
+          CREATE TABLE gantt_expanded_new (
+            user_id INTEGER NOT NULL,
+            item_type TEXT NOT NULL,
+            item_id INTEGER NOT NULL,
+            expanded INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (user_id, item_type, item_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+          )
+        `);
+        const adminRow = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
+        const adminId = adminRow ? adminRow.id : 1;
+        const ins = db.prepare('INSERT INTO gantt_expanded_new (user_id, item_type, item_id, expanded) VALUES (?, ?, ?, ?)');
+        for (const r of oldRows) ins.run(adminId, r.item_type, r.item_id, r.expanded);
+        db.exec('DROP TABLE gantt_expanded');
+        db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
+      }
     } catch (e) {
       console.error('On-demand gantt_expanded migration failed:', e.message);
     }
+  } else if (ganttNewExists) {
+    try {
+      db.exec('DROP TABLE gantt_expanded_new');
+    } catch (_) {}
   }
   assignOrphanRowsToAdmin();
 }

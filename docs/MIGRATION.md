@@ -28,6 +28,15 @@ When you start the app with an existing database, **migrations run automatically
 
 No manual SQL is required for a typical upgrade.
 
+### Recovering from "no such column: user_id" or "table gantt_expanded_new already exists"
+
+If migrations failed partway (e.g. server crashed during gantt_expanded migration), run:
+
+```bash
+cd backend && node scripts/fix-user-id-migration.js
+pm2 restart gantt-api
+```
+
 ---
 
 ## Step-by-Step Migration
