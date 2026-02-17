@@ -311,7 +311,7 @@ Update the app:
 cd /opt/GanttChartApp
 git pull
 npm run install:all
-npm run build:frontend
+npm run build
 pm2 restart gantt-api
 ```
 
