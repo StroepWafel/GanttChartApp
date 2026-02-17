@@ -86,19 +86,9 @@ db.exec(`
   );
 `);
 
-// Create indexes
-db.exec(`
-  CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
-  CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
-  CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed);
-  CREATE INDEX IF NOT EXISTS idx_projects_category ON projects(category_id);
-  CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id);
-  CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
-  CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id);
-`);
-
 // Migration: add user_id to existing tables if missing (for DBs created before multi-user)
-function migrateAddUserId(table, pkColumn) {
+// Must run BEFORE creating indexes on user_id columns
+function migrateAddUserId(table) {
   try {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all();
     if (!cols.some((c) => c.name === 'user_id')) {
@@ -148,6 +138,17 @@ try {
     db.exec('ALTER TABLE gantt_expanded_new RENAME TO gantt_expanded');
   }
 } catch (_) {}
+
+// Create indexes (after migrations ensure user_id exists)
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
+  CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
+  CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed);
+  CREATE INDEX IF NOT EXISTS idx_projects_category ON projects(category_id);
+  CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id);
+  CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
+  CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id);
+`);
 
 // Migration: assign user_id to orphan rows (existing data before multi-user)
 function assignOrphanRowsToAdmin() {
