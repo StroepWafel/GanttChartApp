@@ -7,7 +7,7 @@ interface Props {
 }
 
 export default function AuthGate({ onLogin }: Props) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -15,7 +15,7 @@ export default function AuthGate({ onLogin }: Props) {
     e.preventDefault();
     setError('');
     try {
-      const data = await login(email, password);
+      const data = await login(username, password);
       if (data.token) onLogin(data.token);
       else setError(data.error || 'Invalid credentials');
     } catch (err) {
@@ -28,10 +28,10 @@ export default function AuthGate({ onLogin }: Props) {
       <form className="auth-form" onSubmit={handleSubmit}>
         <h1>Sign in</h1>
         <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           required
           autoFocus
         />

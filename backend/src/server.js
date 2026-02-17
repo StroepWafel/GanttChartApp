@@ -13,6 +13,9 @@ import ganttExpandedRouter from './routes/gantt-expanded.js';
 import clearRouter from './routes/clear.js';
 import backupRouter from './routes/backup.js';
 import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
+import userPreferencesRouter from './routes/user-preferences.js';
+import adminRouter from './routes/admin.js';
 import apiRouter from './routes/api.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,7 +31,16 @@ app.use(express.json());
 // Auth status (no auth required)
 app.use('/api/auth', authRouter);
 
-// Read-only API (optional API key)
+// User management
+app.use('/api/users', optionalAuth, usersRouter);
+
+// User preferences
+app.use('/api/user-preferences', optionalAuth, userPreferencesRouter);
+
+// Admin-only routes
+app.use('/api/admin', adminRouter);
+
+// Read-only IoT API (username + api_key required)
 app.use('/api/readonly', apiRouter);
 
 // Protected routes

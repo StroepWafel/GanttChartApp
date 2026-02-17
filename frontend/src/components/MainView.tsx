@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -43,6 +43,15 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [restoreConfirmData, setRestoreConfirmData] = useState<Record<string, unknown> | null>(null);
   const [priorityColors, setPriorityColors] = useState<PriorityColors>(() => loadPriorityColors());
   const [showPriorityColors, setShowPriorityColors] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean; apiKey: string | null } | null>(null);
+  const [users, setUsers] = useState<{ id: number; username: string; isAdmin: boolean; isActive: boolean; apiKey: string | null }[]>([]);
+  const [showUserManagement, setShowUserManagement] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newTempPassword, setNewTempPassword] = useState('');
+  const [changePasswordCurrent, setChangePasswordCurrent] = useState('');
+  const [changePasswordNew, setChangePasswordNew] = useState('');
+  const [masqueradeUserId, setMasqueradeUserId] = useState<string>('');
+  const [userMgmtError, setUserMgmtError] = useState('');
   const { isMobile } = useMediaQuery();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
@@ -64,6 +73,42 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (authEnabled) {
+      api.getMe()
+        .then((u) => setCurrentUser({ id: u.id, username: u.username, isAdmin: u.isAdmin, apiKey: u.apiKey ?? null }))
+        .catch(() => setCurrentUser(null));
+    } else {
+      setCurrentUser(null);
+    }
+  }, [authEnabled]);
+
+  useEffect(() => {
+    if (authEnabled && currentUser?.isAdmin) {
+      api.getUsers().then(setUsers).catch(() => setUsers([]));
+    }
+  }, [authEnabled, currentUser?.isAdmin]);
+
+  useEffect(() => {
+    if (authEnabled) {
+      api.getUserPreferences()
+        .then((prefs) => {
+          const pc = prefs.priority_colors ?? prefs.priorityColors;
+          if (pc && typeof pc === 'object') {
+            const valid: PriorityColors = {};
+            for (let p = 1; p <= 10; p++) {
+              const v = (pc as Record<number, { bg?: string; progress?: string }>)[p];
+              if (v?.bg && v?.progress) valid[p] = { bg: v.bg, progress: v.progress };
+            }
+            if (Object.keys(valid).length > 0) {
+              setPriorityColors((prev) => ({ ...DEFAULT_PRIORITY_COLORS, ...prev, ...valid }));
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [authEnabled]);
 
   async function handleCreateCategory(name: string) {
     await api.createCategory(name);
@@ -180,6 +225,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         next[p] = { ...(next[p] ?? DEFAULT_PRIORITY_COLORS[p]), [field]: value };
       }
       savePriorityColors(next);
+      if (authEnabled) {
+        api.patchUserPreferences('priority_colors', next).catch(() => {});
+      }
       return next;
     });
   }
@@ -187,6 +235,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   function handleResetPriorityColors() {
     setPriorityColors({ ...DEFAULT_PRIORITY_COLORS });
     savePriorityColors(DEFAULT_PRIORITY_COLORS);
+    if (authEnabled) {
+      api.patchUserPreferences('priority_colors', DEFAULT_PRIORITY_COLORS).catch(() => {});
+    }
   }
 
   async function handleConfirmRestore() {
@@ -194,7 +245,11 @@ export default function MainView({ authEnabled, onLogout }: Props) {
     try {
       await api.restoreBackup(restoreConfirmData);
       applySettingsFromBackup(restoreConfirmData.settings as BackupSettings | undefined);
-      setPriorityColors(() => loadPriorityColors());
+      const colors = loadPriorityColors();
+      setPriorityColors(() => colors);
+      if (authEnabled) {
+        await api.patchUserPreferences('priority_colors', colors);
+      }
       await load();
       setRestoreConfirmData(null);
       setShowSettings(false);
@@ -390,8 +445,245 @@ export default function MainView({ authEnabled, onLogout }: Props) {
 
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Settings</h3>
+            {authEnabled && currentUser && (
+              <div className="settings-section">
+                <h4>Account</h4>
+                <p className="settings-desc">Signed in as <strong>{currentUser.username}</strong></p>
+                <div className="settings-section">
+                  <h5>Change password</h5>
+                  <div className="change-password-form">
+                    <input
+                      type="password"
+                      placeholder="Current password"
+                      value={changePasswordCurrent}
+                      onChange={(e) => setChangePasswordCurrent(e.target.value)}
+                      className="settings-input"
+                    />
+                    <input
+                      type="password"
+                      placeholder="New password"
+                      value={changePasswordNew}
+                      onChange={(e) => setChangePasswordNew(e.target.value)}
+                      className="settings-input"
+                    />
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      onClick={async () => {
+                        if (!changePasswordCurrent || !changePasswordNew) return;
+                        try {
+                          await api.changePassword(changePasswordCurrent, changePasswordNew);
+                          setChangePasswordCurrent('');
+                          setChangePasswordNew('');
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : 'Failed to change password');
+                        }
+                      }}
+                    >
+                      Change password
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-section">
+                  <h5>API key</h5>
+                  <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API.</p>
+                  {currentUser.apiKey ? (
+                    <div className="api-key-row">
+                      <code className="api-key-value">{currentUser.apiKey}</code>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        title="Copy API key"
+                        aria-label="Copy API key"
+                        onClick={() => {
+                          navigator.clipboard.writeText(currentUser.apiKey!);
+                        }}
+                      >
+                        <Copy size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="muted">No API key</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {authEnabled && currentUser?.isAdmin && (
+              <div className="settings-section">
+                <h4>Admin</h4>
+                <div className="settings-section settings-dropdown">
+                  <button
+                    type="button"
+                    className={`settings-dropdown-trigger ${showUserManagement ? 'expanded' : ''}`}
+                    onClick={() => setShowUserManagement((v) => !v)}
+                    aria-expanded={showUserManagement}
+                  >
+                    <span>User management</span>
+                    <ChevronDown size={16} className={showUserManagement ? 'rotated' : ''} />
+                  </button>
+                  {showUserManagement && (
+                    <div className="settings-dropdown-content">
+                      <div className="user-list">
+                        {users.map((u) => (
+                          <div key={u.id} className="user-row user-row-admin">
+                            <span className="user-row-name">
+                              {u.username}
+                              {u.isAdmin && <span className="admin-badge">Admin</span>}
+                              {!u.isActive && <span className="inactive-badge">Disabled</span>}
+                            </span>
+                            {u.id !== currentUser?.id && (
+                              <div className="user-row-actions">
+                                <button
+                                  type="button"
+                                  className="btn-sm btn-sm-danger-outline"
+                                  title={u.isActive ? 'Revoke account access' : 'Restore account access'}
+                                  onClick={async () => {
+                                    try {
+                                      await api.updateUser(u.id, { isActive: !u.isActive });
+                                      api.getUsers().then(setUsers);
+                                    } catch (err) {
+                                      alert(err instanceof Error ? err.message : 'Failed to update user');
+                                    }
+                                  }}
+                                >
+                                  {u.isActive ? 'Revoke account' : 'Restore account'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-sm btn-sm-danger-outline"
+                                  title="Revoke API key"
+                                  disabled={!u.apiKey}
+                                  onClick={async () => {
+                                    if (!u.apiKey) return;
+                                    if (!confirm(`Revoke API key for ${u.username}? They will need a new key to use the IoT API.`)) return;
+                                    try {
+                                      await api.updateUser(u.id, { revokeApiKey: true });
+                                      api.getUsers().then(setUsers);
+                                    } catch (err) {
+                                      alert(err instanceof Error ? err.message : 'Failed to revoke API key');
+                                    }
+                                  }}
+                                >
+                                  Revoke API key
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-sm"
+                                  title="Generate new API key"
+                                  onClick={async () => {
+                                    try {
+                                      await api.updateUser(u.id, { regenerateApiKey: true });
+                                      api.getUsers().then(setUsers);
+                                    } catch (err) {
+                                      alert(err instanceof Error ? err.message : 'Failed to regenerate API key');
+                                    }
+                                  }}
+                                >
+                                  New API key
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="create-user-form">
+                        <input
+                          type="text"
+                          placeholder="Username"
+                          value={newUsername}
+                          onChange={(e) => setNewUsername(e.target.value)}
+                          className="settings-input"
+                        />
+                        <input
+                          type="password"
+                          placeholder="Temporary password"
+                          value={newTempPassword}
+                          onChange={(e) => setNewTempPassword(e.target.value)}
+                          className="settings-input"
+                        />
+                        <button
+                          type="button"
+                          className="btn-sm"
+                          onClick={async () => {
+                            if (!newUsername || !newTempPassword) return;
+                            setUserMgmtError('');
+                            try {
+                              await api.createUser(newUsername, newTempPassword);
+                              setNewUsername('');
+                              setNewTempPassword('');
+                              api.getUsers().then(setUsers);
+                            } catch (err) {
+                              setUserMgmtError(err instanceof Error ? err.message : 'Failed to create user');
+                            }
+                          }}
+                        >
+                          Create user
+                        </button>
+                      </div>
+                      {userMgmtError && <p className="auth-error">{userMgmtError}</p>}
+                    </div>
+                  )}
+                </div>
+                <div className="settings-section">
+                  <h5>Masquerade</h5>
+                  <p className="settings-desc">Act as another user.</p>
+                  <div className="masquerade-row">
+                    <select
+                      value={masqueradeUserId}
+                      onChange={(e) => setMasqueradeUserId(e.target.value)}
+                      className="settings-select"
+                    >
+                      <option value="">Select user...</option>
+                      {users.filter((u) => u.id !== currentUser?.id).map((u) => (
+                        <option key={u.id} value={String(u.id)}>{u.username}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      disabled={!masqueradeUserId}
+                      onClick={async () => {
+                        if (!masqueradeUserId) return;
+                        try {
+                          await api.masquerade(parseInt(masqueradeUserId, 10));
+                          setMasqueradeUserId('');
+                          window.location.reload();
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : 'Masquerade failed');
+                        }
+                      }}
+                    >
+                      Masquerade
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-section">
+                  <h5>Full backup</h5>
+                  <p className="settings-desc">Download backup of all users and data (admin only).</p>
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    onClick={async () => {
+                      try {
+                        const blob = await api.getAdminFullBackup();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `gantt-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : 'Failed to download full backup');
+                      }
+                    }}
+                  >
+                    Download full backup
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="settings-section settings-dropdown">
               <button
                 type="button"

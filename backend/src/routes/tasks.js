@@ -26,6 +26,7 @@ function taskFromRow(row) {
 
 router.get('/', (req, res) => {
   try {
+    const userId = req.user?.userId;
     const { project_id, completed, include_completed } = req.query;
     let sql = `
       SELECT t.*, p.name as project_name, c.name as category_name, c.display_order as category_order
@@ -35,6 +36,7 @@ router.get('/', (req, res) => {
       WHERE 1=1
     `;
     const params = [];
+    if (userId) { sql += ' AND t.user_id = ?'; params.push(userId); }
     if (project_id) { sql += ' AND t.project_id = ?'; params.push(project_id); }
     if (completed === 'true') { sql += ' AND t.completed = 1'; }
     if (completed === 'false') { sql += ' AND t.completed = 0'; }
@@ -50,14 +52,21 @@ router.get('/', (req, res) => {
 
 router.get('/completed', (req, res) => {
   try {
-    const rows = db.prepare(`
-      SELECT t.*, p.name as project_name, c.name as category_name
-      FROM tasks t
-      JOIN projects p ON t.project_id = p.id
-      JOIN categories c ON p.category_id = c.id
-      WHERE t.completed = 1
-      ORDER BY t.completed_at DESC
-    `).all();
+    const userId = req.user?.userId;
+    const sql = userId
+      ? `SELECT t.*, p.name as project_name, c.name as category_name
+         FROM tasks t
+         JOIN projects p ON t.project_id = p.id
+         JOIN categories c ON p.category_id = c.id
+         WHERE t.completed = 1 AND t.user_id = ?
+         ORDER BY t.completed_at DESC`
+      : `SELECT t.*, p.name as project_name, c.name as category_name
+         FROM tasks t
+         JOIN projects p ON t.project_id = p.id
+         JOIN categories c ON p.category_id = c.id
+         WHERE t.completed = 1
+         ORDER BY t.completed_at DESC`;
+    const rows = userId ? db.prepare(sql).all(userId) : db.prepare(sql).all();
     res.json(rows.map(taskFromRow));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -66,13 +75,22 @@ router.get('/completed', (req, res) => {
 
 router.get('/:id', (req, res) => {
   try {
-    const row = db.prepare(`
-      SELECT t.*, p.name as project_name, c.name as category_name
-      FROM tasks t
-      JOIN projects p ON t.project_id = p.id
-      JOIN categories c ON p.category_id = c.id
-      WHERE t.id = ?
-    `).get(req.params.id);
+    const userId = req.user?.userId;
+    const row = userId
+      ? db.prepare(`
+          SELECT t.*, p.name as project_name, c.name as category_name
+          FROM tasks t
+          JOIN projects p ON t.project_id = p.id
+          JOIN categories c ON p.category_id = c.id
+          WHERE t.id = ? AND t.user_id = ?
+        `).get(req.params.id, userId)
+      : db.prepare(`
+          SELECT t.*, p.name as project_name, c.name as category_name
+          FROM tasks t
+          JOIN projects p ON t.project_id = p.id
+          JOIN categories c ON p.category_id = c.id
+          WHERE t.id = ?
+        `).get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Task not found' });
     res.json(taskFromRow(row));
   } catch (err) {
@@ -82,14 +100,18 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
     const { project_id, parent_id, name, start_date, end_date, due_date, progress = 0, base_priority = 5 } = req.body;
     if (!project_id || !name || !start_date || !end_date) {
       return res.status(400).json({ error: 'project_id, name, start_date, end_date required' });
     }
+    const proj = db.prepare('SELECT id FROM projects WHERE id = ? AND user_id = ?').get(project_id, userId);
+    if (!proj) return res.status(400).json({ error: 'Project not found' });
     const result = db.prepare(`
-      INSERT INTO tasks (project_id, parent_id, name, start_date, end_date, due_date, progress, base_priority)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(project_id, parent_id || null, name, start_date, end_date, due_date || null, progress, base_priority);
+      INSERT INTO tasks (user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, base_priority)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, project_id, parent_id || null, name, start_date, end_date, due_date || null, progress, base_priority);
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(taskFromRow(row));
   } catch (err) {
@@ -99,26 +121,27 @@ router.post('/', (req, res) => {
 
 router.post('/split/:id', (req, res) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
     const { id } = req.params;
     const { subtasks } = req.body; // [{ name, start_date, end_date }, ...]
     if (!Array.isArray(subtasks) || subtasks.length < 2) {
       return res.status(400).json({ error: 'subtasks must be an array of at least 2 items with name, start_date, end_date' });
     }
-    const parent = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+    const parent = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(id, userId);
     if (!parent) return res.status(404).json({ error: 'Task not found' });
 
     const inserted = [];
     for (const st of subtasks) {
       if (!st.name || !st.start_date || !st.end_date) continue;
       const result = db.prepare(`
-        INSERT INTO tasks (project_id, parent_id, name, start_date, end_date, due_date, progress, base_priority)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(parent.project_id, id, st.name, st.start_date, st.end_date, parent.due_date, 0, parent.base_priority);
+        INSERT INTO tasks (user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, base_priority)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(userId, parent.project_id, id, st.name, st.start_date, st.end_date, parent.due_date, 0, parent.base_priority);
       const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
       inserted.push(taskFromRow(row));
     }
-    // Mark parent as "project" type by keeping it but we treat it as container
-    db.prepare('UPDATE tasks SET progress = 0 WHERE id = ?').run(id);
+    db.prepare('UPDATE tasks SET progress = 0 WHERE id = ? AND user_id = ?').run(id, userId);
     res.status(201).json({ parent: taskFromRow(parent), children: inserted });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -127,6 +150,7 @@ router.post('/split/:id', (req, res) => {
 
 router.patch('/:id', (req, res) => {
   try {
+    const userId = req.user?.userId;
     const { id } = req.params;
     const { project_id, name, start_date, end_date, due_date, progress, completed, base_priority } = req.body;
     const updates = [];
@@ -143,8 +167,13 @@ router.patch('/:id', (req, res) => {
       params.push(completed ? 1 : 0, completed ? 1 : 0);
     }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
-    params.push(id);
-    db.prepare(`UPDATE tasks SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).run(...params);
+    if (userId) {
+      params.push(userId, id);
+      db.prepare(`UPDATE tasks SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ? AND user_id = ?`).run(...params);
+    } else {
+      params.push(id);
+      db.prepare(`UPDATE tasks SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).run(...params);
+    }
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     res.json(taskFromRow(row));
   } catch (err) {
@@ -154,12 +183,16 @@ router.patch('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
     const { cascade } = req.query;
-    const children = db.prepare('SELECT id FROM tasks WHERE parent_id = ?').all(req.params.id);
+    const task = db.prepare('SELECT id FROM tasks WHERE id = ? AND user_id = ?').get(req.params.id, userId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const children = db.prepare('SELECT id FROM tasks WHERE parent_id = ? AND user_id = ?').all(req.params.id, userId);
     if (children.length > 0 && cascade !== 'true') {
       return res.status(400).json({ error: 'Task has children. Use ?cascade=true to delete with children.' });
     }
-    db.prepare('DELETE FROM tasks WHERE id = ? OR parent_id = ?').run(req.params.id, req.params.id);
+    db.prepare('DELETE FROM tasks WHERE (id = ? OR parent_id = ?) AND user_id = ?').run(req.params.id, req.params.id, userId);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

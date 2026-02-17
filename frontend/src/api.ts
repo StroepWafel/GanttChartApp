@@ -22,15 +22,97 @@ export async function getAuthStatus() {
   return res.json();
 }
 
-export async function login(email: string, password: string) {
+export async function login(username: string, password: string) {
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, password }),
   });
   const data = await res.json();
   if (data.token) localStorage.setItem('gantt_token', data.token);
   return data;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const res = await fetchApi('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to change password');
+  return data;
+}
+
+export async function getMe() {
+  const res = await fetchApi('/users/me');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get user');
+  return data;
+}
+
+export async function getUserPreferences() {
+  const res = await fetchApi('/user-preferences');
+  return res.json();
+}
+
+export async function patchUserPreferences(key: string, value: unknown) {
+  const res = await fetchApi('/user-preferences', {
+    method: 'PATCH',
+    body: JSON.stringify({ key, value }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to save preferences');
+  return data;
+}
+
+export async function getUsers() {
+  const res = await fetchApi('/users');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get users');
+  return data;
+}
+
+export async function createUser(username: string, temporaryPassword: string) {
+  const res = await fetchApi('/users', {
+    method: 'POST',
+    body: JSON.stringify({ username, temporaryPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to create user');
+  return data;
+}
+
+export async function updateUser(id: number, data: {
+  password?: string;
+  currentPassword?: string;
+  isActive?: boolean;
+  revokeApiKey?: boolean;
+  regenerateApiKey?: boolean;
+}) {
+  const res = await fetchApi(`/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  const out = await res.json();
+  if (!res.ok) throw new Error(out.error || 'Failed to update user');
+  return out;
+}
+
+export async function masquerade(userId: number) {
+  const res = await fetchApi('/auth/masquerade', {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Masquerade failed');
+  if (data.token) localStorage.setItem('gantt_token', data.token);
+  return data;
+}
+
+export async function getAdminFullBackup(): Promise<Blob> {
+  const res = await fetchApi('/admin/full-backup');
+  if (!res.ok) throw new Error('Failed to fetch full backup');
+  return res.blob();
 }
 
 export async function getCategories() {

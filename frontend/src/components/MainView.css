@@ -520,3 +520,133 @@
   margin-right: 8px;
   border-radius: var(--radius-sm);
 }
+
+.settings-modal {
+  max-width: 480px;
+}
+
+.settings-modal h5 {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.change-password-form,
+.create-user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-input,
+.settings-select {
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.api-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.api-key-value {
+  flex: 1;
+  font-size: 11px;
+  word-break: break-all;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.masquerade-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.masquerade-row .settings-select {
+  flex: 1;
+}
+
+.user-list {
+  margin-bottom: 12px;
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.user-row-admin {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-row-admin:last-child {
+  border-bottom: none;
+}
+
+.user-row-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.btn-sm-danger-outline {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn-sm-danger-outline:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.admin-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--accent);
+  color: white;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.inactive-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--text-muted);
+  color: var(--bg);
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.auth-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
