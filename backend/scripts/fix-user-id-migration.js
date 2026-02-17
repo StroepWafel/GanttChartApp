@@ -24,6 +24,12 @@ function tableExists(name) {
 }
 
 try {
+  if (!tableExists('users')) {
+    console.log('Database has no users table - it may be empty. Start the app with: pm2 restart gantt-api');
+    console.log('The app will create tables on first run.');
+    process.exit(0);
+  }
+
   // 1. Add user_id to categories, projects, tasks if missing
   for (const table of ['categories', 'projects', 'tasks']) {
     if (!tableExists(table)) continue;
@@ -47,8 +53,8 @@ try {
     }
   }
 
-  // 3. Assign orphan rows to admin
-  const admin = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
+  // 3. Assign orphan rows to admin (only if users table exists)
+  const admin = tableExists('users') ? db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get() : null;
   if (admin) {
     const aid = admin.id;
     for (const table of ['categories', 'projects', 'tasks', 'gantt_expanded']) {
