@@ -22,6 +22,11 @@ export async function getAuthStatus() {
   return res.json();
 }
 
+export async function getLoginHash(username: string): Promise<{ hash: string }> {
+  const res = await fetch(`${API}/auth/login-hash?username=${encodeURIComponent(username)}`);
+  return res.json();
+}
+
 export async function login(username: string, password: string) {
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST',

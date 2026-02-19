@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { login, isAuthEnabled, masqueradeToken, optionalAuth, requireAdmin } from '../auth.js';
@@ -7,6 +8,24 @@ const router = express.Router();
 
 router.get('/status', (req, res) => {
   res.json({ enabled: isAuthEnabled() });
+});
+
+router.get('/login-hash', (req, res) => {
+  try {
+    const username = req.query.username;
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: 'Username required' });
+    }
+    const user = db.prepare(
+      'SELECT password_hash FROM users WHERE username = ? AND is_active = 1'
+    ).get(username);
+    const hash = user
+      ? user.password_hash
+      : bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
+    res.json({ hash });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/login', async (req, res) => {

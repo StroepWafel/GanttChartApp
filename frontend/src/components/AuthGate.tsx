@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { login } from '../api';
+import { Loader2 } from 'lucide-react';
+import { getLoginHash, login } from '../api';
 import './AuthGate.css';
 
 interface Props {
@@ -10,16 +11,21 @@ export default function AuthGate({ onLogin }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
     try {
+      await getLoginHash(username);
       const data = await login(username, password);
       if (data.token) onLogin(data.token);
       else setError(data.error || 'Invalid credentials');
     } catch (err) {
       setError('Login failed');
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -43,7 +49,16 @@ export default function AuthGate({ onLogin }: Props) {
           required
         />
         {error && <p className="auth-error">{error}</p>}
-        <button type="submit">Sign in</button>
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="auth-spinner" size={18} aria-hidden />
+              Signing in…
+            </>
+          ) : (
+            'Sign in'
+          )}
+        </button>
       </form>
     </div>
   );
