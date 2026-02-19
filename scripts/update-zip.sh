@@ -10,12 +10,19 @@ LOG_FILE="${ROOT}/data/backups/update.log"
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG_FILE" 2>/dev/null || echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
 
+log "=== update-zip.sh started ==="
+log "ROOT=$ROOT REPO=${GITHUB_REPO:-StroepWafel/GanttChartApp}"
+
+# STOP PM2 FIRST - prevents race when spawned from in-app (process.exit triggers PM2 restart)
+if command -v pm2 &>/dev/null; then
+  echo "=== Stopping app (PM2) ==="
+  log "Stopping gantt-api"
+  pm2 stop gantt-api 2>/dev/null || true
+fi
+
 REPO="${GITHUB_REPO:-StroepWafel/GanttChartApp}"
 TMP_DIR="$(mktemp -d)"
 trap "rm -rf '$TMP_DIR'" EXIT
-
-log "=== update-zip.sh started ==="
-log "ROOT=$ROOT REPO=$REPO"
 
 echo "=== Fetching latest release ==="
 API_JSON=$(curl -sS "https://api.github.com/repos/${REPO}/releases/latest" \
@@ -56,17 +63,18 @@ elif [ -d "$EXTRACTED/frontend" ]; then
 fi
 [ -f "$EXTRACTED/package-lock.json" ] && cp "$EXTRACTED/package-lock.json" "$ROOT/" || true
 [ -f "$EXTRACTED/ecosystem.config.cjs" ] && cp "$EXTRACTED/ecosystem.config.cjs" "$ROOT/" || true
+[ -d "$EXTRACTED/scripts" ] && rm -rf "$ROOT/scripts" && cp -r "$EXTRACTED/scripts" "$ROOT/" || true
 log "Version in package.json after copy: $(node -p "require('./package.json').version" 2>/dev/null || echo 'read failed')"
 
 echo "=== Installing backend dependencies ==="
 log "Running npm install in backend"
-(cd "$ROOT/backend" && npm install --omit=dev 2>/dev/null) || npm --prefix "$ROOT/backend" install --omit=dev || true
+(cd "$ROOT/backend" && npm install --omit=dev) || npm --prefix "$ROOT/backend" install --omit=dev || true
 
-echo "=== Restarting (PM2 only) ==="
+echo "=== Starting (PM2) ==="
 if command -v pm2 &>/dev/null; then
-  pm2 restart gantt-api 2>/dev/null || true
-  echo "PM2 restart requested."
-  log "PM2 restart requested"
+  pm2 start gantt-api 2>/dev/null || pm2 restart gantt-api 2>/dev/null || true
+  echo "PM2 start/restart requested."
+  log "PM2 start/restart requested"
 else
   echo "PM2 not found. Restart the app manually."
   log "PM2 not found - restart manually"

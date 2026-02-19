@@ -46,9 +46,16 @@ function getDebugInfo() {
   };
 }
 
+/** Normalize version string: strip leading v/V and non-digits, e.g. vV1.0.2 -> 1.0.2 */
+function normalizeVersion(v) {
+  if (!v || typeof v !== 'string') return '0.0.0';
+  const s = v.replace(/^[vV]+/, '').replace(/^[^0-9.]+/, '');
+  return s || '0.0.0';
+}
+
 /** Compare semver strings; returns 1 if a>b, -1 if a<b, 0 if equal */
 function compareVersions(a, b) {
-  const parts = (v) => (v || '0').replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const parts = (v) => normalizeVersion(v).split('.').map((n) => parseInt(n, 10) || 0);
   const pa = parts(a);
   const pb = parts(b);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
@@ -87,8 +94,8 @@ router.get('/check-update', async (req, res) => {
 
     res.json({
       updateAvailable,
-      currentVersion,
-      latestVersion: latestTag,
+      currentVersion: normalizeVersion(currentVersion),
+      latestVersion: normalizeVersion(latestTag),
       releaseUrl: data.html_url,
       ...(debug && { _debug: debugInfo }),
     });
