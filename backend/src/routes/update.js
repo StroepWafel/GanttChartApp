@@ -24,6 +24,20 @@ function getVersion() {
   }
 }
 
+/** Compare semver strings; returns 1 if a>b, -1 if a<b, 0 if equal */
+function compareVersions(a, b) {
+  const parts = (v) => (v || '0').replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const pa = parts(a);
+  const pb = parts(b);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
 router.get('/check-update', async (req, res) => {
   try {
     const currentVersion = getVersion();
@@ -40,7 +54,7 @@ router.get('/check-update', async (req, res) => {
     if (!latestTag) {
       return res.json({ updateAvailable: false, currentVersion });
     }
-    const updateAvailable = latestTag !== currentVersion;
+    const updateAvailable = compareVersions(latestTag, currentVersion) > 0;
     res.json({
       updateAvailable,
       currentVersion,
@@ -52,11 +66,21 @@ router.get('/check-update', async (req, res) => {
   }
 });
 
+function runZipUpdate() {
+  const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
+  const scriptPath = join(ROOT_DIR, 'scripts', 'update-zip.sh');
+  const proc = spawn('bash', [scriptPath], {
+    cwd: ROOT_DIR,
+    stdio: 'inherit',
+    detached: true,
+    env: { ...process.env, GITHUB_REPO: repo, PM2_HOME: process.env.PM2_HOME || '' },
+  });
+  proc.unref();
+  process.exit(0);
+}
+
 router.post('/apply-update', async (req, res) => {
   try {
-    if (!existsSync(join(ROOT_DIR, '.git'))) {
-      return res.status(400).json({ error: 'Not a git repository; cannot auto-update. Use manual git pull.' });
-    }
     if (!existsSync(BACKUPS_DIR)) {
       mkdirSync(BACKUPS_DIR, { recursive: true });
     }
@@ -65,31 +89,45 @@ router.post('/apply-update', async (req, res) => {
     const backupPath = join(BACKUPS_DIR, `gantt-backup-pre-update-${timestamp}.json`);
     writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
 
+    const hasGit = existsSync(join(ROOT_DIR, '.git'));
     const scriptPath = join(ROOT_DIR, 'scripts', 'update.sh');
-    const hasUpdateScript = existsSync(scriptPath);
-    if (!hasUpdateScript) {
+
+    if (hasGit && existsSync(scriptPath)) {
+      res.json({
+        ok: true,
+        message: 'Backup created. Starting git update... (PM2 will restart automatically if deployed with PM2)',
+        backupPath,
+      });
+      setTimeout(() => {
+        const proc = spawn('bash', [scriptPath], {
+          cwd: ROOT_DIR,
+          stdio: 'inherit',
+          detached: true,
+          env: { ...process.env, PM2_HOME: process.env.PM2_HOME || '' },
+        });
+        proc.unref();
+        process.exit(0);
+      }, 500);
+      return;
+    }
+
+    const updateZipPath = join(ROOT_DIR, 'scripts', 'update-zip.sh');
+    if (!existsSync(updateZipPath)) {
       return res.status(400).json({
-        error: 'scripts/update.sh not found. Create it or run update manually.',
+        error: hasGit
+          ? 'scripts/update.sh not found. Create it or run update manually.'
+          : 'Deployed from zip: scripts/update-zip.sh not found. Re-download the latest release and extract over this install.',
         backupCreated: backupPath,
       });
     }
 
     res.json({
       ok: true,
-      message: 'Backup created. Starting update... (PM2 will restart automatically if deployed with PM2)',
+      message: 'Backup created. Starting zip update... (PM2 will restart automatically if deployed with PM2)',
       backupPath,
     });
 
-    setTimeout(() => {
-      const proc = spawn('bash', [scriptPath], {
-        cwd: ROOT_DIR,
-        stdio: 'inherit',
-        detached: true,
-        env: { ...process.env, PM2_HOME: process.env.PM2_HOME || '' },
-      });
-      proc.unref();
-      process.exit(0);
-    }, 500);
+    setTimeout(runZipUpdate, 500);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -105,7 +105,7 @@ jobs:
       - name: Create release archive
         run: |
           mkdir -p release
-          cp -r frontend/dist backend package.json release/
+          cp -r frontend/dist backend package.json scripts release/
           [ -f package-lock.json ] && cp package-lock.json release/
           [ -f ecosystem.config.cjs ] && cp ecosystem.config.cjs release/
           cd release && zip -r ../gantt-app-${{ steps.version.outputs.version }}.zip . && cd ..
