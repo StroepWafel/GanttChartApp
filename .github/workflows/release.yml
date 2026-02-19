@@ -79,9 +79,6 @@ jobs:
       - name: Install dependencies
         run: npm run install:all
 
-      - name: Build
-        run: npm run build
-
       - name: Get version
         id: version
         run: |
@@ -101,6 +98,9 @@ jobs:
               echo "Updated $f to $VER"
             fi
           done
+
+      - name: Build
+        run: npm run build
 
       - name: Create release archive
         run: |
