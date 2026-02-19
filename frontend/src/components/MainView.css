@@ -599,7 +599,22 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.update-debug {
+  margin-top: 10px;
+}
+
+.update-debug-content {
   margin-top: 8px;
+  padding: 10px;
+  background: var(--bg-secondary, #1a1a1a);
+  border-radius: 6px;
+  font-size: 11px;
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
 }
 
 .user-list {

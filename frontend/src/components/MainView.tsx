@@ -59,7 +59,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
     latestVersion?: string;
     releaseUrl?: string;
     error?: string;
+    _debug?: Record<string, unknown>;
   } | null>(null);
+  const [showUpdateDebug, setShowUpdateDebug] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
   const { isMobile } = useMediaQuery();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -701,7 +703,10 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                 </div>
                 <div className="settings-section">
                   <h5>Updates</h5>
-                  <p className="settings-desc">Automatic restarts after update only work when deployed with PM2.</p>
+                  <p className="settings-desc">
+                    Automatic restarts after update only work when deployed with PM2.
+                    Update scripts log to <code>data/backups/update.log</code>.
+                  </p>
                   <div className="settings-checkbox-row">
                     <label>
                       <input
@@ -728,7 +733,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                       onClick={async () => {
                         setUpdateCheck(null);
                         try {
-                          const data = await api.checkUpdate();
+                          const data = await api.checkUpdate(false);
                           setUpdateCheck(data);
                         } catch (err) {
                           setUpdateCheck({ updateAvailable: false, error: err instanceof Error ? err.message : 'Check failed' });
@@ -736,6 +741,23 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                       }}
                     >
                       Check for updates
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      title="Include debug info (paths, version source) for troubleshooting"
+                      onClick={async () => {
+                        setUpdateCheck(null);
+                        try {
+                          const data = await api.checkUpdate(true);
+                          setUpdateCheck(data);
+                          setShowUpdateDebug(true);
+                        } catch (err) {
+                          setUpdateCheck({ updateAvailable: false, error: err instanceof Error ? err.message : 'Check failed' });
+                        }
+                      }}
+                    >
+                      Check with debug
                     </button>
                     {updateCheck?.updateAvailable && (
                       <button
@@ -760,15 +782,33 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                     )}
                   </div>
                   {updateCheck && (
-                    <p className="settings-desc">
-                      {updateCheck.updateAvailable ? (
-                        <>Update available: v{updateCheck.latestVersion} (current: v{updateCheck.currentVersion})</>
-                      ) : updateCheck.error ? (
-                        <span className="auth-error">{updateCheck.error}</span>
-                      ) : (
-                        <>Up to date (v{updateCheck.currentVersion})</>
+                    <>
+                      <p className="settings-desc">
+                        {updateCheck.updateAvailable ? (
+                          <>Update available: v{updateCheck.latestVersion} (current: v{updateCheck.currentVersion})</>
+                        ) : updateCheck.error ? (
+                          <span className="auth-error">{updateCheck.error}</span>
+                        ) : (
+                          <>Up to date (v{updateCheck.currentVersion})</>
+                        )}
+                      </p>
+                      {updateCheck._debug && (
+                        <div className="update-debug">
+                          <button
+                            type="button"
+                            className="btn-sm"
+                            onClick={() => setShowUpdateDebug((v) => !v)}
+                          >
+                            {showUpdateDebug ? 'Hide' : 'Show'} debug info
+                          </button>
+                          {showUpdateDebug && (
+                            <pre className="update-debug-content" title="Copy this to share when reporting issues">
+                              {JSON.stringify(updateCheck._debug, null, 2)}
+                            </pre>
+                          )}
+                        </div>
                       )}
-                    </p>
+                    </>
                   )}
                 </div>
               </div>

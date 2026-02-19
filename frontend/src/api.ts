@@ -145,15 +145,17 @@ export async function patchSettings(data: Record<string, unknown>) {
   return out;
 }
 
-export async function checkUpdate() {
-  const res = await fetchApi('/admin/update/check-update');
+export async function checkUpdate(debug = false) {
+  const url = debug ? '/admin/update/check-update?debug=1' : '/admin/update/check-update';
+  const res = await fetchApi(url);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to check for updates');
   return data;
 }
 
-export async function applyUpdate() {
-  const res = await fetchApi('/admin/update/apply-update', { method: 'POST' });
+export async function applyUpdate(debug = false) {
+  const url = debug ? '/admin/update/apply-update?debug=1' : '/admin/update/apply-update';
+  const res = await fetchApi(url, { method: 'POST' });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to apply update');
   return data;

@@ -45,13 +45,18 @@ app.use('/api/admin', adminRouter);
 app.use('/api/admin/update', updateRouter);
 app.use('/api/settings', optionalAuth, settingsRouter);
 
-// Version (public for update check UI)
+// Version (public for update check UI) - reads root package.json
 app.get('/api/version', (req, res) => {
   try {
-    const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+    const pkgPath = path.resolve(__dirname, '..', '..', 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-    res.json({ version: pkg.version || '1.0.0' });
-  } catch (_) {
+    const version = pkg.version || '1.0.0';
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[version] path=%s version=%s', pkgPath, version);
+    }
+    res.json({ version });
+  } catch (err) {
+    console.error('[version] read failed:', err?.message);
     res.json({ version: '1.0.0' });
   }
 });
