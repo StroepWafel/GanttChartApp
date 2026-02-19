@@ -52,10 +52,23 @@ jobs:
           echo "version=$NEW" >> $GITHUB_OUTPUT
           echo "Bumping to $NEW (was $TAG, bump: $BUMP)"
 
-      - name: Create and push tag
+      - name: Update package.json and commit
         run: |
+          VER="${{ steps.version.outputs.version }}"
+          VER="${VER#v}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in package.json backend/package.json frontend/package.json; do
+            if [ -f "$f" ]; then
+              node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('$f','utf8'));p.version='$VER';fs.writeFileSync('$f',JSON.stringify(p,null,2));"
+            fi
+          done
+          git add package.json backend/package.json frontend/package.json
+          git commit -m "Release ${{ steps.version.outputs.version }}"
+          git push origin HEAD
+
+      - name: Create and push tag
+        run: |
           git tag "${{ steps.version.outputs.version }}"
           git push origin "${{ steps.version.outputs.version }}"
     outputs:
