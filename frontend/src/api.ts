@@ -38,6 +38,28 @@ export async function login(username: string, password: string) {
   return data;
 }
 
+export async function requestPasswordReset(email: string): Promise<{ message: string }> {
+  const res = await fetch(`${API}/auth/password-reset-request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to request reset');
+  return data;
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API}/auth/password-reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to reset password');
+  return data;
+}
+
 export async function changePassword(currentPassword: string, newPassword: string) {
   const res = await fetchApi('/auth/change-password', {
     method: 'POST',

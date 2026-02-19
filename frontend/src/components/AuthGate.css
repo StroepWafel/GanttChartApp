@@ -63,6 +63,34 @@
   cursor: not-allowed;
 }
 
+.auth-link-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.auth-link-button:hover {
+  text-decoration: underline;
+}
+
+.auth-success {
+  color: var(--success, #22c55e);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.auth-form-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 16px;
+  line-height: 1.4;
+}
+
 .auth-form button .auth-spinner {
   animation: auth-spin 0.8s linear infinite;
 }
