@@ -118,6 +118,42 @@ export async function getAdminFullBackup(): Promise<Blob> {
   return res.blob();
 }
 
+export async function getVersion() {
+  const res = await fetch(`${API}/version`);
+  return res.json();
+}
+
+export async function getSettings() {
+  const res = await fetchApi('/settings');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get settings');
+  return data;
+}
+
+export async function patchSettings(data: Record<string, unknown>) {
+  const res = await fetchApi('/settings', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  const out = await res.json();
+  if (!res.ok) throw new Error(out.error || 'Failed to save settings');
+  return out;
+}
+
+export async function checkUpdate() {
+  const res = await fetchApi('/admin/update/check-update');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to check for updates');
+  return data;
+}
+
+export async function applyUpdate() {
+  const res = await fetchApi('/admin/update/apply-update', { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to apply update');
+  return data;
+}
+
 export async function getCategories() {
   const res = await fetchApi('/categories');
   return res.json();

@@ -5,7 +5,7 @@ import { optionalAuth, requireAdmin } from '../auth.js';
 const router = express.Router();
 router.use(optionalAuth, requireAdmin);
 
-function fetchFullBackup() {
+export function fetchFullBackup() {
   const users = db.prepare(`
     SELECT id, username, password_hash, is_admin, api_key, created_at FROM users ORDER BY id
   `).all();

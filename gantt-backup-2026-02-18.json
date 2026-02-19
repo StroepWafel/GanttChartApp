@@ -1,0 +1,700 @@
+{
+  "version": 1,
+  "exportedAt": "2026-02-18T11:41:54.523Z",
+  "categories": [
+    {
+      "id": 5,
+      "name": "OAC Digital Technologies",
+      "display_order": 0,
+      "created_at": "2026-02-13 01:51:31"
+    },
+    {
+      "id": 6,
+      "name": "Stage 2 Physics",
+      "display_order": 0,
+      "created_at": "2026-02-13 01:51:39"
+    },
+    {
+      "id": 7,
+      "name": "Stage 2 Mathematical Methods",
+      "display_order": 0,
+      "created_at": "2026-02-13 01:51:52"
+    },
+    {
+      "id": 8,
+      "name": "Stage 2 Specialist Mathematics",
+      "display_order": 0,
+      "created_at": "2026-02-13 01:52:02"
+    }
+  ],
+  "projects": [
+    {
+      "id": 6,
+      "category_id": 5,
+      "name": "Task 1 Part 1 - Data Logger",
+      "start_date": null,
+      "due_date": "2026-02-17",
+      "created_at": "2026-02-13 01:53:11"
+    },
+    {
+      "id": 7,
+      "category_id": 7,
+      "name": "SAT 1: Differential Calculus",
+      "start_date": null,
+      "due_date": "2026-02-25",
+      "created_at": "2026-02-13 01:56:15"
+    },
+    {
+      "id": 9,
+      "category_id": 6,
+      "name": "SHE Investigation Folio Task",
+      "start_date": null,
+      "due_date": "2026-03-13",
+      "created_at": "2026-02-16 10:29:51"
+    },
+    {
+      "id": 10,
+      "category_id": 5,
+      "name": "Task 1 Part 2 - Data Logger",
+      "start_date": null,
+      "due_date": null,
+      "created_at": "2026-02-17 01:03:27"
+    },
+    {
+      "id": 100,
+      "category_id": 8,
+      "name": "weekly tasks",
+      "start_date": null,
+      "due_date": null,
+      "created_at": "2026-02-18 12:00:00"
+    }
+  ],
+  "tasks": [
+    {
+      "id": 17,
+      "project_id": 6,
+      "parent_id": null,
+      "name": "Write Sensor tracking code",
+      "start_date": "2026-02-13",
+      "end_date": "2026-02-16",
+      "due_date": "2026-02-15",
+      "progress": 0,
+      "completed": 1,
+      "completed_at": "2026-02-14 05:48:59",
+      "base_priority": 7,
+      "created_at": "2026-02-13 01:53:34",
+      "updated_at": "2026-02-14 05:48:59"
+    },
+    {
+      "id": 19,
+      "project_id": 7,
+      "parent_id": null,
+      "name": "Study for Exam",
+      "start_date": "2026-02-19",
+      "end_date": "2026-02-25",
+      "due_date": "2026-02-25",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 10,
+      "created_at": "2026-02-13 01:57:13",
+      "updated_at": "2026-02-13 01:57:48"
+    },
+    {
+      "id": 20,
+      "project_id": 7,
+      "parent_id": null,
+      "name": "Create Formula Sheet",
+      "start_date": "2026-02-15",
+      "end_date": "2026-02-23",
+      "due_date": "2026-05-25",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-13 01:58:30",
+      "updated_at": "2026-02-13 01:58:30"
+    },
+    {
+      "id": 23,
+      "project_id": 9,
+      "parent_id": null,
+      "name": "Dot Points and Ideation",
+      "start_date": "2026-02-18",
+      "end_date": "2026-02-21",
+      "due_date": "2026-02-23",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-16 10:30:37",
+      "updated_at": "2026-02-16 10:30:44"
+    },
+    {
+      "id": 24,
+      "project_id": 9,
+      "parent_id": null,
+      "name": "Draft Due",
+      "start_date": "2026-02-20",
+      "end_date": "2026-02-28",
+      "due_date": "2026-03-02",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 8,
+      "created_at": "2026-02-16 10:33:55",
+      "updated_at": "2026-02-16 10:34:17"
+    },
+    {
+      "id": 25,
+      "project_id": 9,
+      "parent_id": null,
+      "name": "Final Due",
+      "start_date": "2026-02-24",
+      "end_date": "2026-03-13",
+      "due_date": "2026-03-13",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 5,
+      "created_at": "2026-02-16 10:34:52",
+      "updated_at": "2026-02-16 10:40:56"
+    },
+    {
+      "id": 43,
+      "project_id": 10,
+      "parent_id": null,
+      "name": "Log and explain data",
+      "start_date": "2026-02-17",
+      "end_date": "2026-02-24",
+      "due_date": "2026-02-24",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 6,
+      "created_at": "2026-02-17 01:04:39",
+      "updated_at": "2026-02-17 01:04:39"
+    },
+    {
+      "id": 44,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "1A (Q1,2), 1B (Q1,2)",
+      "start_date": "2026-02-09",
+      "end_date": "2026-02-15",
+      "due_date": "2026-02-15",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 45,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "1B (Q3-5, 9-11, 15), RS1A",
+      "start_date": "2026-02-16",
+      "end_date": "2026-02-22",
+      "due_date": "2026-02-22",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 46,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "4A, 4B, 4C",
+      "start_date": "2026-02-23",
+      "end_date": "2026-03-01",
+      "due_date": "2026-03-01",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 47,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "4D, 4E",
+      "start_date": "2026-03-02",
+      "end_date": "2026-03-08",
+      "due_date": "2026-03-08",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 48,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "4F, RS4A",
+      "start_date": "2026-03-09",
+      "end_date": "2026-03-15",
+      "due_date": "2026-03-15",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 49,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "2A, 2B, 2C, 2D",
+      "start_date": "2026-03-16",
+      "end_date": "2026-03-22",
+      "due_date": "2026-03-22",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 50,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "2E, 2F, 2G, RS2A",
+      "start_date": "2026-03-23",
+      "end_date": "2026-03-29",
+      "due_date": "2026-03-29",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 51,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "3A, 3B",
+      "start_date": "2026-03-30",
+      "end_date": "2026-04-05",
+      "due_date": "2026-04-05",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 52,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "3C, 3D, 3E",
+      "start_date": "2026-04-06",
+      "end_date": "2026-04-12",
+      "due_date": "2026-04-12",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 53,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "3F, RS3A",
+      "start_date": "2026-04-27",
+      "end_date": "2026-05-03",
+      "due_date": "2026-05-03",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 54,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "7A, 7B",
+      "start_date": "2026-05-04",
+      "end_date": "2026-05-10",
+      "due_date": "2026-05-10",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 55,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "7C",
+      "start_date": "2026-05-11",
+      "end_date": "2026-05-17",
+      "due_date": "2026-05-17",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 56,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "7D, 7E",
+      "start_date": "2026-05-18",
+      "end_date": "2026-05-24",
+      "due_date": "2026-05-24",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 57,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "7F",
+      "start_date": "2026-05-25",
+      "end_date": "2026-05-31",
+      "due_date": "2026-05-31",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 58,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "RS7A",
+      "start_date": "2026-06-01",
+      "end_date": "2026-06-07",
+      "due_date": "2026-06-07",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 59,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "5A, 5B, 5C, 5D",
+      "start_date": "2026-06-08",
+      "end_date": "2026-06-14",
+      "due_date": "2026-06-14",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 60,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "5E, 5F, 5G",
+      "start_date": "2026-06-15",
+      "end_date": "2026-06-21",
+      "due_date": "2026-06-21",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 61,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "5H, 5I, 6A",
+      "start_date": "2026-06-22",
+      "end_date": "2026-06-28",
+      "due_date": "2026-06-28",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 62,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "6B, 6C, 6D",
+      "start_date": "2026-06-29",
+      "end_date": "2026-07-05",
+      "due_date": "2026-07-05",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 63,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "6E, 6F, 6G",
+      "start_date": "2026-07-20",
+      "end_date": "2026-07-26",
+      "due_date": "2026-07-26",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 64,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "6H, 6I",
+      "start_date": "2026-07-27",
+      "end_date": "2026-08-02",
+      "due_date": "2026-08-02",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 65,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "6J, 6K",
+      "start_date": "2026-08-03",
+      "end_date": "2026-08-09",
+      "due_date": "2026-08-09",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 66,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "RS6A",
+      "start_date": "2026-08-10",
+      "end_date": "2026-08-16",
+      "due_date": "2026-08-16",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 67,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "8A, 8B",
+      "start_date": "2026-08-17",
+      "end_date": "2026-08-23",
+      "due_date": "2026-08-23",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 68,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "8C, 8D, 8E",
+      "start_date": "2026-08-24",
+      "end_date": "2026-08-30",
+      "due_date": "2026-08-30",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 69,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "8F, 8G, 8H, RS8A",
+      "start_date": "2026-08-31",
+      "end_date": "2026-09-06",
+      "due_date": "2026-09-06",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 70,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "9A, 9B, 9C",
+      "start_date": "2026-09-07",
+      "end_date": "2026-09-13",
+      "due_date": "2026-09-13",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 71,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "9D, 9E",
+      "start_date": "2026-09-14",
+      "end_date": "2026-09-20",
+      "due_date": "2026-09-20",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    },
+    {
+      "id": 72,
+      "project_id": 100,
+      "parent_id": null,
+      "name": "9F, RS9A",
+      "start_date": "2026-09-21",
+      "end_date": "2026-09-27",
+      "due_date": "2026-09-27",
+      "progress": 0,
+      "completed": 0,
+      "completed_at": null,
+      "base_priority": 7,
+      "created_at": "2026-02-18 12:00:00",
+      "updated_at": "2026-02-18 12:00:00"
+    }
+  ],
+  "gantt_expanded": [
+    {
+      "item_type": "category",
+      "item_id": 5,
+      "expanded": 0
+    },
+    {
+      "item_type": "category",
+      "item_id": 6,
+      "expanded": 1
+    },
+    {
+      "item_type": "category",
+      "item_id": 7,
+      "expanded": 1
+    },
+    {
+      "item_type": "project",
+      "item_id": 7,
+      "expanded": 1
+    },
+    {
+      "item_type": "project",
+      "item_id": 9,
+      "expanded": 1
+    },
+    {
+      "item_type": "project",
+      "item_id": 10,
+      "expanded": 1
+    },
+    {
+      "item_type": "category",
+      "item_id": 8,
+      "expanded": 1
+    },
+    {
+      "item_type": "project",
+      "item_id": 100,
+      "expanded": 1
+    }
+  ],
+  "settings": {
+    "priorityColors": {
+      "1": {
+        "bg": "#64748b",
+        "progress": "#94a3b8"
+      },
+      "2": {
+        "bg": "#64748b",
+        "progress": "#94a3b8"
+      },
+      "3": {
+        "bg": "#6366f1",
+        "progress": "#818cf8"
+      },
+      "4": {
+        "bg": "#6366f1",
+        "progress": "#818cf8"
+      },
+      "5": {
+        "bg": "#0ea5e9",
+        "progress": "#38bdf8"
+      },
+      "6": {
+        "bg": "#0ea5e9",
+        "progress": "#38bdf8"
+      },
+      "7": {
+        "bg": "#22c55e",
+        "progress": "#4ade80"
+      },
+      "8": {
+        "bg": "#eab308",
+        "progress": "#facc15"
+      },
+      "9": {
+        "bg": "#f97316",
+        "progress": "#fb923c"
+      },
+      "10": {
+        "bg": "#ef4444",
+        "progress": "#f87171"
+      }
+    }
+  }
+}

@@ -68,36 +68,57 @@ router.post('/', (req, res) => {
     db.prepare('DELETE FROM projects WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM categories WHERE user_id = ?').run(userId);
 
+    const catMap = {};
+    const projMap = {};
+    const taskMap = {};
+
     const insertCat = db.prepare(`
-      INSERT INTO categories (id, user_id, name, display_order, created_at)
-      VALUES (?, ?, ?, COALESCE(?, 0), COALESCE(?, datetime('now')))
+      INSERT INTO categories (user_id, name, display_order, created_at)
+      VALUES (?, ?, COALESCE(?, 0), COALESCE(?, datetime('now')))
     `);
     for (const c of categories) {
-      insertCat.run(c.id, userId, c.name, c.display_order, c.created_at);
+      const r = insertCat.run(userId, c.name, c.display_order, c.created_at);
+      catMap[c.id] = r.lastInsertRowid;
     }
 
     const insertProj = db.prepare(`
-      INSERT INTO projects (id, user_id, category_id, name, start_date, due_date, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
+      INSERT INTO projects (user_id, category_id, name, start_date, due_date, created_at)
+      VALUES (?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
     `);
     for (const p of projects) {
-      insertProj.run(
-        p.id, userId, p.category_id, p.name,
-        p.start_date ?? null, p.due_date ?? null,
-        p.created_at
-      );
+      const newCatId = catMap[p.category_id] ?? p.category_id;
+      const r = insertProj.run(userId, newCatId, p.name, p.start_date ?? null, p.due_date ?? null, p.created_at);
+      projMap[p.id] = r.lastInsertRowid;
     }
 
     const insertTask = db.prepare(`
-      INSERT INTO tasks (id, user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), COALESCE(?, 0), ?, COALESCE(?, 5), COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))
+      INSERT INTO tasks (user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), COALESCE(?, 0), ?, COALESCE(?, 5), COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))
     `);
-    for (const t of tasks) {
-      insertTask.run(
-        t.id, userId, t.project_id, t.parent_id || null, t.name, t.start_date, t.end_date,
-        t.due_date || null, t.progress, t.completed ? 1 : 0, t.completed_at,
-        t.base_priority, t.created_at, t.updated_at
-      );
+    let inserted = true;
+    while (inserted) {
+      inserted = false;
+      for (const t of tasks) {
+        if (taskMap[t.id] != null) continue;
+        const newProjId = projMap[t.project_id] ?? t.project_id;
+        const newParentId = t.parent_id == null ? null : (taskMap[t.parent_id] ?? null);
+        if (t.parent_id != null && newParentId == null) continue;
+        const r = insertTask.run(
+          userId, newProjId, newParentId, t.name, t.start_date, t.end_date,
+          t.due_date ?? null, t.progress, t.completed ? 1 : 0, t.completed_at,
+          t.base_priority, t.created_at, t.updated_at
+        );
+        taskMap[t.id] = r.lastInsertRowid;
+        inserted = true;
+      }
+    }
+
+    function remapItemId(type, oldId) {
+      const n = parseInt(oldId, 10);
+      if (type === 'category') return catMap[n] ?? n;
+      if (type === 'project') return projMap[n] ?? n;
+      if (type === 'task') return taskMap[n] ?? n;
+      return n;
     }
 
     if (Array.isArray(gantt_expanded) && gantt_expanded.length > 0) {
@@ -105,7 +126,8 @@ router.post('/', (req, res) => {
         INSERT INTO gantt_expanded (user_id, item_type, item_id, expanded) VALUES (?, ?, ?, ?)
       `);
       for (const e of gantt_expanded) {
-        insertExp.run(userId, e.item_type, e.item_id, e.expanded ? 1 : 0);
+        const newItemId = remapItemId(e.item_type, e.item_id);
+        insertExp.run(userId, e.item_type, newItemId, e.expanded ? 1 : 0);
       }
     } else if (gantt_expanded && typeof gantt_expanded === 'object') {
       const insertExp = db.prepare(`
@@ -115,7 +137,8 @@ router.post('/', (req, res) => {
         const obj = gantt_expanded[type];
         if (obj && typeof obj === 'object') {
           for (const [itemId, expanded] of Object.entries(obj)) {
-            insertExp.run(userId, type, parseInt(itemId, 10), expanded ? 1 : 0);
+            const newItemId = remapItemId(type, itemId);
+            insertExp.run(userId, type, newItemId, expanded ? 1 : 0);
           }
         }
       }

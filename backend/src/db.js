@@ -76,6 +76,11 @@ db.exec(`
     FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS gantt_expanded (
     user_id INTEGER NOT NULL,
     item_type TEXT NOT NULL,

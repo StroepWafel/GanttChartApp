@@ -578,6 +578,30 @@
   flex: 1;
 }
 
+.settings-checkbox-row {
+  margin: 8px 0;
+}
+
+.settings-checkbox-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.update-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
 .user-list {
   margin-bottom: 12px;
 }

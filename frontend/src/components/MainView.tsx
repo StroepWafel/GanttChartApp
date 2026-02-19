@@ -52,6 +52,15 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [changePasswordNew, setChangePasswordNew] = useState('');
   const [masqueradeUserId, setMasqueradeUserId] = useState<string>('');
   const [userMgmtError, setUserMgmtError] = useState('');
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
+  const [updateCheck, setUpdateCheck] = useState<{
+    updateAvailable: boolean;
+    currentVersion?: string;
+    latestVersion?: string;
+    releaseUrl?: string;
+    error?: string;
+  } | null>(null);
+  const [applyingUpdate, setApplyingUpdate] = useState(false);
   const { isMobile } = useMediaQuery();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
@@ -87,6 +96,14 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   useEffect(() => {
     if (authEnabled && currentUser?.isAdmin) {
       api.getUsers().then(setUsers).catch(() => setUsers([]));
+    }
+  }, [authEnabled, currentUser?.isAdmin]);
+
+  useEffect(() => {
+    if (authEnabled && currentUser?.isAdmin) {
+      api.getSettings()
+        .then((s) => setAutoUpdateEnabled(!!s.auto_update_enabled))
+        .catch(() => {});
     }
   }, [authEnabled, currentUser?.isAdmin]);
 
@@ -681,6 +698,78 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                   >
                     Download full backup
                   </button>
+                </div>
+                <div className="settings-section">
+                  <h5>Updates</h5>
+                  <p className="settings-desc">Automatic restarts after update only work when deployed with PM2.</p>
+                  <div className="settings-checkbox-row">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={autoUpdateEnabled}
+                        onChange={async (e) => {
+                          const v = e.target.checked;
+                          setAutoUpdateEnabled(v);
+                          try {
+                            await api.patchSettings({ auto_update_enabled: v });
+                          } catch (err) {
+                            setAutoUpdateEnabled(!v);
+                            alert(err instanceof Error ? err.message : 'Failed to save');
+                          }
+                        }}
+                      />
+                      Enable automatic update checks
+                    </label>
+                  </div>
+                  <div className="update-actions">
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      onClick={async () => {
+                        setUpdateCheck(null);
+                        try {
+                          const data = await api.checkUpdate();
+                          setUpdateCheck(data);
+                        } catch (err) {
+                          setUpdateCheck({ updateAvailable: false, error: err instanceof Error ? err.message : 'Check failed' });
+                        }
+                      }}
+                    >
+                      Check for updates
+                    </button>
+                    {updateCheck?.updateAvailable && (
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        disabled={applyingUpdate}
+                        onClick={async () => {
+                          if (!confirm(`Update to v${updateCheck.latestVersion}? A full backup will be created first. The app will restart (PM2 only).`)) return;
+                          setApplyingUpdate(true);
+                          try {
+                            await api.applyUpdate();
+                            alert('Backup created. Update in progress. The page will reload when the update completes.');
+                            setTimeout(() => window.location.reload(), 3000);
+                          } catch (err) {
+                            setApplyingUpdate(false);
+                            alert(err instanceof Error ? err.message : 'Failed to apply update');
+                          }
+                        }}
+                      >
+                        {applyingUpdate ? 'Applying…' : `Apply update (v${updateCheck.latestVersion})`}
+                      </button>
+                    )}
+                  </div>
+                  {updateCheck && (
+                    <p className="settings-desc">
+                      {updateCheck.updateAvailable ? (
+                        <>Update available: v{updateCheck.latestVersion} (current: v{updateCheck.currentVersion})</>
+                      ) : updateCheck.error ? (
+                        <span className="auth-error">{updateCheck.error}</span>
+                      ) : (
+                        <>Up to date (v{updateCheck.currentVersion})</>
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
             )}

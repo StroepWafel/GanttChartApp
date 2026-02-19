@@ -1,5 +1,6 @@
 import './load-env.js';
 import path from 'path';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
@@ -16,6 +17,8 @@ import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 import userPreferencesRouter from './routes/user-preferences.js';
 import adminRouter from './routes/admin.js';
+import settingsRouter from './routes/settings.js';
+import updateRouter from './routes/update.js';
 import apiRouter from './routes/api.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,6 +42,19 @@ app.use('/api/user-preferences', optionalAuth, userPreferencesRouter);
 
 // Admin-only routes
 app.use('/api/admin', adminRouter);
+app.use('/api/admin/update', updateRouter);
+app.use('/api/settings', optionalAuth, settingsRouter);
+
+// Version (public for update check UI)
+app.get('/api/version', (req, res) => {
+  try {
+    const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    res.json({ version: pkg.version || '1.0.0' });
+  } catch (_) {
+    res.json({ version: '1.0.0' });
+  }
+});
 
 // Read-only IoT API (username + api_key required)
 app.use('/api/readonly', apiRouter);
