@@ -4,6 +4,7 @@
 # Logs to data/backups/update.log
 
 set -e
+set -o pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 LOG_FILE="${ROOT}/data/backups/update.log"
@@ -61,11 +62,11 @@ log "Version in package.json after checkout: $(node -p "require('./package.json'
 
 echo "=== Installing dependencies ==="
 log "Running npm run install:all"
-npm run install:all
+npm run install:all 2>&1 | tee -a "$LOG_FILE"
 
 echo "=== Building ==="
 log "Running npm run build"
-npm run build
+npm run build 2>&1 | tee -a "$LOG_FILE"
 
 echo "=== Restarting (PM2) ==="
 if command -v pm2 &>/dev/null; then
