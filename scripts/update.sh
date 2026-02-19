@@ -34,13 +34,15 @@ fi
 
 echo "=== Fetching updates ==="
 log "Fetching from git"
+export GIT_TERMINAL_PROMPT=0
 git fetch origin
 LATEST_TAG=$(git tag -l 'v*' | sort -V | tail -1)
 log "LATEST_TAG=$LATEST_TAG"
 
 if [ -n "$LATEST_TAG" ]; then
-  log "Checking out $LATEST_TAG"
-  git checkout "$LATEST_TAG" 2>/dev/null || git pull origin main
+  log "Checking out $LATEST_TAG (force, non-interactive)"
+  git checkout -f "$LATEST_TAG" || { log "Checkout failed, trying git pull origin main"; git pull origin main || true; }
+  log "Checkout complete"
   # Normalize tag to valid semver: strip leading v/V, handle vV1.0.2 -> 1.0.2
   TAG_VER=$(echo "$LATEST_TAG" | sed 's/^[vV]*//' | sed 's/^[^0-9]*//')
   [ -z "$TAG_VER" ] && TAG_VER="0.0.0"
@@ -54,9 +56,11 @@ if [ -n "$LATEST_TAG" ]; then
       " "$f" "$TAG_VER" 2>/dev/null && log "Synced $f to $TAG_VER" || true
     fi
   done
+  log "Version sync done"
 else
-  log "Pulling main"
+  log "No tags found, pulling main"
   git pull origin main
+  log "Pull complete"
 fi
 log "Version in package.json after checkout: $(node -p "require('./package.json').version" 2>/dev/null || echo '?')"
 
