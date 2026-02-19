@@ -153,6 +153,71 @@ export async function patchSettings(data: Record<string, unknown>) {
   return out;
 }
 
+export type EmailOnboardingSettings = {
+  email_onboarding_enabled?: boolean;
+  email_onboarding_api_key?: string;
+  email_onboarding_region?: 'us' | 'eu';
+  email_onboarding_domain?: string;
+  email_onboarding_sending_username?: string;
+  email_onboarding_app_domain?: string;
+  email_onboarding_your_name?: string;
+  email_onboarding_login_url?: string;
+  email_onboarding_subject?: string;
+  email_onboarding_template?: string;
+};
+
+export async function getEmailOnboardingSettings(): Promise<EmailOnboardingSettings> {
+  const settings = await getSettings();
+  const keys = [
+    'email_onboarding_enabled', 'email_onboarding_api_key', 'email_onboarding_region',
+    'email_onboarding_domain', 'email_onboarding_sending_username', 'email_onboarding_app_domain',
+    'email_onboarding_your_name', 'email_onboarding_login_url', 'email_onboarding_subject',
+    'email_onboarding_template',
+  ];
+  const out: EmailOnboardingSettings = {};
+  for (const k of keys) {
+    if (settings[k] !== undefined) out[k as keyof EmailOnboardingSettings] = settings[k];
+  }
+  return out;
+}
+
+export async function patchEmailOnboardingSettings(data: EmailOnboardingSettings) {
+  return patchSettings(data);
+}
+
+export async function previewOnboardEmail(username: string) {
+  const res = await fetchApi('/admin/preview-onboard-email', {
+    method: 'POST',
+    body: JSON.stringify({ username }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to preview email');
+  return data as { subject: string; body: string };
+}
+
+export async function onboardUser(email: string, username: string) {
+  const res = await fetchApi('/admin/onboard-user', {
+    method: 'POST',
+    body: JSON.stringify({ email, username }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to onboard user');
+  return data as {
+    user: { id: number; username: string; isAdmin: boolean; apiKey: string | null; createdAt: string };
+    mailgunResponse: { statusCode: number; status: string; body: unknown };
+  };
+}
+
+export async function sendTestOnboardEmail(toEmail: string) {
+  const res = await fetchApi('/admin/test-onboard-email', {
+    method: 'POST',
+    body: JSON.stringify({ to: toEmail }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to send test email');
+  return data as { mailgunResponse: { statusCode: number; status: string; body: unknown } };
+}
+
 export async function checkUpdate(debug = false) {
   const url = debug ? '/admin/update/check-update?debug=1' : '/admin/update/check-update';
   const res = await fetchApi(url);

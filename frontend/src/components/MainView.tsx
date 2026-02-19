@@ -47,8 +47,13 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean; apiKey: string | null } | null>(null);
   const [users, setUsers] = useState<{ id: number; username: string; isAdmin: boolean; isActive: boolean; apiKey: string | null }[]>([]);
   const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showCreateManually, setShowCreateManually] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newTempPassword, setNewTempPassword] = useState('');
+  const [newOnboardEmail, setNewOnboardEmail] = useState('');
+  const [onboardPreviewData, setOnboardPreviewData] = useState<{ email: string; username: string; subject: string; body: string } | null>(null);
+  const [onboardSending, setOnboardSending] = useState(false);
+  const [onboardResult, setOnboardResult] = useState<{ statusCode: number; status: string; body: unknown } | null>(null);
   const [changePasswordCurrent, setChangePasswordCurrent] = useState('');
   const [changePasswordNew, setChangePasswordNew] = useState('');
   const [masqueradeUserId, setMasqueradeUserId] = useState<string>('');
@@ -65,8 +70,13 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [showUpdateDebug, setShowUpdateDebug] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
   const [appVersion, setAppVersion] = useState<string | null>(null);
-  type SettingsTab = 'personal' | 'admin' | 'updates' | 'danger';
+  type SettingsTab = 'personal' | 'admin' | 'emailOnboarding' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
+  const [emailOnboardingSettings, setEmailOnboardingSettings] = useState<api.EmailOnboardingSettings>({});
+  const [showEmailOnboardingSetup, setShowEmailOnboardingSetup] = useState(false);
+  const [emailOnboardingSaving, setEmailOnboardingSaving] = useState(false);
+  const [testOnboardEmailTo, setTestOnboardEmailTo] = useState('');
+  const [testOnboardEmailResponse, setTestOnboardEmailResponse] = useState<string | null>(null);
   const { isMobile } = useMediaQuery();
   const modal = useModal();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -109,7 +119,20 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   useEffect(() => {
     if (authEnabled && currentUser?.isAdmin) {
       api.getSettings()
-        .then((s) => setAutoUpdateEnabled(!!s.auto_update_enabled))
+        .then((s) => {
+          setAutoUpdateEnabled(!!s.auto_update_enabled);
+          const eoKeys = [
+            'email_onboarding_enabled', 'email_onboarding_api_key', 'email_onboarding_region',
+            'email_onboarding_domain', 'email_onboarding_sending_username', 'email_onboarding_app_domain',
+            'email_onboarding_your_name', 'email_onboarding_login_url', 'email_onboarding_subject',
+            'email_onboarding_template',
+          ];
+          const eo: api.EmailOnboardingSettings = {};
+          for (const k of eoKeys) {
+            if (s[k] !== undefined) eo[k as keyof api.EmailOnboardingSettings] = s[k];
+          }
+          setEmailOnboardingSettings(eo);
+        })
         .catch(() => {});
     }
   }, [authEnabled, currentUser?.isAdmin]);
@@ -452,6 +475,74 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         />
       )}
 
+      {onboardPreviewData && (
+        <div className="modal-overlay" onClick={() => { if (!onboardSending) { setOnboardPreviewData(null); setOnboardResult(null); } }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <h3>{onboardResult ? 'Onboard email sent' : 'Preview onboarding email'}</h3>
+            {onboardResult ? (
+              <div className="settings-desc">
+                <p><strong>Status:</strong> {onboardResult.statusCode} {onboardResult.status}</p>
+                <pre style={{ background: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: 4, fontSize: '0.8rem', overflow: 'auto', maxHeight: 200 }}>
+                  {JSON.stringify(onboardResult.body, null, 2)}
+                </pre>
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() => {
+                    setOnboardPreviewData(null);
+                    setOnboardResult(null);
+                    setNewOnboardEmail('');
+                    setNewUsername('');
+                    api.getUsers().then(setUsers);
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="settings-desc" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+                  <p><strong>To:</strong> {onboardPreviewData.email}</p>
+                  <p><strong>Subject:</strong> {onboardPreviewData.subject}</p>
+                  <p><strong>Body:</strong></p>
+                  <pre style={{ whiteSpace: 'pre-wrap', background: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: 4, fontSize: '0.85rem' }}>
+                    {onboardPreviewData.body}
+                  </pre>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    disabled={onboardSending}
+                    onClick={async () => {
+                      setOnboardSending(true);
+                      try {
+                        const data = await api.onboardUser(onboardPreviewData!.email, onboardPreviewData!.username);
+                        setOnboardResult(data.mailgunResponse);
+                      } catch (err) {
+                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to onboard user' });
+                      } finally {
+                        setOnboardSending(false);
+                      }
+                    }}
+                  >
+                    {onboardSending ? 'Sending…' : 'Send invite'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-sm btn-sm-danger-outline"
+                    disabled={onboardSending}
+                    onClick={() => { setOnboardPreviewData(null); }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {showCompleted && (
         <CompletedTasks
           onClose={() => setShowCompleted(false)}
@@ -498,6 +589,17 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                   onClick={() => setSettingsTab('admin')}
                 >
                   Admin
+                </button>
+              )}
+              {currentUser?.isAdmin && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={settingsTab === 'emailOnboarding'}
+                  className={`settings-tab ${settingsTab === 'emailOnboarding' ? 'active' : ''}`}
+                  onClick={() => setSettingsTab('emailOnboarding')}
+                >
+                  Email onboarding
                 </button>
               )}
               {currentUser?.isAdmin && (
@@ -774,38 +876,117 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         ))}
                       </div>
                       <div className="create-user-form">
-                        <input
-                          type="text"
-                          placeholder="Username"
-                          value={newUsername}
-                          onChange={(e) => setNewUsername(e.target.value)}
-                          className="settings-input"
-                        />
-                        <input
-                          type="password"
-                          placeholder="Temporary password"
-                          value={newTempPassword}
-                          onChange={(e) => setNewTempPassword(e.target.value)}
-                          className="settings-input"
-                        />
-                        <button
-                          type="button"
-                          className="btn-sm"
-                          onClick={async () => {
-                            if (!newUsername || !newTempPassword) return;
-                            setUserMgmtError('');
-                            try {
-                              await api.createUser(newUsername, newTempPassword);
-                              setNewUsername('');
-                              setNewTempPassword('');
-                              api.getUsers().then(setUsers);
-                            } catch (err) {
-                              setUserMgmtError(err instanceof Error ? err.message : 'Failed to create user');
-                            }
-                          }}
-                        >
-                          Create user
-                        </button>
+                        {(emailOnboardingSettings.email_onboarding_enabled &&
+                          emailOnboardingSettings.email_onboarding_api_key &&
+                          emailOnboardingSettings.email_onboarding_domain) ? (
+                          <>
+                            <input
+                              type="email"
+                              placeholder="Email"
+                              value={newOnboardEmail}
+                              onChange={(e) => { setNewOnboardEmail(e.target.value); setUserMgmtError(''); }}
+                              className="settings-input"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Username"
+                              value={newUsername}
+                              onChange={(e) => { setNewUsername(e.target.value); setUserMgmtError(''); }}
+                              className="settings-input"
+                            />
+                            <button
+                              type="button"
+                              className="btn-sm"
+                              disabled={!newOnboardEmail.trim() || !newUsername.trim() || onboardSending}
+                              onClick={async () => {
+                                const email = newOnboardEmail.trim();
+                                const username = newUsername.trim();
+                                if (!email || !username) return;
+                                setUserMgmtError('');
+                                try {
+                                  const preview = await api.previewOnboardEmail(username);
+                                  setOnboardPreviewData({ email, username, subject: preview.subject, body: preview.body });
+                                  setOnboardResult(null);
+                                } catch (err) {
+                                  setUserMgmtError(err instanceof Error ? err.message : 'Failed to preview');
+                                }
+                              }}
+                            >
+                              Onboard
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-sm btn-sm-danger-outline"
+                              onClick={() => setShowCreateManually((v) => !v)}
+                            >
+                              {showCreateManually ? 'Hide' : 'Create manually'}
+                            </button>
+                            {showCreateManually && (
+                              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
+                                <input
+                                  type="password"
+                                  placeholder="Temporary password"
+                                  value={newTempPassword}
+                                  onChange={(e) => setNewTempPassword(e.target.value)}
+                                  className="settings-input"
+                                />
+                                <button
+                                  type="button"
+                                  className="btn-sm"
+                                  onClick={async () => {
+                                    if (!newUsername || !newTempPassword) return;
+                                    setUserMgmtError('');
+                                    try {
+                                      await api.createUser(newUsername, newTempPassword);
+                                      setNewUsername('');
+                                      setNewTempPassword('');
+                                      api.getUsers().then(setUsers);
+                                    } catch (err) {
+                                      setUserMgmtError(err instanceof Error ? err.message : 'Failed to create user');
+                                    }
+                                  }}
+                                >
+                                  Create user
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              placeholder="Username"
+                              value={newUsername}
+                              onChange={(e) => setNewUsername(e.target.value)}
+                              className="settings-input"
+                            />
+                            <input
+                              type="password"
+                              placeholder="Temporary password"
+                              value={newTempPassword}
+                              onChange={(e) => setNewTempPassword(e.target.value)}
+                              className="settings-input"
+                            />
+                            <button
+                              type="button"
+                              className="btn-sm"
+                              onClick={async () => {
+                                if (!newUsername || !newTempPassword) return;
+                                setUserMgmtError('');
+                                try {
+                                  await api.createUser(newUsername, newTempPassword);
+                                  setNewUsername('');
+                                  setNewTempPassword('');
+                                  api.getUsers().then(setUsers);
+                                } catch (err) {
+                                  setUserMgmtError(err instanceof Error ? err.message : 'Failed to create user');
+                                }
+                              }}
+                            >
+                              Create user
+                            </button>
+                          </>
+                        )}
                       </div>
                       {userMgmtError && <p className="auth-error">{userMgmtError}</p>}
                     </div>
@@ -866,6 +1047,286 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                   >
                     Download full backup
                   </button>
+                </div>
+              </div>
+            )}
+            {settingsTab === 'emailOnboarding' && currentUser?.isAdmin && (
+              <div className="settings-tab-content" role="tabpanel">
+                <div className="settings-section settings-dropdown">
+                  <button
+                    type="button"
+                    className={`settings-dropdown-trigger ${showEmailOnboardingSetup ? 'expanded' : ''}`}
+                    onClick={() => setShowEmailOnboardingSetup((v) => !v)}
+                    aria-expanded={showEmailOnboardingSetup}
+                  >
+                    <span>Mailgun setup instructions</span>
+                    <ChevronDown size={16} className={showEmailOnboardingSetup ? 'rotated' : ''} />
+                  </button>
+                  {showEmailOnboardingSetup && (
+                    <div className="settings-dropdown-content">
+                      <ol className="settings-desc" style={{ paddingLeft: '1.25rem', marginTop: '0.5rem' }}>
+                        <li>Sign up at <a href="https://app.mailgun.com" target="_blank" rel="noopener noreferrer">app.mailgun.com</a></li>
+                        <li>Go to API Keys in your dashboard and copy your <strong>Private API key</strong></li>
+                        <li>For sandbox: add your email as an authorized recipient and verify it</li>
+                        <li>For production: verify your domain and configure DNS (see <a href="https://documentation.mailgun.com/docs/mailgun/quickstart" target="_blank" rel="noopener noreferrer">Mailgun Quickstart</a>)</li>
+                        <li>Use <strong>US</strong> base URL (api.mailgun.net) or <strong>EU</strong> (api.eu.mailgun.net) based on your domain region</li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
+                <div className="settings-section">
+                  <div className="settings-checkbox-row">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={!!emailOnboardingSettings.email_onboarding_enabled}
+                        onChange={async (e) => {
+                          const v = e.target.checked;
+                          setEmailOnboardingSaving(true);
+                          try {
+                            await api.patchSettings({ email_onboarding_enabled: v });
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_enabled: v }));
+                          } catch (err) {
+                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                          } finally {
+                            setEmailOnboardingSaving(false);
+                          }
+                        }}
+                      />
+                      Enable email onboarding
+                    </label>
+                  </div>
+                </div>
+                <div className="settings-section">
+                  <h5>API configuration</h5>
+                  <p className="settings-desc">Mailgun Private API key and sending domain.</p>
+                  <input
+                    type="password"
+                    placeholder="API Key"
+                    value={emailOnboardingSettings.email_onboarding_api_key ?? ''}
+                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_api_key: e.target.value }))}
+                    onBlur={async (e) => {
+                      const v = e.target.value;
+                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_api_key: v }));
+                      setEmailOnboardingSaving(true);
+                      try {
+                        await api.patchSettings({ email_onboarding_api_key: v });
+                      } catch (err) {
+                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                      } finally {
+                        setEmailOnboardingSaving(false);
+                      }
+                    }}
+                    className="settings-input"
+                    style={{ marginBottom: '0.5rem' }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                    <select
+                      value={emailOnboardingSettings.email_onboarding_region ?? 'us'}
+                      onChange={async (e) => {
+                        const v = e.target.value as 'us' | 'eu';
+                        setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_region: v }));
+                        setEmailOnboardingSaving(true);
+                        try {
+                          await api.patchSettings({ email_onboarding_region: v });
+                        } catch (err) {
+                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                        } finally {
+                          setEmailOnboardingSaving(false);
+                        }
+                      }}
+                      className="settings-select"
+                    >
+                      <option value="us">US (api.mailgun.net)</option>
+                      <option value="eu">EU (api.eu.mailgun.net)</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Domain (e.g. mail.stroepwafel.au)"
+                      value={emailOnboardingSettings.email_onboarding_domain ?? ''}
+                      onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_domain: e.target.value }))}
+                      onBlur={async (e) => {
+                        const v = e.target.value;
+                        setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_domain: v }));
+                        setEmailOnboardingSaving(true);
+                        try {
+                          await api.patchSettings({ email_onboarding_domain: v });
+                        } catch (err) {
+                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                        } finally {
+                          setEmailOnboardingSaving(false);
+                        }
+                      }}
+                      className="settings-input"
+                      style={{ flex: 1, minWidth: '160px' }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Sending username (e.g. onboarding)"
+                      value={emailOnboardingSettings.email_onboarding_sending_username ?? 'onboarding'}
+                      onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_sending_username: e.target.value }))}
+                      onBlur={async (e) => {
+                        const v = e.target.value;
+                        setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_sending_username: v }));
+                        setEmailOnboardingSaving(true);
+                        try {
+                          await api.patchSettings({ email_onboarding_sending_username: v });
+                        } catch (err) {
+                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                        } finally {
+                          setEmailOnboardingSaving(false);
+                        }
+                      }}
+                      className="settings-input"
+                      style={{ minWidth: '120px' }}
+                    />
+                  </div>
+                  <p className="settings-desc muted">
+                    From: Gantt &lt;{(emailOnboardingSettings.email_onboarding_sending_username || 'onboarding')}@{(emailOnboardingSettings.email_onboarding_domain || 'domain')}&gt;
+                  </p>
+                </div>
+                <div className="settings-section">
+                  <h5>Email template</h5>
+                  <p className="settings-desc">Placeholders: {"{{Username}}"}, {"{{password}}"}, {"{{app_domain}}"}, {"{{login_url}}"}, {"{{your_name}}"}</p>
+                  <input
+                    type="text"
+                    placeholder="App domain (e.g. gantt.stroepwafel.au)"
+                    value={emailOnboardingSettings.email_onboarding_app_domain ?? ''}
+                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: e.target.value }))}
+                    onBlur={async (e) => {
+                      const v = e.target.value;
+                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: v }));
+                      setEmailOnboardingSaving(true);
+                      try {
+                        await api.patchSettings({ email_onboarding_app_domain: v });
+                      } catch (err) {
+                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                      } finally {
+                        setEmailOnboardingSaving(false);
+                      }
+                    }}
+                    className="settings-input"
+                    style={{ marginBottom: '0.5rem' }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Your name (signature)"
+                    value={emailOnboardingSettings.email_onboarding_your_name ?? ''}
+                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: e.target.value }))}
+                    onBlur={async (e) => {
+                      const v = e.target.value;
+                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: v }));
+                      setEmailOnboardingSaving(true);
+                      try {
+                        await api.patchSettings({ email_onboarding_your_name: v });
+                      } catch (err) {
+                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                      } finally {
+                        setEmailOnboardingSaving(false);
+                      }
+                    }}
+                    className="settings-input"
+                    style={{ marginBottom: '0.5rem' }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Login URL (e.g. https://gantt.stroepwafel.au)"
+                    value={emailOnboardingSettings.email_onboarding_login_url ?? ''}
+                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: e.target.value }))}
+                    onBlur={async (e) => {
+                      const v = e.target.value;
+                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: v }));
+                      setEmailOnboardingSaving(true);
+                      try {
+                        await api.patchSettings({ email_onboarding_login_url: v });
+                      } catch (err) {
+                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                      } finally {
+                        setEmailOnboardingSaving(false);
+                      }
+                    }}
+                    className="settings-input"
+                    style={{ marginBottom: '0.5rem' }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Subject line"
+                    value={emailOnboardingSettings.email_onboarding_subject ?? ''}
+                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_subject: e.target.value }))}
+                    onBlur={async (e) => {
+                      const v = e.target.value;
+                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_subject: v }));
+                      setEmailOnboardingSaving(true);
+                      try {
+                        await api.patchSettings({ email_onboarding_subject: v });
+                      } catch (err) {
+                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                      } finally {
+                        setEmailOnboardingSaving(false);
+                      }
+                    }}
+                    className="settings-input"
+                    style={{ marginBottom: '0.5rem' }}
+                  />
+                  <textarea
+                    placeholder="Email body template"
+                    value={emailOnboardingSettings.email_onboarding_template ?? ''}
+                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_template: e.target.value }))}
+                    onBlur={async (e) => {
+                      const v = e.target.value;
+                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_template: v }));
+                      setEmailOnboardingSaving(true);
+                      try {
+                        await api.patchSettings({ email_onboarding_template: v });
+                      } catch (err) {
+                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                      } finally {
+                        setEmailOnboardingSaving(false);
+                      }
+                    }}
+                    className="settings-input"
+                    rows={12}
+                    style={{ fontFamily: 'monospace', fontSize: '0.9rem', resize: 'vertical' }}
+                  />
+                </div>
+                <div className="settings-section">
+                  <h5>Test send</h5>
+                  <p className="settings-desc">Send a test email to verify your Mailgun configuration.</p>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      type="email"
+                      placeholder="To: email@example.com"
+                      value={testOnboardEmailTo}
+                      onChange={(e) => { setTestOnboardEmailTo(e.target.value); setTestOnboardEmailResponse(null); }}
+                      className="settings-input"
+                      style={{ flex: 1, minWidth: '180px' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      disabled={!testOnboardEmailTo.trim() || emailOnboardingSaving}
+                      onClick={async () => {
+                        if (!testOnboardEmailTo.trim()) return;
+                        setTestOnboardEmailResponse(null);
+                        try {
+                          const data = await api.sendTestOnboardEmail(testOnboardEmailTo.trim());
+                          const r = data.mailgunResponse;
+                          setTestOnboardEmailResponse(
+                            `Status: ${r.statusCode} ${r.status}\n\nResponse:\n${JSON.stringify(r.body, null, 2)}`
+                          );
+                        } catch (err) {
+                          setTestOnboardEmailResponse(`Error: ${err instanceof Error ? err.message : 'Failed to send'}`);
+                        }
+                      }}
+                    >
+                      Send test
+                    </button>
+                  </div>
+                  {testOnboardEmailResponse && (
+                    <pre className="settings-desc" style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 4, fontSize: '0.8rem', overflow: 'auto', maxHeight: 200 }}>
+                      {testOnboardEmailResponse}
+                    </pre>
+                  )}
                 </div>
               </div>
             )}

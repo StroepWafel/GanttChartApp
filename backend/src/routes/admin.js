@@ -1,6 +1,103 @@
 import express from 'express';
+import bcrypt from 'bcryptjs';
+import { randomUUID, randomBytes } from 'crypto';
 import db, { runUserIdMigrations } from '../db.js';
 import { optionalAuth, requireAdmin } from '../auth.js';
+
+const DEFAULT_EMAIL_TEMPLATE = `Hi {{Username}},
+
+Your account for {{app_domain}} is ready.
+
+You can log in with:
+
+Username: {{Username}}
+Password: {{password}}
+
+We recommend changing your password after your first login.
+
+Start building your project timelines here: {{login_url}}
+
+– {{your_name}}
+Gantt`;
+
+function getSystemSettings() {
+  const rows = db.prepare('SELECT key, value FROM system_settings').all();
+  const out = {};
+  for (const r of rows) {
+    try {
+      out[r.key] = r.value ? JSON.parse(r.value) : null;
+    } catch {
+      out[r.key] = r.value;
+    }
+  }
+  return out;
+}
+
+function getEmailOnboardingConfig() {
+  const s = getSystemSettings();
+  const region = s.email_onboarding_region || 'us';
+  const baseUrl = region === 'eu' ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net';
+  return {
+    enabled: !!s.email_onboarding_enabled,
+    apiKey: s.email_onboarding_api_key || '',
+    domain: s.email_onboarding_domain || '',
+    sendingUsername: s.email_onboarding_sending_username || 'onboarding',
+    appDomain: s.email_onboarding_app_domain || 'gantt.example.com',
+    yourName: s.email_onboarding_your_name || 'The Team',
+    loginUrl: s.email_onboarding_login_url || 'https://gantt.example.com',
+    subject: s.email_onboarding_subject || 'Your Gantt account is ready',
+    template: s.email_onboarding_template || DEFAULT_EMAIL_TEMPLATE,
+    baseUrl,
+  };
+}
+
+function renderTemplate(config, { username, password = '(generated when you send)' }) {
+  let body = config.template;
+  body = body.replace(/\{\{Username\}\}/g, username || '');
+  body = body.replace(/\{\{password\}\}/g, password);
+  body = body.replace(/\{\{app_domain\}\}/g, config.appDomain);
+  body = body.replace(/\{\{login_url\}\}/g, config.loginUrl);
+  body = body.replace(/\{\{your_name\}\}/g, config.yourName);
+  return body;
+}
+
+async function sendMailgunEmail(config, { to, subject, text }) {
+  if (!config.apiKey || !config.domain) {
+    throw new Error('Mailgun API key and domain must be configured');
+  }
+  const fromAddr = `${config.sendingUsername}@${config.domain}`;
+  const fromDisplay = `Gantt <${fromAddr}>`;
+  const url = `${config.baseUrl}/v3/${config.domain}/messages`;
+
+  const form = new FormData();
+  form.append('from', fromDisplay);
+  form.append('to', to);
+  form.append('subject', subject);
+  form.append('text', text);
+
+  const auth = Buffer.from(`api:${config.apiKey}`).toString('base64');
+  const res = await fetch(url, {
+    method: 'POST',
+    body: form,
+    headers: {
+      Authorization: `Basic ${auth}`,
+    },
+  });
+
+  const bodyText = await res.text();
+  let bodyJson;
+  try {
+    bodyJson = JSON.parse(bodyText);
+  } catch {
+    bodyJson = { raw: bodyText };
+  }
+
+  return {
+    statusCode: res.status,
+    status: res.status === 200 ? 'ok' : 'error',
+    body: bodyJson,
+  };
+}
 
 const router = express.Router();
 router.use(optionalAuth, requireAdmin);
@@ -43,12 +140,113 @@ export function fetchFullBackup() {
     };
   });
 
+  const systemSettingsRows = db.prepare('SELECT key, value FROM system_settings').all();
+  const system_settings = {};
+  for (const r of systemSettingsRows) {
+    system_settings[r.key] = r.value;
+  }
+
   return {
     version: 2,
     exportedAt: new Date().toISOString(),
     users: usersWithData,
+    system_settings,
   };
 }
+
+/** Preview onboard email (no send, no user creation) */
+router.post('/preview-onboard-email', (req, res) => {
+  try {
+    const { username } = req.body || {};
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: 'username required' });
+    }
+    const config = getEmailOnboardingConfig();
+    const body = renderTemplate(config, { username });
+    res.json({
+      subject: config.subject,
+      body,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Onboard user: create user with random password and send invite email */
+router.post('/onboard-user', async (req, res) => {
+  try {
+    const { email, username } = req.body || {};
+    if (!email || !username || typeof email !== 'string' || typeof username !== 'string') {
+      return res.status(400).json({ error: 'email and username required' });
+    }
+    const emailTrim = email.trim();
+    const usernameTrim = username.trim();
+    if (!emailTrim || !usernameTrim) {
+      return res.status(400).json({ error: 'email and username required' });
+    }
+    const config = getEmailOnboardingConfig();
+    if (!config.enabled || !config.apiKey || !config.domain) {
+      return res.status(400).json({ error: 'Email onboarding is not configured or enabled. Configure it in Settings > Email onboarding.' });
+    }
+    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(usernameTrim);
+    if (existing) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    const temporaryPassword = randomBytes(12).toString('base64').replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' }[c] || c));
+    const hash = await bcrypt.hash(temporaryPassword, 10);
+    const apiKey = randomUUID();
+    const result = db.prepare(`
+      INSERT INTO users (username, password_hash, is_admin, api_key)
+      VALUES (?, ?, 0, ?)
+    `).run(usernameTrim, hash, apiKey);
+    const user = db.prepare('SELECT id, username, is_admin, api_key, created_at FROM users WHERE id = ?')
+      .get(result.lastInsertRowid);
+
+    const body = renderTemplate(config, { username: usernameTrim, password: temporaryPassword });
+    const mailgunRes = await sendMailgunEmail(config, {
+      to: emailTrim,
+      subject: config.subject,
+      text: body,
+    });
+
+    res.status(201).json({
+      user: {
+        id: user.id,
+        username: user.username,
+        isAdmin: !!user.is_admin,
+        apiKey: user.api_key,
+        createdAt: user.created_at,
+      },
+      mailgunResponse: mailgunRes,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Send test onboard email to verify Mailgun config */
+router.post('/test-onboard-email', async (req, res) => {
+  try {
+    const { to } = req.body || {};
+    if (!to || typeof to !== 'string' || !to.trim()) {
+      return res.status(400).json({ error: 'to (email address) required' });
+    }
+    const config = getEmailOnboardingConfig();
+    if (!config.apiKey || !config.domain) {
+      return res.status(400).json({ error: 'Mailgun API key and domain must be configured' });
+    }
+    const body = renderTemplate(config, { username: 'TestUser', password: '(test - no real account)' });
+    const mailgunRes = await sendMailgunEmail(config, {
+      to: to.trim(),
+      subject: `[Test] ${config.subject}`,
+      text: body,
+    });
+    res.json({ mailgunResponse: mailgunRes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /** Admin full backup: all users and data (excluding password hashes as plaintext) */
 router.get('/full-backup', (req, res) => {
@@ -203,6 +401,18 @@ router.post('/full-restore', (req, res) => {
               insertExp.run(uid, type, parseInt(itemId, 10), expanded ? 1 : 0);
             }
           }
+        }
+      }
+
+      if (body.system_settings && typeof body.system_settings === 'object') {
+        const upsertSetting = db.prepare(`
+          INSERT INTO system_settings (key, value) VALUES (?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        `);
+        for (const [key, value] of Object.entries(body.system_settings)) {
+          if (!key) continue;
+          const valStr = typeof value === 'string' ? value : JSON.stringify(value);
+          upsertSetting.run(key, valStr);
         }
       }
 
