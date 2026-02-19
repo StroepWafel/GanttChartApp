@@ -1409,7 +1409,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                           try {
                             await api.applyUpdate();
                             modal.showAlert({ title: 'Update in progress', message: 'Backup created. Update in progress. You may need to reload the page in a minute or so depending on the performance of the server. The page will attempt to reload automatically in 30 seconds.' });
-                            setTimeout(() => window.location.reload(), 30000);
+                            setTimeout(() => window.location.reload(), 3000);
                           } catch (err) {
                             setApplyingUpdate(false);
                             modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to apply update' });
