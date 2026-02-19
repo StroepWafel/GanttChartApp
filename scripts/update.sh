@@ -60,13 +60,10 @@ else
 fi
 log "Version in package.json after checkout: $(node -p "require('./package.json').version" 2>/dev/null || echo '?')"
 
-echo "=== Installing dependencies ==="
-log "Running npm run install:all"
-npm run install:all 2>&1 | tee -a "$LOG_FILE"
-
-echo "=== Building ==="
-log "Running npm run build"
-npm run build 2>&1 | tee -a "$LOG_FILE"
+echo "=== Installing dependencies and building ==="
+log "Running npm run install:all && npm run build (NODE_ENV=development for devDependencies)"
+NODE_ENV=development npm run install:all 2>&1 | tee -a "$LOG_FILE"
+NODE_ENV=development npm run build 2>&1 | tee -a "$LOG_FILE"
 
 echo "=== Restarting (PM2) ==="
 if command -v pm2 &>/dev/null; then
