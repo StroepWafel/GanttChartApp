@@ -63,6 +63,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   } | null>(null);
   const [showUpdateDebug, setShowUpdateDebug] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const { isMobile } = useMediaQuery();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
@@ -108,6 +109,10 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         .catch(() => {});
     }
   }, [authEnabled, currentUser?.isAdmin]);
+
+  useEffect(() => {
+    api.getVersion().then((v) => setAppVersion(v.version)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (authEnabled) {
@@ -703,6 +708,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                 </div>
                 <div className="settings-section">
                   <h5>Updates</h5>
+                  <p className="settings-desc settings-version">
+                    Version v{appVersion ?? '…'} · testupdatesystem
+                  </p>
                   <p className="settings-desc">
                     Automatic restarts after update only work when deployed with PM2.
                     Update scripts log to <code>data/backups/update.log</code>.
