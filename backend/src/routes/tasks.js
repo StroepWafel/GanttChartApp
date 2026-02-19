@@ -168,7 +168,7 @@ router.patch('/:id', (req, res) => {
     }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
     if (userId) {
-      params.push(userId, id);
+      params.push(id, userId);
       db.prepare(`UPDATE tasks SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ? AND user_id = ?`).run(...params);
     } else {
       params.push(id);

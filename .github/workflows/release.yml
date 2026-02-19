@@ -15,6 +15,10 @@ on:
           - minor
           - major
         default: patch
+      release_name:
+        description: 'Custom release name (defaults to version tag)'
+        required: false
+        type: string
 
 jobs:
   create-tag:
@@ -87,6 +91,17 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Update package.json version
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          VER="${VER#v}"
+          for f in package.json backend/package.json frontend/package.json; do
+            if [ -f "$f" ]; then
+              node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('$f','utf8'));p.version='$VER';fs.writeFileSync('$f',JSON.stringify(p,null,2));"
+              echo "Updated $f to $VER"
+            fi
+          done
+
       - name: Create release archive
         run: |
           mkdir -p release
@@ -99,6 +114,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ github.event.inputs.release_name || steps.version.outputs.version }}
           files: gantt-app-${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
         env:
