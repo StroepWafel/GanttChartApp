@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "build": "node -e \"console.log('Backend: no build step')\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
