@@ -309,6 +309,7 @@ Update the app:
 
 ```bash
 cd /opt/GanttChartApp
+git checkout main
 git pull
 npm run install:all
 npm run build
