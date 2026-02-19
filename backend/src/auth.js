@@ -26,9 +26,14 @@ export function optionalAuth(req, res, next) {
   try {
     const token = auth.slice(7);
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = db.prepare('SELECT is_active FROM users WHERE id = ?').get(decoded.userId);
+    const user = db.prepare('SELECT is_active, token_version FROM users WHERE id = ?').get(decoded.userId);
     if (!user || user.is_active === 0) {
       return res.status(401).json({ error: 'Account disabled' });
+    }
+    const dbVersion = user.token_version ?? 0;
+    const tokenVersion = decoded.tokenVersion ?? 0;
+    if (tokenVersion < dbVersion) {
+      return res.status(401).json({ error: 'Session invalidated. Please log in again.' });
     }
     req.user = {
       userId: decoded.userId,
@@ -59,13 +64,13 @@ export function requireAuth(req, res, next) {
 export async function login(username, password) {
   if (!username || !password) return null;
   const user = db.prepare(
-    'SELECT id, username, password_hash, is_admin, is_active FROM users WHERE username = ?'
+    'SELECT id, username, password_hash, is_admin, is_active, token_version FROM users WHERE username = ?'
   ).get(username);
   if (!user || user.is_active === 0) return null;
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return null;
   return jwt.sign(
-    { userId: user.id, username: user.username, isAdmin: !!user.is_admin },
+    { userId: user.id, username: user.username, isAdmin: !!user.is_admin, tokenVersion: user.token_version ?? 0 },
     JWT_SECRET,
     { expiresIn: '24h' }
   );
@@ -89,10 +94,10 @@ export function requireApiKey(req, res, next) {
 }
 
 export function masqueradeToken(userId) {
-  const user = db.prepare('SELECT id, username, is_admin, is_active FROM users WHERE id = ?').get(userId);
+  const user = db.prepare('SELECT id, username, is_admin, is_active, token_version FROM users WHERE id = ?').get(userId);
   if (!user || user.is_active === 0) return null;
   return jwt.sign(
-    { userId: user.id, username: user.username, isAdmin: !!user.is_admin },
+    { userId: user.id, username: user.username, isAdmin: !!user.is_admin, tokenVersion: user.token_version ?? 0 },
     JWT_SECRET,
     { expiresIn: '24h' }
   );

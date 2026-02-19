@@ -77,10 +77,10 @@ export async function getUsers() {
   return data;
 }
 
-export async function createUser(username: string, temporaryPassword: string) {
+export async function createUser(username: string, temporaryPassword: string, email?: string) {
   const res = await fetchApi('/users', {
     method: 'POST',
-    body: JSON.stringify({ username, temporaryPassword }),
+    body: JSON.stringify({ username, temporaryPassword, email: email || undefined }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to create user');
@@ -93,6 +93,7 @@ export async function updateUser(id: number, data: {
   isActive?: boolean;
   revokeApiKey?: boolean;
   regenerateApiKey?: boolean;
+  email?: string | null;
 }) {
   const res = await fetchApi(`/users/${id}`, {
     method: 'PATCH',
@@ -163,6 +164,7 @@ export type EmailOnboardingSettings = {
   email_onboarding_app_domain?: string;
   email_onboarding_your_name?: string;
   email_onboarding_login_url?: string;
+  password_reset_base_url?: string;
   email_onboarding_subject?: string;
   email_onboarding_template?: string;
 };
@@ -173,7 +175,7 @@ export async function getEmailOnboardingSettings(): Promise<EmailOnboardingSetti
     'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
     'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
     'email_onboarding_app_domain', 'email_onboarding_your_name', 'email_onboarding_login_url',
-    'email_onboarding_subject', 'email_onboarding_template',
+    'password_reset_base_url', 'email_onboarding_subject', 'email_onboarding_template',
   ];
   const out: EmailOnboardingSettings = {};
   for (const k of keys) {

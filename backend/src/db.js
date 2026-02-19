@@ -152,6 +152,26 @@ try {
   if (!userCols.some((c) => c.name === 'is_active')) {
     db.exec('ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1');
   }
+  if (!userCols.some((c) => c.name === 'email')) {
+    db.exec('ALTER TABLE users ADD COLUMN email TEXT');
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL');
+  }
+  if (!userCols.some((c) => c.name === 'token_version')) {
+    db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0');
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT NOT NULL UNIQUE,
+      user_id INTEGER NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash ON password_reset_tokens(token_hash)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id)');
 
   const ganttCols = db.prepare("PRAGMA table_info(gantt_expanded)").all();
   const ganttNewExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gantt_expanded_new'").get();

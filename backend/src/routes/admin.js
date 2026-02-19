@@ -3,22 +3,11 @@ import bcrypt from 'bcryptjs';
 import { randomUUID, randomBytes } from 'crypto';
 import db, { runUserIdMigrations } from '../db.js';
 import { optionalAuth, requireAdmin } from '../auth.js';
-
-const DEFAULT_EMAIL_TEMPLATE = `Hi {{Username}},
-
-Your account for {{app_domain}} is ready.
-
-You can log in with:
-
-Username: {{Username}}
-Password: {{password}}
-
-We recommend changing your password after your first login.
-
-Start building your project timelines here: {{login_url}}
-
-– {{your_name}}
-Gantt`;
+import {
+  getEmailOnboardingConfig,
+  renderOnboardingTemplate,
+  sendMailgunEmail,
+} from '../mailgun.js';
 
 function getSystemSettings() {
   const rows = db.prepare('SELECT key, value FROM system_settings').all();
@@ -33,83 +22,12 @@ function getSystemSettings() {
   return out;
 }
 
-function getEmailOnboardingConfig() {
-  const s = getSystemSettings();
-  const region = s.email_onboarding_region || 'us';
-  const baseUrl = region === 'eu' ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net';
-  const useDefaultTemplate = s.email_onboarding_use_default_template !== false;
-  return {
-    enabled: !!s.email_onboarding_enabled,
-    apiKey: s.email_onboarding_api_key || '',
-    domain: s.email_onboarding_domain || '',
-    sendingUsername: s.email_onboarding_sending_username || 'onboarding',
-    appDomain: s.email_onboarding_app_domain || 'gantt.example.com',
-    yourName: s.email_onboarding_your_name || 'The Team',
-    loginUrl: s.email_onboarding_login_url || 'https://gantt.example.com',
-    subject: s.email_onboarding_subject || 'Your Gantt account is ready',
-    template: useDefaultTemplate ? DEFAULT_EMAIL_TEMPLATE : (s.email_onboarding_template || DEFAULT_EMAIL_TEMPLATE),
-    baseUrl,
-  };
-}
-
-function renderTemplate(config, { username, password = '(generated when you send)' }) {
-  const template = config.template;
-  if (!template.includes('{{Username}}') || !template.includes('{{password}}')) {
-    throw new Error('Email template must include {{Username}} and {{password}} placeholders');
-  }
-  let body = template;
-  body = body.replace(/\{\{Username\}\}/g, username || '');
-  body = body.replace(/\{\{password\}\}/g, password);
-  body = body.replace(/\{\{app_domain\}\}/g, config.appDomain);
-  body = body.replace(/\{\{login_url\}\}/g, config.loginUrl);
-  body = body.replace(/\{\{your_name\}\}/g, config.yourName);
-  return body;
-}
-
-async function sendMailgunEmail(config, { to, subject, text }) {
-  if (!config.apiKey || !config.domain) {
-    throw new Error('Mailgun API key and domain must be configured');
-  }
-  const fromAddr = `${config.sendingUsername}@${config.domain}`;
-  const fromDisplay = `Gantt <${fromAddr}>`;
-  const url = `${config.baseUrl}/v3/${config.domain}/messages`;
-
-  const form = new FormData();
-  form.append('from', fromDisplay);
-  form.append('to', to);
-  form.append('subject', subject);
-  form.append('text', text);
-
-  const auth = Buffer.from(`api:${config.apiKey}`).toString('base64');
-  const res = await fetch(url, {
-    method: 'POST',
-    body: form,
-    headers: {
-      Authorization: `Basic ${auth}`,
-    },
-  });
-
-  const bodyText = await res.text();
-  let bodyJson;
-  try {
-    bodyJson = JSON.parse(bodyText);
-  } catch {
-    bodyJson = { raw: bodyText };
-  }
-
-  return {
-    statusCode: res.status,
-    status: res.status === 200 ? 'ok' : 'error',
-    body: bodyJson,
-  };
-}
-
 const router = express.Router();
 router.use(optionalAuth, requireAdmin);
 
 export function fetchFullBackup() {
   const users = db.prepare(`
-    SELECT id, username, password_hash, is_admin, api_key, created_at FROM users ORDER BY id
+    SELECT id, username, password_hash, is_admin, api_key, created_at, email, token_version FROM users ORDER BY id
   `).all();
   const userPrefs = db.prepare(`
     SELECT user_id, key, value FROM user_preferences
@@ -167,7 +85,7 @@ router.post('/preview-onboard-email', (req, res) => {
       return res.status(400).json({ error: 'username required' });
     }
     const config = getEmailOnboardingConfig();
-    const body = renderTemplate(config, { username });
+    const body = renderOnboardingTemplate(config, { username });
     res.json({
       subject: config.subject,
       body,
@@ -197,18 +115,23 @@ router.post('/onboard-user', async (req, res) => {
     if (existing) {
       return res.status(400).json({ error: 'Username already exists' });
     }
+    const emailNormalized = emailTrim.toLowerCase();
+    const existingEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(emailNormalized);
+    if (existingEmail) {
+      return res.status(400).json({ error: 'Email already in use' });
+    }
 
     const temporaryPassword = randomBytes(12).toString('base64').replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' }[c] || c));
     const hash = await bcrypt.hash(temporaryPassword, 10);
     const apiKey = randomUUID();
     const result = db.prepare(`
-      INSERT INTO users (username, password_hash, is_admin, api_key)
-      VALUES (?, ?, 0, ?)
-    `).run(usernameTrim, hash, apiKey);
+      INSERT INTO users (username, password_hash, is_admin, api_key, email)
+      VALUES (?, ?, 0, ?, ?)
+    `).run(usernameTrim, hash, apiKey, emailNormalized);
     const user = db.prepare('SELECT id, username, is_admin, api_key, created_at FROM users WHERE id = ?')
       .get(result.lastInsertRowid);
 
-    const body = renderTemplate(config, { username: usernameTrim, password: temporaryPassword });
+    const body = renderOnboardingTemplate(config, { username: usernameTrim, password: temporaryPassword });
     const mailgunRes = await sendMailgunEmail(config, {
       to: emailTrim,
       subject: config.subject,
@@ -241,7 +164,7 @@ router.post('/test-onboard-email', async (req, res) => {
     if (!config.apiKey || !config.domain) {
       return res.status(400).json({ error: 'Mailgun API key and domain must be configured' });
     }
-    const body = renderTemplate(config, { username: 'TestUser', password: '(test - no real account)' });
+    const body = renderOnboardingTemplate(config, { username: 'TestUser', password: '(test - no real account)' });
     const mailgunRes = await sendMailgunEmail(config, {
       to: to.trim(),
       subject: `[Test] ${config.subject}`,
@@ -337,12 +260,12 @@ router.post('/full-restore', (req, res) => {
 
       if (Array.isArray(usersData) && usersData.length > 0) {
         const insertUser = db.prepare(`
-          INSERT INTO users (id, username, password_hash, is_admin, api_key, created_at)
-          VALUES (?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
+          INSERT INTO users (id, username, password_hash, is_admin, api_key, created_at, email, token_version)
+          VALUES (?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, COALESCE(?, 0))
         `);
         for (const u of usersData) {
           if (!u.password_hash) continue;
-          insertUser.run(u.id, u.username, u.password_hash, u.is_admin ? 1 : 0, u.api_key || null, u.created_at);
+          insertUser.run(u.id, u.username, u.password_hash, u.is_admin ? 1 : 0, u.api_key || null, u.created_at, u.email || null, u.token_version);
         }
       }
 

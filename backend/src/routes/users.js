@@ -11,7 +11,7 @@ router.get('/me', optionalAuth, (req, res) => {
     return res.status(401).json({ error: 'Authentication required' });
   }
   const user = db.prepare(
-    'SELECT id, username, is_admin, api_key, created_at FROM users WHERE id = ?'
+    'SELECT id, username, is_admin, api_key, created_at, email FROM users WHERE id = ?'
   ).get(req.user.userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({
@@ -20,12 +20,13 @@ router.get('/me', optionalAuth, (req, res) => {
     isAdmin: !!user.is_admin,
     apiKey: user.api_key,
     createdAt: user.created_at,
+    email: user.email ?? undefined,
   });
 });
 
 router.get('/', optionalAuth, requireAdmin, (req, res) => {
   const rows = db.prepare(`
-    SELECT id, username, is_admin, is_active, api_key, created_at FROM users ORDER BY username
+    SELECT id, username, is_admin, is_active, api_key, created_at, email FROM users ORDER BY username
   `).all();
   res.json(rows.map((r) => ({
     id: r.id,
@@ -34,12 +35,13 @@ router.get('/', optionalAuth, requireAdmin, (req, res) => {
     isActive: r.is_active !== 0,
     apiKey: r.api_key,
     createdAt: r.created_at,
+    email: r.email ?? undefined,
   })));
 });
 
 router.post('/', optionalAuth, requireAdmin, async (req, res) => {
   try {
-    const { username, temporaryPassword } = req.body;
+    const { username, temporaryPassword, email } = req.body;
     if (!username || !temporaryPassword) {
       return res.status(400).json({ error: 'username and temporaryPassword required' });
     }
@@ -47,12 +49,19 @@ router.post('/', optionalAuth, requireAdmin, async (req, res) => {
     if (existing) {
       return res.status(400).json({ error: 'Username already exists' });
     }
+    const emailNorm = email && typeof email === 'string' ? email.trim().toLowerCase() : null;
+    if (emailNorm) {
+      const existingEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(emailNorm);
+      if (existingEmail) {
+        return res.status(400).json({ error: 'Email already in use' });
+      }
+    }
     const hash = await bcrypt.hash(temporaryPassword, 10);
     const apiKey = randomUUID();
     const result = db.prepare(`
-      INSERT INTO users (username, password_hash, is_admin, api_key)
-      VALUES (?, ?, 0, ?)
-    `).run(username, hash, apiKey);
+      INSERT INTO users (username, password_hash, is_admin, api_key, email)
+      VALUES (?, ?, 0, ?, ?)
+    `).run(username, hash, apiKey, emailNorm);
     const user = db.prepare('SELECT id, username, is_admin, api_key, created_at FROM users WHERE id = ?')
       .get(result.lastInsertRowid);
     res.status(201).json({
@@ -70,7 +79,7 @@ router.post('/', optionalAuth, requireAdmin, async (req, res) => {
 router.patch('/:id', optionalAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { password, isActive, revokeApiKey, regenerateApiKey } = req.body;
+    const { password, isActive, revokeApiKey, regenerateApiKey, email } = req.body;
 
     const isSelf = req.user.userId === id;
     const isAdmin = req.user.isAdmin;
@@ -83,8 +92,8 @@ router.patch('/:id', optionalAuth, async (req, res) => {
     if (!target) return res.status(404).json({ error: 'User not found' });
 
     if (password !== undefined) {
-      if (!password || typeof password !== 'string' || password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      if (!password || typeof password !== 'string' || password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
       }
       if (isSelf && !isAdmin) {
         const { currentPassword } = req.body;
@@ -94,8 +103,20 @@ router.patch('/:id', optionalAuth, async (req, res) => {
         const ok = await bcrypt.compare(currentPassword, target.password_hash);
         if (!ok) return res.status(401).json({ error: 'Current password incorrect' });
       }
-      const hash = await bcrypt.hash(password, 10);
-      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, id);
+      const hash = await bcrypt.hash(password, 12);
+      db.prepare('UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?')
+        .run(hash, id);
+    }
+
+    if (email !== undefined) {
+      const emailNorm = email === null || email === '' ? null : (typeof email === 'string' ? email.trim().toLowerCase() : null);
+      if (emailNorm) {
+        const existingEmail = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(emailNorm, id);
+        if (existingEmail) {
+          return res.status(400).json({ error: 'Email already in use' });
+        }
+      }
+      db.prepare('UPDATE users SET email = ? WHERE id = ?').run(emailNorm, id);
     }
 
     if (isAdmin && !isSelf) {
@@ -118,7 +139,7 @@ router.patch('/:id', optionalAuth, async (req, res) => {
       }
     }
 
-    const user = db.prepare('SELECT id, username, is_admin, is_active, api_key, created_at FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT id, username, is_admin, is_active, api_key, created_at, email FROM users WHERE id = ?').get(id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({
       id: user.id,
@@ -127,6 +148,7 @@ router.patch('/:id', optionalAuth, async (req, res) => {
       isActive: user.is_active !== 0,
       apiKey: user.api_key,
       createdAt: user.created_at,
+      email: user.email ?? undefined,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

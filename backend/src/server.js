@@ -14,6 +14,7 @@ import ganttExpandedRouter from './routes/gantt-expanded.js';
 import clearRouter from './routes/clear.js';
 import backupRouter from './routes/backup.js';
 import authRouter from './routes/auth.js';
+import passwordResetRouter from './routes/password-reset.js';
 import usersRouter from './routes/users.js';
 import userPreferencesRouter from './routes/user-preferences.js';
 import adminRouter from './routes/admin.js';
@@ -33,6 +34,7 @@ app.use(express.json());
 
 // Auth status (no auth required)
 app.use('/api/auth', authRouter);
+app.use('/api/auth', passwordResetRouter);
 
 // User management
 app.use('/api/users', optionalAuth, usersRouter);

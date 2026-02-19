@@ -45,11 +45,14 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [priorityColors, setPriorityColors] = useState<PriorityColors>(() => loadPriorityColors());
   const [showPriorityColors, setShowPriorityColors] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean; apiKey: string | null } | null>(null);
-  const [users, setUsers] = useState<{ id: number; username: string; isAdmin: boolean; isActive: boolean; apiKey: string | null }[]>([]);
+  const [users, setUsers] = useState<{ id: number; username: string; isAdmin: boolean; isActive: boolean; apiKey: string | null; email?: string | null }[]>([]);
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showCreateManually, setShowCreateManually] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newTempPassword, setNewTempPassword] = useState('');
+  const [newManualEmail, setNewManualEmail] = useState('');
+  const [editUserEmailId, setEditUserEmailId] = useState<number | null>(null);
+  const [editUserEmailValue, setEditUserEmailValue] = useState('');
   const [newOnboardEmail, setNewOnboardEmail] = useState('');
   const [onboardPreviewData, setOnboardPreviewData] = useState<{ email: string; username: string; subject: string; body: string } | null>(null);
   const [onboardSending, setOnboardSending] = useState(false);
@@ -125,7 +128,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
           const eoKeys = [
             'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
             'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
-            'email_onboarding_app_domain', 'email_onboarding_your_name', 'email_onboarding_login_url',
+            'email_onboarding_app_domain', 'email_onboarding_your_name', 'email_onboarding_login_url', 'password_reset_base_url',
             'email_onboarding_subject', 'email_onboarding_template',
           ];
           const eo: api.EmailOnboardingSettings = {};
@@ -791,6 +794,61 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                               {u.isAdmin && <span className="admin-badge">Admin</span>}
                               {!u.isActive && <span className="inactive-badge">Disabled</span>}
                             </span>
+                            {editUserEmailId === u.id ? (
+                              <div className="user-email-edit" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
+                                <input
+                                  type="email"
+                                  placeholder="Email"
+                                  value={editUserEmailValue}
+                                  onChange={(e) => setEditUserEmailValue(e.target.value)}
+                                  className="settings-input"
+                                  style={{ minWidth: '180px' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn-sm"
+                                  onClick={async () => {
+                                    setUserMgmtError('');
+                                    try {
+                                      await api.updateUser(u.id, { email: editUserEmailValue.trim() || null });
+                                      setEditUserEmailId(null);
+                                      setEditUserEmailValue('');
+                                      api.getUsers().then(setUsers);
+                                    } catch (err) {
+                                      setUserMgmtError(err instanceof Error ? err.message : 'Failed to update email');
+                                    }
+                                  }}
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-sm btn-sm-danger-outline"
+                                  onClick={() => {
+                                    setEditUserEmailId(null);
+                                    setEditUserEmailValue('');
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="user-email-display" style={{ marginLeft: '0.5rem', color: 'var(--muted)' }}>
+                                {u.email ? u.email : '—'}
+                                <button
+                                  type="button"
+                                  className="btn-sm btn-sm-danger-outline"
+                                  style={{ marginLeft: '0.5rem', padding: '0.15rem 0.4rem', fontSize: '0.75rem' }}
+                                  title="Edit email"
+                                  onClick={() => {
+                                    setEditUserEmailId(u.id);
+                                    setEditUserEmailValue(u.email || '');
+                                  }}
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              </span>
+                            )}
                             {u.id !== currentUser?.id && (
                               <div className="user-row-actions">
                                 <button
@@ -925,6 +983,13 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                             {showCreateManually && (
                               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
                                 <input
+                                  type="email"
+                                  placeholder="Email (optional)"
+                                  value={newManualEmail}
+                                  onChange={(e) => setNewManualEmail(e.target.value)}
+                                  className="settings-input"
+                                />
+                                <input
                                   type="password"
                                   placeholder="Temporary password"
                                   value={newTempPassword}
@@ -938,9 +1003,10 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                                     if (!newUsername || !newTempPassword) return;
                                     setUserMgmtError('');
                                     try {
-                                      await api.createUser(newUsername, newTempPassword);
+                                      await api.createUser(newUsername, newTempPassword, newManualEmail.trim() || undefined);
                                       setNewUsername('');
                                       setNewTempPassword('');
+                                      setNewManualEmail('');
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
                                       setUserMgmtError(err instanceof Error ? err.message : 'Failed to create user');
@@ -962,6 +1028,13 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                               className="settings-input"
                             />
                             <input
+                              type="email"
+                              placeholder="Email (optional)"
+                              value={newManualEmail}
+                              onChange={(e) => setNewManualEmail(e.target.value)}
+                              className="settings-input"
+                            />
+                            <input
                               type="password"
                               placeholder="Temporary password"
                               value={newTempPassword}
@@ -973,12 +1046,13 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                               className="btn-sm"
                               onClick={async () => {
                                 if (!newUsername || !newTempPassword) return;
-                                setUserMgmtError('');
-                                try {
-                                  await api.createUser(newUsername, newTempPassword);
-                                  setNewUsername('');
-                                  setNewTempPassword('');
-                                  api.getUsers().then(setUsers);
+                                    setUserMgmtError('');
+                                    try {
+                                      await api.createUser(newUsername, newTempPassword, newManualEmail.trim() || undefined);
+                                      setNewUsername('');
+                                      setNewTempPassword('');
+                                      setNewManualEmail('');
+                                      api.getUsers().then(setUsers);
                                 } catch (err) {
                                   setUserMgmtError(err instanceof Error ? err.message : 'Failed to create user');
                                 }
@@ -1398,6 +1472,27 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                             }
                           }}
                           className="settings-input"
+                        />
+                        <label className="input-label">Password reset base URL</label>
+                        <input
+                          type="text"
+                          placeholder="Same as login URL if blank"
+                          value={emailOnboardingSettings.password_reset_base_url ?? ''}
+                          onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, password_reset_base_url: e.target.value }))}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            setEmailOnboardingSettings((s) => ({ ...s, password_reset_base_url: v }));
+                            setEmailOnboardingSaving(true);
+                            try {
+                              await api.patchSettings({ password_reset_base_url: v });
+                            } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally {
+                              setEmailOnboardingSaving(false);
+                            }
+                          }}
+                          className="settings-input"
+                          title="Base URL for password reset links (e.g. https://gantt.example.com). Uses Login URL if blank."
                         />
                         <label className="input-label">Subject</label>
                         <input

@@ -57,8 +57,12 @@ router.post('/change-password', optionalAuth, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     const ok = await bcrypt.compare(currentPassword, user.password_hash);
     if (!ok) return res.status(401).json({ error: 'Current password incorrect' });
-    const hash = await bcrypt.hash(newPassword, 10);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.user.userId);
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+    const hash = await bcrypt.hash(newPassword, 12);
+    db.prepare('UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?')
+      .run(hash, req.user.userId);
     res.json({ ok: true, message: 'Password changed' });
   } catch (err) {
     res.status(500).json({ error: err.message });
