@@ -709,7 +709,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                 <div className="settings-section">
                   <h5>Updates</h5>
                   <p className="settings-desc settings-version">
-                    Version v{appVersion ?? '…'} <span title="Frontend build applied">✓</span>
+                    Version v{appVersion ?? '…'} <span title="Frontend build applied">✓ Success</span>
                   </p>
                   <p className="settings-desc">
                     Automatic restarts after update only work when deployed with PM2.
