@@ -37,6 +37,7 @@ function getEmailOnboardingConfig() {
   const s = getSystemSettings();
   const region = s.email_onboarding_region || 'us';
   const baseUrl = region === 'eu' ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net';
+  const useDefaultTemplate = s.email_onboarding_use_default_template !== false;
   return {
     enabled: !!s.email_onboarding_enabled,
     apiKey: s.email_onboarding_api_key || '',
@@ -46,13 +47,17 @@ function getEmailOnboardingConfig() {
     yourName: s.email_onboarding_your_name || 'The Team',
     loginUrl: s.email_onboarding_login_url || 'https://gantt.example.com',
     subject: s.email_onboarding_subject || 'Your Gantt account is ready',
-    template: s.email_onboarding_template || DEFAULT_EMAIL_TEMPLATE,
+    template: useDefaultTemplate ? DEFAULT_EMAIL_TEMPLATE : (s.email_onboarding_template || DEFAULT_EMAIL_TEMPLATE),
     baseUrl,
   };
 }
 
 function renderTemplate(config, { username, password = '(generated when you send)' }) {
-  let body = config.template;
+  const template = config.template;
+  if (!template.includes('{{Username}}') || !template.includes('{{password}}')) {
+    throw new Error('Email template must include {{Username}} and {{password}} placeholders');
+  }
+  let body = template;
   body = body.replace(/\{\{Username\}\}/g, username || '');
   body = body.replace(/\{\{password\}\}/g, password);
   body = body.replace(/\{\{app_domain\}\}/g, config.appDomain);

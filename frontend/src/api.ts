@@ -155,6 +155,7 @@ export async function patchSettings(data: Record<string, unknown>) {
 
 export type EmailOnboardingSettings = {
   email_onboarding_enabled?: boolean;
+  email_onboarding_use_default_template?: boolean;
   email_onboarding_api_key?: string;
   email_onboarding_region?: 'us' | 'eu';
   email_onboarding_domain?: string;
@@ -169,10 +170,10 @@ export type EmailOnboardingSettings = {
 export async function getEmailOnboardingSettings(): Promise<EmailOnboardingSettings> {
   const settings = await getSettings();
   const keys = [
-    'email_onboarding_enabled', 'email_onboarding_api_key', 'email_onboarding_region',
-    'email_onboarding_domain', 'email_onboarding_sending_username', 'email_onboarding_app_domain',
-    'email_onboarding_your_name', 'email_onboarding_login_url', 'email_onboarding_subject',
-    'email_onboarding_template',
+    'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
+    'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
+    'email_onboarding_app_domain', 'email_onboarding_your_name', 'email_onboarding_login_url',
+    'email_onboarding_subject', 'email_onboarding_template',
   ];
   const out: EmailOnboardingSettings = {};
   for (const k of keys) {

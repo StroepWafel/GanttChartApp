@@ -77,6 +77,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [emailOnboardingSaving, setEmailOnboardingSaving] = useState(false);
   const [testOnboardEmailTo, setTestOnboardEmailTo] = useState('');
   const [testOnboardEmailResponse, setTestOnboardEmailResponse] = useState<string | null>(null);
+  const [templateValidationError, setTemplateValidationError] = useState<string | null>(null);
   const { isMobile } = useMediaQuery();
   const modal = useModal();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -122,10 +123,10 @@ export default function MainView({ authEnabled, onLogout }: Props) {
         .then((s) => {
           setAutoUpdateEnabled(!!s.auto_update_enabled);
           const eoKeys = [
-            'email_onboarding_enabled', 'email_onboarding_api_key', 'email_onboarding_region',
-            'email_onboarding_domain', 'email_onboarding_sending_username', 'email_onboarding_app_domain',
-            'email_onboarding_your_name', 'email_onboarding_login_url', 'email_onboarding_subject',
-            'email_onboarding_template',
+            'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
+            'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
+            'email_onboarding_app_domain', 'email_onboarding_your_name', 'email_onboarding_login_url',
+            'email_onboarding_subject', 'email_onboarding_template',
           ];
           const eo: api.EmailOnboardingSettings = {};
           for (const k of eoKeys) {
@@ -568,7 +569,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
 
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-          <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
+          <div className={`modal settings-modal${settingsTab === 'emailOnboarding' ? ' settings-modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
             <h3>Settings</h3>
             <div className="settings-tabs" role="tablist">
               <button
@@ -1097,12 +1098,13 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                     </label>
                   </div>
                 </div>
-                <div className="settings-section">
+                <div className={`settings-section email-onboarding-config${!emailOnboardingSettings.email_onboarding_enabled ? ' email-onboarding-disabled' : ''}`}>
                   <h5>API configuration</h5>
                   <p className="settings-desc">Mailgun Private API key and sending domain.</p>
+                  <label className="input-label">API key</label>
                   <input
                     type="password"
-                    placeholder="API Key"
+                    placeholder="••••••••••••"
                     value={emailOnboardingSettings.email_onboarding_api_key ?? ''}
                     onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_api_key: e.target.value }))}
                     onBlur={async (e) => {
@@ -1120,7 +1122,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                     className="settings-input"
                     style={{ marginBottom: '0.5rem' }}
                   />
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                  <div className="settings-input-row" style={{ marginBottom: '0.5rem' }}>
                     <select
                       value={emailOnboardingSettings.email_onboarding_region ?? 'us'}
                       onChange={async (e) => {
@@ -1137,12 +1139,12 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                       }}
                       className="settings-select"
                     >
-                      <option value="us">US (api.mailgun.net)</option>
-                      <option value="eu">EU (api.eu.mailgun.net)</option>
+                      <option value="us">US</option>
+                      <option value="eu">EU</option>
                     </select>
                     <input
                       type="text"
-                      placeholder="Domain (e.g. mail.stroepwafel.au)"
+                      placeholder="Domain"
                       value={emailOnboardingSettings.email_onboarding_domain ?? ''}
                       onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_domain: e.target.value }))}
                       onBlur={async (e) => {
@@ -1158,11 +1160,11 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         }
                       }}
                       className="settings-input"
-                      style={{ flex: 1, minWidth: '160px' }}
+                      title="e.g. mail.yourdomain.ext"
                     />
                     <input
                       type="text"
-                      placeholder="Sending username (e.g. onboarding)"
+                      placeholder="Sending user"
                       value={emailOnboardingSettings.email_onboarding_sending_username ?? 'onboarding'}
                       onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_sending_username: e.target.value }))}
                       onBlur={async (e) => {
@@ -1178,124 +1180,256 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         }
                       }}
                       className="settings-input"
-                      style={{ minWidth: '120px' }}
+                      style={{ minWidth: '100px' }}
+                      title="e.g. onboarding"
                     />
                   </div>
                   <p className="settings-desc muted">
-                    From: Gantt &lt;{(emailOnboardingSettings.email_onboarding_sending_username || 'onboarding')}@{(emailOnboardingSettings.email_onboarding_domain || 'domain')}&gt;
+                    From: Gantt &lt;{(emailOnboardingSettings.email_onboarding_sending_username || 'onboarding')}@{emailOnboardingSettings.email_onboarding_domain || '(set domain above)'}&gt;
                   </p>
                 </div>
-                <div className="settings-section">
+                <div className={`settings-section email-onboarding-config${!emailOnboardingSettings.email_onboarding_enabled ? ' email-onboarding-disabled' : ''}`}>
                   <h5>Email template</h5>
-                  <p className="settings-desc">Placeholders: {"{{Username}}"}, {"{{password}}"}, {"{{app_domain}}"}, {"{{login_url}}"}, {"{{your_name}}"}</p>
-                  <input
-                    type="text"
-                    placeholder="App domain (e.g. gantt.stroepwafel.au)"
-                    value={emailOnboardingSettings.email_onboarding_app_domain ?? ''}
-                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: e.target.value }))}
-                    onBlur={async (e) => {
-                      const v = e.target.value;
-                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: v }));
-                      setEmailOnboardingSaving(true);
-                      try {
-                        await api.patchSettings({ email_onboarding_app_domain: v });
-                      } catch (err) {
-                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
-                      } finally {
-                        setEmailOnboardingSaving(false);
-                      }
-                    }}
-                    className="settings-input"
-                    style={{ marginBottom: '0.5rem' }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Your name (signature)"
-                    value={emailOnboardingSettings.email_onboarding_your_name ?? ''}
-                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: e.target.value }))}
-                    onBlur={async (e) => {
-                      const v = e.target.value;
-                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: v }));
-                      setEmailOnboardingSaving(true);
-                      try {
-                        await api.patchSettings({ email_onboarding_your_name: v });
-                      } catch (err) {
-                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
-                      } finally {
-                        setEmailOnboardingSaving(false);
-                      }
-                    }}
-                    className="settings-input"
-                    style={{ marginBottom: '0.5rem' }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Login URL (e.g. https://gantt.stroepwafel.au)"
-                    value={emailOnboardingSettings.email_onboarding_login_url ?? ''}
-                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: e.target.value }))}
-                    onBlur={async (e) => {
-                      const v = e.target.value;
-                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: v }));
-                      setEmailOnboardingSaving(true);
-                      try {
-                        await api.patchSettings({ email_onboarding_login_url: v });
-                      } catch (err) {
-                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
-                      } finally {
-                        setEmailOnboardingSaving(false);
-                      }
-                    }}
-                    className="settings-input"
-                    style={{ marginBottom: '0.5rem' }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Subject line"
-                    value={emailOnboardingSettings.email_onboarding_subject ?? ''}
-                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_subject: e.target.value }))}
-                    onBlur={async (e) => {
-                      const v = e.target.value;
-                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_subject: v }));
-                      setEmailOnboardingSaving(true);
-                      try {
-                        await api.patchSettings({ email_onboarding_subject: v });
-                      } catch (err) {
-                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
-                      } finally {
-                        setEmailOnboardingSaving(false);
-                      }
-                    }}
-                    className="settings-input"
-                    style={{ marginBottom: '0.5rem' }}
-                  />
-                  <textarea
-                    placeholder="Email body template"
-                    value={emailOnboardingSettings.email_onboarding_template ?? ''}
-                    onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_template: e.target.value }))}
-                    onBlur={async (e) => {
-                      const v = e.target.value;
-                      setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_template: v }));
-                      setEmailOnboardingSaving(true);
-                      try {
-                        await api.patchSettings({ email_onboarding_template: v });
-                      } catch (err) {
-                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
-                      } finally {
-                        setEmailOnboardingSaving(false);
-                      }
-                    }}
-                    className="settings-input"
-                    rows={12}
-                    style={{ fontFamily: 'monospace', fontSize: '0.9rem', resize: 'vertical' }}
-                  />
+                  <div className="settings-checkbox-row" style={{ marginBottom: '0.75rem' }}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={emailOnboardingSettings.email_onboarding_use_default_template !== false}
+                        onChange={async (e) => {
+                          const v = e.target.checked;
+                          setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_use_default_template: v }));
+                          setTemplateValidationError(null);
+                          setEmailOnboardingSaving(true);
+                          try {
+                            await api.patchSettings({ email_onboarding_use_default_template: v });
+                          } catch (err) {
+                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                          } finally {
+                            setEmailOnboardingSaving(false);
+                          }
+                        }}
+                      />
+                      Use default email template
+                    </label>
+                  </div>
+                  {emailOnboardingSettings.email_onboarding_use_default_template === false ? (
+                    <div className="email-compose">
+                      <div className="email-compose-header">
+                        <div className="email-header-row">
+                          <span className="email-header-label">From</span>
+                          <span className="email-header-value">
+                            Gantt &lt;{(emailOnboardingSettings.email_onboarding_sending_username || 'onboarding')}@{emailOnboardingSettings.email_onboarding_domain || '(set domain)'}&gt;
+                          </span>
+                        </div>
+                        <div className="email-header-row">
+                          <span className="email-header-label">To</span>
+                          <span className="email-header-value muted">(recipient set at invite time)</span>
+                        </div>
+                        <div className="email-header-row">
+                          <span className="email-header-label">Subject</span>
+                          <input
+                            type="text"
+                            placeholder="Your Gantt account is ready"
+                            value={emailOnboardingSettings.email_onboarding_subject ?? ''}
+                            onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_subject: e.target.value }))}
+                            onBlur={async (e) => {
+                              const v = e.target.value;
+                              setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_subject: v }));
+                              setEmailOnboardingSaving(true);
+                              try {
+                                await api.patchSettings({ email_onboarding_subject: v });
+                              } catch (err) {
+                                modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              } finally {
+                                setEmailOnboardingSaving(false);
+                              }
+                            }}
+                            className="email-header-input"
+                          />
+                        </div>
+                      </div>
+                      <div className="email-compose-body">
+                        <textarea
+                          placeholder={"Hi {{Username}},\n\nYour account for {{app_domain}} is ready.\n\nYou can log in with:\nUsername: {{Username}}\nPassword: {{password}}\n\n– {{your_name}}\nGantt"}
+                          value={emailOnboardingSettings.email_onboarding_template ?? ''}
+                          onChange={(e) => {
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_template: e.target.value }));
+                            setTemplateValidationError(null);
+                          }}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            if (!v.includes('{{Username}}') || !v.includes('{{password}}')) {
+                              setTemplateValidationError('Template must include {{Username}} and {{password}}');
+                              return;
+                            }
+                            setTemplateValidationError(null);
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_template: v }));
+                            setEmailOnboardingSaving(true);
+                            try {
+                              await api.patchSettings({ email_onboarding_template: v });
+                            } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally {
+                              setEmailOnboardingSaving(false);
+                            }
+                          }}
+                          className="email-body-input"
+                          rows={10}
+                        />
+                        {templateValidationError && (
+                          <p className="auth-error" style={{ marginTop: '0.5rem' }}>{templateValidationError}</p>
+                        )}
+                      </div>
+                      <div className="email-compose-vars">
+                        <span className="email-var-label">Variables for placeholders:</span>
+                        <input
+                          type="text"
+                          placeholder="App domain"
+                          value={emailOnboardingSettings.email_onboarding_app_domain ?? ''}
+                          onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: e.target.value }))}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: v }));
+                            setEmailOnboardingSaving(true);
+                            try { await api.patchSettings({ email_onboarding_app_domain: v }); } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally { setEmailOnboardingSaving(false); }
+                          }}
+                          className="email-var-input"
+                          title="{{app_domain}}"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Your name"
+                          value={emailOnboardingSettings.email_onboarding_your_name ?? ''}
+                          onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: e.target.value }))}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: v }));
+                            setEmailOnboardingSaving(true);
+                            try { await api.patchSettings({ email_onboarding_your_name: v }); } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally { setEmailOnboardingSaving(false); }
+                          }}
+                          className="email-var-input"
+                          title="{{your_name}}"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Login URL"
+                          value={emailOnboardingSettings.email_onboarding_login_url ?? ''}
+                          onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: e.target.value }))}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: v }));
+                            setEmailOnboardingSaving(true);
+                            try { await api.patchSettings({ email_onboarding_login_url: v }); } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally { setEmailOnboardingSaving(false); }
+                          }}
+                          className="email-var-input"
+                          title="{{login_url}}"
+                        />
+                      </div>
+                      <p className="settings-desc" style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
+                        Required in body: {"{{Username}}"}, {"{{password}}"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="email-template-vars">
+                      <p className="settings-desc">Customize variables for the default template.</p>
+                      <div className="email-var-grid">
+                        <label className="input-label">App domain</label>
+                        <input
+                          type="text"
+                          placeholder="gantt.example.com"
+                          value={emailOnboardingSettings.email_onboarding_app_domain ?? ''}
+                          onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: e.target.value }))}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: v }));
+                            setEmailOnboardingSaving(true);
+                            try {
+                              await api.patchSettings({ email_onboarding_app_domain: v });
+                            } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally {
+                              setEmailOnboardingSaving(false);
+                            }
+                          }}
+                          className="settings-input"
+                        />
+                        <label className="input-label">Your name (signature)</label>
+                        <input
+                          type="text"
+                          placeholder="The Team"
+                          value={emailOnboardingSettings.email_onboarding_your_name ?? ''}
+                          onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: e.target.value }))}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: v }));
+                            setEmailOnboardingSaving(true);
+                            try {
+                              await api.patchSettings({ email_onboarding_your_name: v });
+                            } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally {
+                              setEmailOnboardingSaving(false);
+                            }
+                          }}
+                          className="settings-input"
+                        />
+                        <label className="input-label">Login URL</label>
+                        <input
+                          type="text"
+                          placeholder="https://gantt.example.com"
+                          value={emailOnboardingSettings.email_onboarding_login_url ?? ''}
+                          onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: e.target.value }))}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: v }));
+                            setEmailOnboardingSaving(true);
+                            try {
+                              await api.patchSettings({ email_onboarding_login_url: v });
+                            } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally {
+                              setEmailOnboardingSaving(false);
+                            }
+                          }}
+                          className="settings-input"
+                        />
+                        <label className="input-label">Subject</label>
+                        <input
+                          type="text"
+                          placeholder="Your Gantt account is ready"
+                          value={emailOnboardingSettings.email_onboarding_subject ?? ''}
+                          onChange={(e) => setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_subject: e.target.value }))}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_subject: v }));
+                            setEmailOnboardingSaving(true);
+                            try {
+                              await api.patchSettings({ email_onboarding_subject: v });
+                            } catch (err) {
+                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            } finally {
+                              setEmailOnboardingSaving(false);
+                            }
+                          }}
+                          className="settings-input"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="settings-section">
+                <div className="settings-section email-onboarding-config">
                   <h5>Test send</h5>
                   <p className="settings-desc">Send a test email to verify your Mailgun configuration.</p>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="settings-input-row" style={{ alignItems: 'center' }}>
                     <input
                       type="email"
-                      placeholder="To: email@example.com"
+                      placeholder="Recipient email"
                       value={testOnboardEmailTo}
                       onChange={(e) => { setTestOnboardEmailTo(e.target.value); setTestOnboardEmailResponse(null); }}
                       className="settings-input"
@@ -1323,9 +1457,12 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                     </button>
                   </div>
                   {testOnboardEmailResponse && (
-                    <pre className="settings-desc" style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 4, fontSize: '0.8rem', overflow: 'auto', maxHeight: 200 }}>
-                      {testOnboardEmailResponse}
-                    </pre>
+                    <div className="settings-desc" style={{ marginTop: '0.75rem' }}>
+                      <strong>API response:</strong>
+                      <pre style={{ marginTop: '0.25rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 4, fontSize: '0.8rem', overflow: 'auto', maxHeight: 200, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {testOnboardEmailResponse}
+                      </pre>
+                    </div>
                   )}
                 </div>
               </div>
