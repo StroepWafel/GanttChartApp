@@ -526,6 +526,40 @@
   max-width: 720px;
 }
 
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 -24px 16px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-tab {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+
+.settings-tab:hover {
+  color: var(--text);
+}
+
+.settings-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.settings-tab-content {
+  padding-top: 4px;
+}
+
 .settings-modal h5 {
   margin: 10px 0 6px;
   font-size: 12px;
