@@ -477,7 +477,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
       )}
 
       {onboardPreviewData && (
-        <div className="modal-overlay" onClick={() => { if (!onboardSending) { setOnboardPreviewData(null); setOnboardResult(null); } }}>
+        <div className="modal-overlay modal-overlay-onboard" onClick={() => { if (!onboardSending) { setOnboardPreviewData(null); setOnboardResult(null); } }}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             <h3>{onboardResult ? 'Onboard email sent' : 'Preview onboarding email'}</h3>
             {onboardResult ? (
@@ -600,7 +600,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                   className={`settings-tab ${settingsTab === 'emailOnboarding' ? 'active' : ''}`}
                   onClick={() => setSettingsTab('emailOnboarding')}
                 >
-                  Email onboarding
+                  Email invite settings
                 </button>
               )}
               {currentUser?.isAdmin && (

@@ -484,6 +484,10 @@
   box-sizing: border-box;
 }
 
+.modal-overlay-onboard {
+  z-index: 1100;
+}
+
 .modal {
   background: var(--bg-panel);
   border: 1px solid var(--border);
