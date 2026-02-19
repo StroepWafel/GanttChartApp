@@ -30,6 +30,17 @@ log "LATEST_TAG=$LATEST_TAG"
 if [ -n "$LATEST_TAG" ]; then
   log "Checking out $LATEST_TAG"
   git checkout "$LATEST_TAG" 2>/dev/null || git pull origin main
+  # Sync package.json version to match tag (tags may point to commits before version bump was committed)
+  TAG_VER="${LATEST_TAG#v}"
+  for f in package.json backend/package.json frontend/package.json; do
+    if [ -f "$f" ]; then
+      node -e "
+        const fs=require('fs');
+        const p=JSON.parse(fs.readFileSync('"$f"','utf8'));
+        if (p.version !== '"$TAG_VER"') { p.version='"$TAG_VER"'; fs.writeFileSync('"$f"',JSON.stringify(p,null,2)); }
+      " 2>/dev/null && log "Synced $f to $TAG_VER" || true
+    fi
+  done
 else
   log "Pulling main"
   git pull origin main
