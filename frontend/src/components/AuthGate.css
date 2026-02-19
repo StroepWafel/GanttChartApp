@@ -42,6 +42,10 @@
 .auth-form button {
   width: 100%;
   padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: var(--accent);
   border: none;
   border-radius: var(--radius-sm);
@@ -60,8 +64,6 @@
 }
 
 .auth-form button .auth-spinner {
-  vertical-align: middle;
-  margin-right: 8px;
   animation: auth-spin 0.8s linear infinite;
 }
 
