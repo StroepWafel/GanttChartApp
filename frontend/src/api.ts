@@ -103,6 +103,14 @@ export async function updateUser(id: number, data: {
   return out;
 }
 
+export async function deleteUser(id: number) {
+  const res = await fetchApi(`/users/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to delete user');
+  }
+}
+
 export async function masquerade(userId: number) {
   const res = await fetchApi('/auth/masquerade', {
     method: 'POST',

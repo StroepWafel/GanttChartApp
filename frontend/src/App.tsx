@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getAuthStatus } from './api';
 import AuthGate from './components/AuthGate';
 import MainView from './components/MainView';
+import { ModalProvider } from './context/ModalContext';
 
 export default function App() {
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
@@ -26,9 +27,11 @@ export default function App() {
   }
 
   return (
-    <MainView
-      authEnabled={authEnabled}
-      onLogout={() => { localStorage.removeItem('gantt_token'); setToken(null); }}
-    />
+    <ModalProvider>
+      <MainView
+        authEnabled={authEnabled}
+        onLogout={() => { localStorage.removeItem('gantt_token'); setToken(null); }}
+      />
+    </ModalProvider>
   );
 }

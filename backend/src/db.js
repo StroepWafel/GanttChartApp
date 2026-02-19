@@ -15,6 +15,7 @@ if (!existsSync(dataDir)) {
 }
 
 const db = new Database(DB_PATH);
+db.pragma('foreign_keys = ON');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (

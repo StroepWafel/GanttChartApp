@@ -133,4 +133,34 @@ router.patch('/:id', optionalAuth, async (req, res) => {
   }
 });
 
+router.delete('/:id', optionalAuth, requireAdmin, (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const isSelf = req.user.userId === id;
+
+    if (isSelf) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    const target = db.prepare('SELECT id, username, is_admin, is_active FROM users WHERE id = ?').get(id);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    if (target.is_active !== 0) {
+      return res.status(400).json({ error: 'Account must be disabled before permanent deletion' });
+    }
+
+    if (target.is_admin) {
+      const adminCount = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_admin = 1').get();
+      if (adminCount.c <= 1) {
+        return res.status(400).json({ error: 'Cannot delete the last admin' });
+      }
+    }
+
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

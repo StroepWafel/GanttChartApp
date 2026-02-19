@@ -10,6 +10,7 @@ import CategoryProjectForm from './CategoryProjectForm';
 import ClearAllConfirmModal from './ClearAllConfirmModal';
 import ConfirmModal from './ConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useModal } from '../context/ModalContext';
 import {
   loadPriorityColors,
   savePriorityColors,
@@ -67,6 +68,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   type SettingsTab = 'personal' | 'admin' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
   const { isMobile } = useMediaQuery();
+  const modal = useModal();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
   );
@@ -224,7 +226,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to download backup');
+      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to download backup' });
     }
   }
 
@@ -237,12 +239,12 @@ export default function MainView({ authEnabled, onLogout }: Props) {
       try {
         const data = JSON.parse(reader.result as string) as Record<string, unknown>;
         if (!Array.isArray(data.categories) || !Array.isArray(data.projects) || !Array.isArray(data.tasks)) {
-          alert('Invalid backup file');
+          modal.showAlert({ title: 'Error', message: 'Invalid backup file' });
           return;
         }
         setRestoreConfirmData(data);
       } catch {
-        alert('Invalid backup file');
+        modal.showAlert({ title: 'Error', message: 'Invalid backup file' });
       }
     };
     reader.readAsText(file);
@@ -284,7 +286,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
       setRestoreConfirmData(null);
       setShowSettings(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to restore backup');
+      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to restore backup' });
     }
   }
 
@@ -467,8 +469,8 @@ export default function MainView({ authEnabled, onLogout }: Props) {
           onAddProject={handleCreateProject}
           onUpdateCategory={handleUpdateCategory}
           onUpdateProject={handleUpdateProject}
-          onDeleteCategory={handleDeleteCategory}
-          onDeleteProject={handleDeleteProject}
+          onRequestDeleteCategory={(c) => setDeleteCategoryConfirm(c)}
+          onRequestDeleteProject={(p) => setDeleteProjectConfirm(p)}
           onClose={() => { setShowCatProj(false); setEditCategory(null); setEditProject(null); }}
         />
       )}
@@ -552,7 +554,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                           setChangePasswordCurrent('');
                           setChangePasswordNew('');
                         } catch (err) {
-                          alert(err instanceof Error ? err.message : 'Failed to change password');
+                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to change password' });
                         }
                       }}
                     >
@@ -697,7 +699,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                                       await api.updateUser(u.id, { isActive: !u.isActive });
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
-                                      alert(err instanceof Error ? err.message : 'Failed to update user');
+                                      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to update user' });
                                     }
                                   }}
                                 >
@@ -710,12 +712,18 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                                   disabled={!u.apiKey}
                                   onClick={async () => {
                                     if (!u.apiKey) return;
-                                    if (!confirm(`Revoke API key for ${u.username}? They will need a new key to use the IoT API.`)) return;
+                                    const ok = await modal.showConfirm({
+                                      title: 'Revoke API key',
+                                      message: `Revoke API key for ${u.username}? They will need a new key to use the IoT API.`,
+                                      confirmLabel: 'Revoke',
+                                      variant: 'danger',
+                                    });
+                                    if (!ok) return;
                                     try {
                                       await api.updateUser(u.id, { revokeApiKey: true });
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
-                                      alert(err instanceof Error ? err.message : 'Failed to revoke API key');
+                                      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to revoke API key' });
                                     }
                                   }}
                                 >
@@ -730,12 +738,36 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                                       await api.updateUser(u.id, { regenerateApiKey: true });
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
-                                      alert(err instanceof Error ? err.message : 'Failed to regenerate API key');
+                                      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to regenerate API key' });
                                     }
                                   }}
                                 >
                                   New API key
                                 </button>
+                                {!u.isActive && (
+                                  <button
+                                    type="button"
+                                    className="btn-sm btn-sm-danger"
+                                    title="Permanently delete this user"
+                                    onClick={async () => {
+                                      const ok = await modal.showConfirm({
+                                        title: 'Delete user permanently',
+                                        message: `Permanently delete user "${u.username}"? This cannot be undone. Their categories, projects, and tasks will also be removed.`,
+                                        confirmLabel: 'Delete',
+                                        variant: 'danger',
+                                      });
+                                      if (!ok) return;
+                                      try {
+                                        await api.deleteUser(u.id);
+                                        api.getUsers().then(setUsers);
+                                      } catch (err) {
+                                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to delete user' });
+                                      }
+                                    }}
+                                  >
+                                    Delete permanently
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -804,7 +836,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                           setMasqueradeUserId('');
                           window.location.reload();
                         } catch (err) {
-                          alert(err instanceof Error ? err.message : 'Masquerade failed');
+                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Masquerade failed' });
                         }
                       }}
                     >
@@ -828,7 +860,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         a.click();
                         URL.revokeObjectURL(url);
                       } catch (err) {
-                        alert(err instanceof Error ? err.message : 'Failed to download full backup');
+                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to download full backup' });
                       }
                     }}
                   >
@@ -860,7 +892,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                             await api.patchSettings({ auto_update_enabled: v });
                           } catch (err) {
                             setAutoUpdateEnabled(!v);
-                            alert(err instanceof Error ? err.message : 'Failed to save');
+                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
                           }
                         }}
                       />
@@ -906,15 +938,20 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         className="btn-sm"
                         disabled={applyingUpdate}
                         onClick={async () => {
-                          if (!confirm(`Update to v${updateCheck.latestVersion}? A full backup will be created first. The app will restart (PM2 only).`)) return;
+                          const ok = await modal.showConfirm({
+                            title: 'Apply update',
+                            message: `Update to v${updateCheck.latestVersion}? A full backup will be created first. The app will restart (PM2 only).`,
+                            confirmLabel: 'Update',
+                          });
+                          if (!ok) return;
                           setApplyingUpdate(true);
                           try {
                             await api.applyUpdate();
-                            alert('Backup created. Update in progress. The page will reload when the update completes.');
+                            modal.showAlert({ title: 'Update in progress', message: 'Backup created. Update in progress. The page will reload when the update completes.' });
                             setTimeout(() => window.location.reload(), 3000);
                           } catch (err) {
                             setApplyingUpdate(false);
-                            alert(err instanceof Error ? err.message : 'Failed to apply update');
+                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to apply update' });
                           }
                         }}
                       >
@@ -1004,6 +1041,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
           onConfirm={() => {
             handleDeleteCategory(deleteCategoryConfirm.id);
             setDeleteCategoryConfirm(null);
+            setShowCatProj(false);
+            setEditCategory(null);
+            setEditProject(null);
           }}
           onCancel={() => setDeleteCategoryConfirm(null)}
           variant="danger"
@@ -1023,6 +1063,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
           onConfirm={() => {
             handleDeleteProject(deleteProjectConfirm.id);
             setDeleteProjectConfirm(null);
+            setShowCatProj(false);
+            setEditCategory(null);
+            setEditProject(null);
           }}
           onCancel={() => setDeleteProjectConfirm(null)}
           variant="danger"

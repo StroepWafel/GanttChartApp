@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import type { Task } from '../types';
+import { useModal } from '../context/ModalContext';
 
 interface Props {
   task: Task;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function SplitTaskModal({ task, onClose, onSplit }: Props) {
+  const modal = useModal();
   const [subtasks, setSubtasks] = useState([
     { name: '', start_date: task.start_date, end_date: task.end_date },
     { name: '', start_date: task.start_date, end_date: task.end_date },
@@ -39,12 +41,12 @@ export default function SplitTaskModal({ task, onClose, onSplit }: Props) {
     e.preventDefault();
     const valid = subtasks.filter((st) => st.name && st.start_date && st.end_date);
     if (valid.length < 2) {
-      alert('Need at least 2 subtasks with names and dates');
+      modal.showAlert({ title: 'Validation', message: 'Need at least 2 subtasks with names and dates' });
       return;
     }
     const bad = valid.some((st) => st.end_date < st.start_date);
     if (bad) {
-      alert('End date cannot be before start date for any subtask');
+      modal.showAlert({ title: 'Validation', message: 'End date cannot be before start date for any subtask' });
       return;
     }
     onSplit(task.id, valid);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Category, Project, Task } from '../types';
+import { useModal } from '../context/ModalContext';
 import type { updateTask } from '../api';
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function TaskForm({ categories, projects, task, onClose, onCreate, onUpdate }: Props) {
+  const modal = useModal();
   const today = new Date().toISOString().slice(0, 10);
   const isEdit = !!task;
   const [categoryId, setCategoryId] = useState<number>(categories[0]?.id ?? 0);
@@ -53,11 +55,11 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
     e.preventDefault();
     if (!projectId || !name || !startDate || !endDate) return;
     if (endDate < startDate) {
-      alert('End date cannot be before start date');
+      modal.showAlert({ title: 'Validation', message: 'End date cannot be before start date' });
       return;
     }
     if (dueDate && dueDate < startDate) {
-      alert('Due date cannot be before start date');
+      modal.showAlert({ title: 'Validation', message: 'Due date cannot be before start date' });
       return;
     }
     if (isEdit && task && onUpdate) {

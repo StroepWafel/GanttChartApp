@@ -9,8 +9,8 @@ interface Props {
   onAddProject: (name: string, categoryId: number, dueDate?: string, startDate?: string) => void;
   onUpdateCategory: (id: number, name: string) => void;
   onUpdateProject: (id: number, name: string, categoryId: number, dueDate?: string | null, startDate?: string | null) => void;
-  onDeleteCategory: (id: number) => void;
-  onDeleteProject: (id: number) => void;
+  onRequestDeleteCategory: (cat: Category) => void;
+  onRequestDeleteProject: (proj: Project) => void;
   onClose: () => void;
 }
 
@@ -22,8 +22,8 @@ export default function CategoryProjectForm({
   onAddProject,
   onUpdateCategory,
   onUpdateProject,
-  onDeleteCategory,
-  onDeleteProject,
+  onRequestDeleteCategory,
+  onRequestDeleteProject,
   onClose,
 }: Props) {
   const [mode, setMode] = useState<'category' | 'project'>('category');
@@ -89,16 +89,12 @@ export default function CategoryProjectForm({
 
   function handleDeleteCategory() {
     if (!editingCategory) return;
-    if (!confirm(`Delete category "${editingCategory.name}" and all its projects and tasks?`)) return;
-    onDeleteCategory(editingCategory.id);
-    onClose();
+    onRequestDeleteCategory(editingCategory);
   }
 
   function handleDeleteProject() {
     if (!editingProject) return;
-    if (!confirm(`Delete project "${editingProject.name}" and all its tasks?`)) return;
-    onDeleteProject(editingProject.id);
-    onClose();
+    onRequestDeleteProject(editingProject);
   }
 
   return (

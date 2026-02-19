@@ -696,6 +696,17 @@
   background: rgba(239, 68, 68, 0.15);
 }
 
+.btn-sm-danger {
+  color: white;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn-sm-danger:hover:not(:disabled) {
+  background: #e11d48;
+  border-color: #e11d48;
+}
+
 .admin-badge {
   font-size: 10px;
   padding: 2px 6px;
