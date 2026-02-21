@@ -199,6 +199,36 @@ router.get('/full-backup', (req, res) => {
   }
 });
 
+/** Admin clear all data (all users). Requires password verification. Keeps users table. */
+router.post('/clear-all-data', async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Password required' });
+    }
+    const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Incorrect password' });
+
+    db.exec('BEGIN TRANSACTION');
+    try {
+      db.prepare('DELETE FROM gantt_expanded').run();
+      db.prepare('DELETE FROM tasks').run();
+      db.prepare('DELETE FROM projects').run();
+      db.prepare('DELETE FROM categories').run();
+      db.prepare('DELETE FROM user_preferences').run();
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    res.json({ ok: true, message: 'All data cleared' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** Admin full restore: replace all data from backup. Never accept plaintext passwords. */
 router.post('/full-restore', (req, res) => {
   try {

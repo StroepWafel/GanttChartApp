@@ -8,6 +8,7 @@ import SplitTaskModal from './SplitTaskModal';
 import CompletedTasks from './CompletedTasks';
 import CategoryProjectForm from './CategoryProjectForm';
 import ClearAllConfirmModal from './ClearAllConfirmModal';
+import ClearEveryoneConfirmModal from './ClearEveryoneConfirmModal';
 import ConfirmModal from './ConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useModal } from '../context/ModalContext';
@@ -40,6 +41,8 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  const [showClearEveryoneConfirm, setShowClearEveryoneConfirm] = useState(false);
+  const [clearEveryoneError, setClearEveryoneError] = useState<string | null>(null);
   const [deleteCategoryConfirm, setDeleteCategoryConfirm] = useState<Category | null>(null);
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<Project | null>(null);
   const [restoreConfirmData, setRestoreConfirmData] = useState<Record<string, unknown> | null>(null);
@@ -271,6 +274,18 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     await load();
     setShowSettings(false);
     setShowClearAllConfirm(false);
+  }
+
+  async function handleClearEveryone(password: string) {
+    setClearEveryoneError(null);
+    try {
+      await api.clearAllDataEveryone(password);
+      await load();
+      setShowClearEveryoneConfirm(false);
+      setShowSettings(false);
+    } catch (err) {
+      setClearEveryoneError(err instanceof Error ? err.message : 'Failed to clear all data');
+    }
   }
 
   async function handleDownloadBackup() {
@@ -1841,12 +1856,27 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 <div className="settings-section danger-zone">
                   <h4>Danger zone</h4>
                   <p className="settings-desc">Permanently remove all categories, projects, and tasks. This cannot be undone.</p>
-                  <button
-                    className="btn-danger"
-                    onClick={() => setShowClearAllConfirm(true)}
-                  >
-                    Clear all data
-                  </button>
+                  <div className="form-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      onClick={() => setShowClearAllConfirm(true)}
+                    >
+                      Delete my data
+                    </button>
+                    {currentUser?.isAdmin && (
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        onClick={() => {
+                          setClearEveryoneError(null);
+                          setShowClearEveryoneConfirm(true);
+                        }}
+                      >
+                        Delete everyone&apos;s data
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1871,6 +1901,17 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         <ClearAllConfirmModal
           onConfirm={handleClearAll}
           onCancel={() => setShowClearAllConfirm(false)}
+        />
+      )}
+
+      {showClearEveryoneConfirm && (
+        <ClearEveryoneConfirmModal
+          onConfirm={handleClearEveryone}
+          onCancel={() => {
+            setShowClearEveryoneConfirm(false);
+            setClearEveryoneError(null);
+          }}
+          error={clearEveryoneError}
         />
       )}
 

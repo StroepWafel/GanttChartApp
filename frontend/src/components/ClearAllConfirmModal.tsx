@@ -15,9 +15,9 @@ export default function ClearAllConfirmModal({ onConfirm, onCancel }: Props) {
     return (
       <div className="modal-overlay" onClick={onCancel}>
         <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
-          <h3>Clear all data?</h3>
+          <h3>Delete my data?</h3>
           <div className="confirm-modal-message">
-            This will permanently delete all tasks, projects, and categories. This cannot be undone.
+            This will permanently delete <strong>your</strong> tasks, projects, and categories. This cannot be undone.
           </div>
           <div className="form-actions">
             <button type="button" onClick={onCancel}>Cancel</button>
@@ -31,7 +31,7 @@ export default function ClearAllConfirmModal({ onConfirm, onCancel }: Props) {
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Confirm clear all</h3>
+        <h3>Confirm delete my data</h3>
         <div className="confirm-modal-message">
           To confirm, type <strong>{CONFIRM_TEXT}</strong> in the box below:
         </div>
@@ -53,7 +53,7 @@ export default function ClearAllConfirmModal({ onConfirm, onCancel }: Props) {
             onClick={onConfirm}
             disabled={typedText.toLowerCase() !== CONFIRM_TEXT}
           >
-            Clear all data
+            Delete my data
           </button>
         </div>
       </div>

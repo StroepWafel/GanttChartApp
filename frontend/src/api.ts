@@ -413,6 +413,22 @@ export async function clearAllData() {
   return res.json();
 }
 
+export async function clearAllDataEveryone(password: string): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API}/admin/clear-all-data`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to clear all data');
+  }
+  return data;
+}
+
 export async function getBackupData(): Promise<Record<string, unknown>> {
   const res = await fetchApi('/backup');
   if (!res.ok) throw new Error('Failed to fetch backup');
