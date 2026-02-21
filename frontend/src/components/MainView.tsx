@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
@@ -73,6 +73,9 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   } | null>(null);
   const [showUpdateDebug, setShowUpdateDebug] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [updateReloadPhase, setUpdateReloadPhase] = useState<null | 'waiting' | 'reloading'>(null);
+  const [updateReloadTimedOut, setUpdateReloadTimedOut] = useState(false);
+  const updatePollRef = useRef<{ intervalId: ReturnType<typeof setInterval>; timeoutId: ReturnType<typeof setTimeout>; hasSeenFailure: boolean } | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   type SettingsTab = 'personal' | 'admin' | 'emailOnboarding' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
@@ -163,6 +166,16 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   useEffect(() => {
     if (showSettings) setSettingsTab('personal');
   }, [showSettings]);
+
+  useEffect(() => {
+    return () => {
+      if (updatePollRef.current) {
+        clearInterval(updatePollRef.current.intervalId);
+        clearTimeout(updatePollRef.current.timeoutId);
+        updatePollRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (authEnabled) {
@@ -336,6 +349,32 @@ export default function MainView({ authEnabled, onLogout }: Props) {
 
   return (
     <div className="main-view">
+      {updateReloadPhase && (
+        <div className="update-reload-overlay" role="alert" aria-live="polite">
+          <div className="update-reload-overlay-content">
+            {updateReloadPhase === 'waiting' && (
+              <>
+                <p className="update-reload-title">Update in progress</p>
+                <p className="update-reload-message">The server is restarting. This page will reload automatically when it is back.</p>
+                {updateReloadTimedOut && (
+                  <>
+                    <p className="update-reload-timeout">If the page did not reload, click below to refresh now.</p>
+                    <button type="button" className="btn-sm update-reload-refresh-btn" onClick={() => window.location.reload()}>
+                      Refresh now
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+            {updateReloadPhase === 'reloading' && (
+              <>
+                <p className="update-reload-title">Application is reloading</p>
+                <p className="update-reload-message">The app was updated. Reloading now…</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <header className="main-header">
         <button
           className="sidebar-toggle"
@@ -1676,15 +1715,40 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                         onClick={async () => {
                           const ok = await modal.showConfirm({
                             title: 'Apply update',
-                            message: `Update to v${updateCheck.latestVersion}? A full backup will be created first. The app will restart (PM2 only).`,
+                            message: `Update to v${updateCheck.latestVersion}? A full backup will be created first. The server will restart, and this page will reload automatically once it is back. You will see a short message before the reload.`,
                             confirmLabel: 'Update',
                           });
                           if (!ok) return;
                           setApplyingUpdate(true);
+                          setUpdateReloadTimedOut(false);
                           try {
                             await api.applyUpdate();
-                            modal.showAlert({ title: 'Update in progress', message: 'Backup created. Update in progress. You may need to reload the page in a minute or so depending on the performance of the server. The page will attempt to reload automatically in 30 seconds.' });
-                            setTimeout(() => window.location.reload(), 3000);
+                            setUpdateReloadPhase('waiting');
+                            let hasSeenFailure = false;
+                            const intervalId = setInterval(async () => {
+                              try {
+                                await api.getVersion();
+                                if (hasSeenFailure) {
+                                  if (updatePollRef.current) {
+                                    clearInterval(updatePollRef.current.intervalId);
+                                    clearTimeout(updatePollRef.current.timeoutId);
+                                    updatePollRef.current = null;
+                                  }
+                                  setUpdateReloadPhase('reloading');
+                                  setTimeout(() => window.location.reload(), 1500);
+                                }
+                              } catch {
+                                hasSeenFailure = true;
+                              }
+                            }, 2000);
+                            const timeoutId = setTimeout(() => {
+                              setUpdateReloadTimedOut(true);
+                              if (updatePollRef.current) {
+                                clearInterval(updatePollRef.current.intervalId);
+                                updatePollRef.current = null;
+                              }
+                            }, 120000);
+                            updatePollRef.current = { intervalId, timeoutId, hasSeenFailure: false };
                           } catch (err) {
                             setApplyingUpdate(false);
                             modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to apply update' });
