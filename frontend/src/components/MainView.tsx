@@ -1668,6 +1668,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     <label className="input-label">GitHub token (optional)</label>
                     <p className="settings-desc" style={{ marginTop: 0 }}>
                       Add a personal access token to raise the API rate limit from 60 to 5,000 requests/hour. Leave blank to use the default limit.
+                      To generate a token, go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">GitHub settings</a> and create a new classic token, set the expiration date to never, and give it the <code>public_repo</code> scope.
                     </p>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input

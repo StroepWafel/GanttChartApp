@@ -18,6 +18,7 @@ function getResetToken(): string | null {
 const SLOW_POLL_MS = 25000;
 const AGGRESSIVE_POLL_MS = 2000;
 const RELOAD_DELAY_MS = 1500;
+const MIN_RELOAD_MESSAGE_MS = 2500; // Show "Reloading now..." at least this long so it's visible
 const WAIT_TIMEOUT_MS = 120000;
 
 export default function App() {
@@ -63,7 +64,7 @@ export default function App() {
               updatePollRef.current = null;
             }
             setUpdatePhase('reloading');
-            setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
+            setTimeout(() => window.location.reload(), Math.max(RELOAD_DELAY_MS, MIN_RELOAD_MESSAGE_MS));
           }
         })
         .catch(() => {
