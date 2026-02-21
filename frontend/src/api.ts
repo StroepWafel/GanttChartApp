@@ -177,7 +177,7 @@ export async function getAdminFullBackup(): Promise<Blob> {
 }
 
 export async function getVersion(): Promise<{ version: string; updating?: boolean }> {
-  const res = await fetch(`${API}/version`);
+  const res = await fetch(`${API}/version`, { cache: 'no-store' });
   return res.json();
 }
 

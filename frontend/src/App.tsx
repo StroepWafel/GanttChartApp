@@ -49,22 +49,29 @@ export default function App() {
     if (updatePhase !== 'waiting') return;
     setUpdateReloadTimedOut(false);
     let hasSeenFailure = false;
-    const intervalId = setInterval(async () => {
-      try {
-        const data = await getVersion();
-        if (hasSeenFailure || !data.updating) {
-          if (updatePollRef.current) {
-            clearInterval(updatePollRef.current.intervalId);
-            clearTimeout(updatePollRef.current.timeoutId);
-            updatePollRef.current = null;
+    let didReload = false;
+    function checkAndReload() {
+      if (didReload) return;
+      getVersion()
+        .then((data) => {
+          if (didReload) return;
+          if (hasSeenFailure || !data.updating) {
+            didReload = true;
+            if (updatePollRef.current) {
+              clearInterval(updatePollRef.current.intervalId);
+              clearTimeout(updatePollRef.current.timeoutId);
+              updatePollRef.current = null;
+            }
+            setUpdatePhase('reloading');
+            setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
           }
-          setUpdatePhase('reloading');
-          setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
-        }
-      } catch {
-        hasSeenFailure = true;
-      }
-    }, AGGRESSIVE_POLL_MS);
+        })
+        .catch(() => {
+          hasSeenFailure = true;
+        });
+    }
+    checkAndReload();
+    const intervalId = setInterval(checkAndReload, AGGRESSIVE_POLL_MS);
     const timeoutId = setTimeout(() => {
       setUpdateReloadTimedOut(true);
       if (updatePollRef.current) {
