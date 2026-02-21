@@ -526,12 +526,12 @@
 }
 
 .settings-modal {
-  width: 90%;
-  max-width: 720px;
+  width: 95%;
+  max-width: min(960px, 95vw);
 }
 
 .settings-modal-wide {
-  max-width: 800px;
+  max-width: min(1040px, 95vw);
 }
 
 .settings-tabs {
