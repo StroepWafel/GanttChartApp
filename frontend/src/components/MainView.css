@@ -937,6 +937,28 @@
   margin: 0 0 8px;
 }
 
+/* Bottom-left red text when an update is available (admin only) */
+.update-available-banner {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  z-index: 100;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--danger);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.update-available-banner:hover {
+  color: var(--danger);
+  background: rgba(244, 63, 94, 0.12);
+}
+
 /* Full-screen overlay when server is restarting after an update */
 .update-reload-overlay {
   position: fixed;

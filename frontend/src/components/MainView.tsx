@@ -147,6 +147,14 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     api.getVersion().then((v) => setAppVersion(v.version)).catch(() => {});
   }, []);
 
+  // One-time update check when admin loads (so we can show "Update available" in corner)
+  useEffect(() => {
+    if (!authEnabled || !currentUser?.isAdmin) return;
+    api.checkUpdate(false)
+      .then(setUpdateCheck)
+      .catch(() => setUpdateCheck({ updateAvailable: false, error: 'Check failed' }));
+  }, [authEnabled, currentUser?.isAdmin]);
+
   // Automatic update check every ~10 minutes when enabled (admin only)
   const AUTO_UPDATE_INTERVAL_MS = 10 * 60 * 1000;
   useEffect(() => {
@@ -337,6 +345,16 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
 
   return (
     <div className="main-view">
+      {currentUser?.isAdmin && updateCheck?.updateAvailable && (
+        <button
+          type="button"
+          className="update-available-banner"
+          onClick={() => { setShowSettings(true); setSettingsTab('updates'); }}
+          title="Update available - click to open Settings"
+        >
+          Update available (v{updateCheck.latestVersion})
+        </button>
+      )}
       <header className="main-header">
         <button
           className="sidebar-toggle"
