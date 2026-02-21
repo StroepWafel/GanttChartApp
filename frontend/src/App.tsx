@@ -17,7 +17,7 @@ function getResetToken(): string | null {
 
 const SLOW_POLL_MS = 25000;
 const AGGRESSIVE_POLL_MS = 2000;
-const RELOAD_DELAY_MS = 1500;
+const RELOAD_DELAY_MS = 2500;
 const WAIT_TIMEOUT_MS = 120000;
 
 export default function App() {
@@ -50,12 +50,15 @@ export default function App() {
     setUpdateReloadTimedOut(false);
     let hasSeenFailure = false;
     let didReload = false;
+    let storedBootId: string | null = null;
     function checkAndReload() {
       if (didReload) return;
       getVersion()
-        .then(() => {
+        .then((data) => {
           if (didReload) return;
-          if (!hasSeenFailure) return;
+          if (data.updating && data.bootId) storedBootId = data.bootId;
+          const bootIdChanged = storedBootId != null && data.bootId !== storedBootId;
+          if (!hasSeenFailure && !bootIdChanged) return;
           didReload = true;
           if (updatePollRef.current) {
             clearInterval(updatePollRef.current.intervalId);

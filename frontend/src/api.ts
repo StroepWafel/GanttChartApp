@@ -176,8 +176,9 @@ export async function getAdminFullBackup(): Promise<Blob> {
   return res.blob();
 }
 
-export async function getVersion(): Promise<{ version: string; updating?: boolean }> {
+export async function getVersion(): Promise<{ version: string; updating?: boolean; bootId?: string }> {
   const res = await fetch(`${API}/version?_t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Version check failed: ${res.status}`);
   return res.json();
 }
 

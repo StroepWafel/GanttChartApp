@@ -1,5 +1,6 @@
 import './load-env.js';
 import path from 'path';
+import crypto from 'crypto';
 import { readFileSync, existsSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import express from 'express';
@@ -38,6 +39,9 @@ try {
   console.warn('[server] Could not clear update flag:', e?.message);
 }
 
+// Per-process id so clients can detect when this process restarted (new boot = new id)
+const SERVER_BOOT_ID = crypto.randomUUID();
+
 // Frontend dist: when running from backend/, it's ../frontend/dist
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 
@@ -72,7 +76,7 @@ app.get('/api/version', (req, res) => {
     const updating = existsSync(UPDATE_RESTARTING_FLAG);
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.set('Pragma', 'no-cache');
-    res.json({ version, ...(updating && { updating: true }) });
+    res.json({ version, bootId: SERVER_BOOT_ID, ...(updating && { updating: true }) });
   } catch (err) {
     console.error('[version] read failed:', err?.message);
     res.json({ version: '1.0.0' });
