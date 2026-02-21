@@ -53,18 +53,17 @@ export default function App() {
     function checkAndReload() {
       if (didReload) return;
       getVersion()
-        .then((data) => {
+        .then(() => {
           if (didReload) return;
-          if (hasSeenFailure || !data.updating) {
-            didReload = true;
-            if (updatePollRef.current) {
-              clearInterval(updatePollRef.current.intervalId);
-              clearTimeout(updatePollRef.current.timeoutId);
-              updatePollRef.current = null;
-            }
-            setUpdatePhase('reloading');
-            setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
+          if (!hasSeenFailure) return;
+          didReload = true;
+          if (updatePollRef.current) {
+            clearInterval(updatePollRef.current.intervalId);
+            clearTimeout(updatePollRef.current.timeoutId);
+            updatePollRef.current = null;
           }
+          setUpdatePhase('reloading');
+          setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
         })
         .catch(() => {
           hasSeenFailure = true;
