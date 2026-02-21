@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
@@ -77,6 +77,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [appVersion, setAppVersion] = useState<string | null>(null);
   type SettingsTab = 'personal' | 'admin' | 'emailOnboarding' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
+  const settingsOpenToTabRef = useRef<SettingsTab | null>(null);
   const [emailOnboardingSettings, setEmailOnboardingSettings] = useState<api.EmailOnboardingSettings>({});
   const [showEmailOnboardingSetup, setShowEmailOnboardingSetup] = useState(false);
   const [emailOnboardingSaving, setEmailOnboardingSaving] = useState(false);
@@ -170,7 +171,11 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   }, [autoUpdateEnabled, currentUser?.isAdmin]);
 
   useEffect(() => {
-    if (showSettings) setSettingsTab('personal');
+    if (showSettings) {
+      const openTo = settingsOpenToTabRef.current;
+      settingsOpenToTabRef.current = null;
+      setSettingsTab(openTo ?? 'personal');
+    }
   }, [showSettings]);
 
   useEffect(() => {
@@ -349,7 +354,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         <button
           type="button"
           className="update-available-banner"
-          onClick={() => { setShowSettings(true); setSettingsTab('updates'); }}
+          onClick={() => { settingsOpenToTabRef.current = 'updates'; setShowSettings(true); }}
           title="Update available - click to open Settings"
         >
           Update available (v{updateCheck.latestVersion})
