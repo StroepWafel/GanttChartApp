@@ -9,6 +9,11 @@ router.get('/', optionalAuth, requireAdmin, (req, res) => {
     const rows = db.prepare('SELECT key, value FROM system_settings').all();
     const settings = {};
     for (const r of rows) {
+      if (r.key === 'github_token') {
+        const v = r.value;
+        settings.github_token_set = !!(v && String(v).trim() !== '' && String(v).trim() !== '""');
+        continue;
+      }
       try {
         settings[r.key] = r.value ? JSON.parse(r.value) : null;
       } catch {

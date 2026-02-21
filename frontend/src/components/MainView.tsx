@@ -68,6 +68,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     updateAvailable: boolean;
     currentVersion?: string;
     latestVersion?: string;
+    releaseName?: string | null;
     releaseUrl?: string;
     error?: string;
     _debug?: Record<string, unknown>;
@@ -75,6 +76,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [showUpdateDebug, setShowUpdateDebug] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [githubTokenSet, setGithubTokenSet] = useState(false);
+  const [githubTokenInput, setGithubTokenInput] = useState('');
+  const [githubTokenSaving, setGithubTokenSaving] = useState(false);
   type SettingsTab = 'personal' | 'admin' | 'emailOnboarding' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
   const settingsOpenToTabRef = useRef<SettingsTab | null>(null);
@@ -128,6 +132,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       api.getSettings()
         .then((s) => {
           setAutoUpdateEnabled(!!s.auto_update_enabled);
+          setGithubTokenSet(!!s.github_token_set);
           const eoKeys = [
             'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
             'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
@@ -1659,6 +1664,43 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       Enable automatic update checks
                     </label>
                   </div>
+                  <div className="settings-field-row">
+                    <label className="input-label">GitHub token (optional)</label>
+                    <p className="settings-desc" style={{ marginTop: 0 }}>
+                      Add a personal access token to raise the API rate limit from 60 to 5,000 requests/hour. Leave blank to use the default limit.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        type="password"
+                        className="settings-input"
+                        placeholder={githubTokenSet ? 'Token configured — enter new token to replace' : 'ghp_… (optional)'}
+                        value={githubTokenInput}
+                        onChange={(e) => setGithubTokenInput(e.target.value)}
+                        autoComplete="off"
+                        style={{ maxWidth: 320 }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        disabled={githubTokenSaving}
+                        onClick={async () => {
+                          setGithubTokenSaving(true);
+                          try {
+                            await api.patchSettings({ github_token: githubTokenInput.trim() || '' });
+                            setGithubTokenSet(!!githubTokenInput.trim());
+                            setGithubTokenInput('');
+                            modal.showAlert({ message: githubTokenInput.trim() ? 'Token saved.' : 'Token cleared.' });
+                          } catch (err) {
+                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                          } finally {
+                            setGithubTokenSaving(false);
+                          }
+                        }}
+                      >
+                        {githubTokenSaving ? 'Saving…' : (githubTokenInput.trim() ? 'Save token' : 'Clear token')}
+                      </button>
+                    </div>
+                  </div>
                   <div className="update-actions">
                     <button
                       type="button"
@@ -1722,7 +1764,13 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     <>
                       <p className="settings-desc">
                         {updateCheck.updateAvailable ? (
-                          <>Update available: v{updateCheck.latestVersion} (current: v{updateCheck.currentVersion})</>
+                          <>
+                            Update available: v{updateCheck.latestVersion}
+                            {updateCheck.releaseName && (
+                              <span className="update-release-name"> — {updateCheck.releaseName}</span>
+                            )}
+                            {' '}(current: v{updateCheck.currentVersion})
+                          </>
                         ) : updateCheck.error ? (
                           <span className="auth-error">{updateCheck.error}</span>
                         ) : (

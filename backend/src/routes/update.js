@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { optionalAuth, requireAdmin } from '../auth.js';
 import { fetchFullBackup } from './admin.js';
+import db from '../db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
@@ -68,6 +69,21 @@ function compareVersions(a, b) {
   return 0;
 }
 
+/** GitHub token from env or system_settings (increases rate limit to 5,000/hr when set) */
+function getGitHubToken() {
+  const fromEnv = process.env.GITHUB_TOKEN;
+  if (fromEnv && String(fromEnv).trim()) return String(fromEnv).trim();
+  try {
+    const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('github_token');
+    if (!row?.value) return null;
+    const v = typeof row.value === 'string' ? (() => { try { return JSON.parse(row.value); } catch { return row.value; } })() : row.value;
+    const token = String(v ?? '').trim();
+    return token || null;
+  } catch {
+    return null;
+  }
+}
+
 router.get('/check-update', async (req, res) => {
   const debug = req.query.debug === '1' || req.query.debug === 'true';
   try {
@@ -75,15 +91,31 @@ router.get('/check-update', async (req, res) => {
     const currentVersion = debugInfo.packageJsonVersion;
     const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
     const url = `https://api.github.com/repos/${repo}/releases/latest`;
+    const token = getGitHubToken();
+    const headers = { Accept: 'application/vnd.github.v3+json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
 
     console.log('[update] check-update: packageJsonPath=%s currentVersion=%s', PACKAGE_JSON, currentVersion);
 
-    const resp = await fetch(url, {
-      headers: { Accept: 'application/vnd.github.v3+json' },
-    });
+    const resp = await fetch(url, { headers });
     if (!resp.ok) {
       console.error('[update] GitHub API failed: %s %s', resp.status, resp.statusText);
-      return res.json({ updateAvailable: false, currentVersion, error: 'Failed to fetch releases', ...(debug && { _debug: debugInfo }) });
+      let errorMessage = 'Failed to fetch releases';
+      const resetHeader = resp.headers.get('x-ratelimit-reset') || resp.headers.get('X-RateLimit-Reset');
+      if ((resp.status === 403 || resp.status === 429) && resetHeader) {
+        const resetSeconds = parseInt(resetHeader, 10);
+        if (!Number.isNaN(resetSeconds)) {
+          const resetDate = new Date(resetSeconds * 1000);
+          const resetStr = resetDate.toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' });
+          errorMessage = `GitHub API rate limited. Limit resets at ${resetStr} UTC. Try again after that.`;
+        }
+      }
+      return res.json({
+        updateAvailable: false,
+        currentVersion,
+        error: errorMessage,
+        ...(debug && { _debug: debugInfo }),
+      });
     }
     const data = await resp.json();
     const latestTag = data.tag_name?.replace(/^v/, '') || data.name || '';
@@ -97,6 +129,7 @@ router.get('/check-update', async (req, res) => {
       updateAvailable,
       currentVersion: normalizeVersion(currentVersion),
       latestVersion: normalizeVersion(latestTag),
+      releaseName: data.name || null,
       releaseUrl: data.html_url,
       ...(debug && { _debug: debugInfo }),
     });

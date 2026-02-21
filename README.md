@@ -102,6 +102,7 @@ Copy `.env.example` to `.env` and configure:
 | `AUTH_PASSWORD_HASH` | Optional: pre-computed bcrypt hash (avoids plaintext in .env) |
 | `JWT_SECRET` | Secret for signing JWTs (change in production!) |
 | `DB_PATH` | Path to SQLite database (default: `./data/gantt.db`) |
+| `GITHUB_TOKEN` | Optional: personal access token for update check (5,000 API requests/hr; can also be set in Settings → Updates) |
 
 When auth is enabled, the first user (admin) is created from `AUTH_USERNAME` and `AUTH_PASSWORD` if the users table is empty. Each user gets their own API key from **Settings → Account** for the read-only IoT API.
 

@@ -959,6 +959,11 @@
   background: rgba(244, 63, 94, 0.12);
 }
 
+.update-release-name {
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
 /* Full-screen overlay when server is restarting after an update */
 .update-reload-overlay {
   position: fixed;
