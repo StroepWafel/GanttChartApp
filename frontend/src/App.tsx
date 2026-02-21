@@ -44,21 +44,21 @@ export default function App() {
     return () => clearInterval(id);
   }, [updatePhase]);
 
-  // When waiting: aggressive poll until server is back, then reload
+  // When waiting: aggressive poll until server is back, then reload.
+  // Only reload after we've seen a failure (connection/5xx) then success — never on bootId
+  // change alone, since behind a load balancer a different instance can return a different
+  // bootId before our origin has restarted.
   useEffect(() => {
     if (updatePhase !== 'waiting') return;
     setUpdateReloadTimedOut(false);
     let hasSeenFailure = false;
     let didReload = false;
-    let storedBootId: string | null = null;
     function checkAndReload() {
       if (didReload) return;
       getVersion()
-        .then((data) => {
+        .then(() => {
           if (didReload) return;
-          if (data.updating && data.bootId) storedBootId = data.bootId;
-          const bootIdChanged = storedBootId != null && data.bootId !== storedBootId;
-          if (!hasSeenFailure && !bootIdChanged) return;
+          if (!hasSeenFailure) return;
           didReload = true;
           if (updatePollRef.current) {
             clearInterval(updatePollRef.current.intervalId);
