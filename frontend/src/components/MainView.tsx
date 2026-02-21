@@ -1027,17 +1027,17 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                           emailOnboardingSettings.email_onboarding_domain) ? (
                           <>
                             <input
-                              type="email"
-                              placeholder="Email"
-                              value={newOnboardEmail}
-                              onChange={(e) => { setNewOnboardEmail(e.target.value); setUserMgmtError(''); }}
-                              className="settings-input"
-                            />
-                            <input
                               type="text"
                               placeholder="Username"
                               value={newUsername}
                               onChange={(e) => { setNewUsername(e.target.value); setUserMgmtError(''); }}
+                              className="settings-input"
+                            />
+                            <input
+                              type="email"
+                              placeholder="Email"
+                              value={newOnboardEmail}
+                              onChange={(e) => { setNewOnboardEmail(e.target.value); setUserMgmtError(''); }}
                               className="settings-input"
                             />
                             <button
