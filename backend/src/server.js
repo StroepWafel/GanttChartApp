@@ -70,6 +70,8 @@ app.get('/api/version', (req, res) => {
       console.log('[version] path=%s version=%s', pkgPath, version);
     }
     const updating = existsSync(UPDATE_RESTARTING_FLAG);
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
     res.json({ version, ...(updating && { updating: true }) });
   } catch (err) {
     console.error('[version] read failed:', err?.message);
