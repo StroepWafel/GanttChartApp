@@ -317,6 +317,8 @@ export default function MainView({ authEnabled, onLogout }: Props) {
     }
   }
 
+  const isMasquerading = typeof window !== 'undefined' && !!localStorage.getItem('gantt_token_admin');
+
   return (
     <div className="main-view">
       <header className="main-header">
@@ -364,6 +366,15 @@ export default function MainView({ authEnabled, onLogout }: Props) {
           )}
         </div>
       </header>
+
+      {authEnabled && isMasquerading && currentUser && (
+        <div className="masquerade-banner" role="status">
+          <span>Viewing as <strong>{currentUser.username}</strong>.</span>
+          <button type="button" className="btn-sm" onClick={() => api.stopMasquerade()}>
+            Back to admin
+          </button>
+        </div>
+      )}
 
       <div className="main-body">
         {isSidebarOverlay && (
@@ -633,6 +644,11 @@ export default function MainView({ authEnabled, onLogout }: Props) {
               <div className="settings-section">
                 <h4>Account</h4>
                 <p className="settings-desc">Signed in as <strong>{currentUser.username}</strong></p>
+                {isMasquerading && (
+                  <p className="settings-desc masquerade-settings-line">
+                    You're acting as this user. <button type="button" className="btn-sm" onClick={() => api.stopMasquerade()}>Back to admin</button>
+                  </p>
+                )}
                 <div className="settings-section">
                   <h5>Change password</h5>
                   <div className="change-password-form">

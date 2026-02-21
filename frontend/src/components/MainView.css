@@ -620,6 +620,28 @@
   flex: 1;
 }
 
+.masquerade-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.masquerade-banner span {
+  color: var(--text-muted);
+}
+
+.masquerade-settings-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
 .settings-checkbox-row {
   margin: 8px 0;
 }

@@ -141,8 +141,20 @@ export async function masquerade(userId: number) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Masquerade failed');
-  if (data.token) localStorage.setItem('gantt_token', data.token);
+  if (data.token) {
+    const prev = localStorage.getItem('gantt_token');
+    if (prev) localStorage.setItem('gantt_token_admin', prev);
+    localStorage.setItem('gantt_token', data.token);
+  }
   return data;
+}
+
+export function stopMasquerade(): void {
+  const adminToken = localStorage.getItem('gantt_token_admin');
+  if (!adminToken) return;
+  localStorage.setItem('gantt_token', adminToken);
+  localStorage.removeItem('gantt_token_admin');
+  window.location.reload();
 }
 
 export async function getAdminFullBackup(): Promise<Blob> {

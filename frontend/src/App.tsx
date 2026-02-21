@@ -57,7 +57,7 @@ export default function App() {
     <ModalProvider>
       <MainView
         authEnabled={authEnabled}
-        onLogout={() => { localStorage.removeItem('gantt_token'); setToken(null); }}
+        onLogout={() => { localStorage.removeItem('gantt_token'); localStorage.removeItem('gantt_token_admin'); setToken(null); }}
       />
     </ModalProvider>
   );
