@@ -12,6 +12,7 @@ router.use(optionalAuth, requireAdmin);
 
 const DB_PATH = resolve(process.env.DB_PATH || join(__dirname, '../../data/gantt.db'));
 const BACKUPS_DIR = join(dirname(DB_PATH), 'backups');
+const UPDATE_RESTARTING_FLAG = join(dirname(DB_PATH), 'update-restarting.flag');
 const ROOT_DIR = resolve(join(__dirname, '../../..'));
 const PACKAGE_JSON = join(ROOT_DIR, 'package.json');
 
@@ -123,6 +124,10 @@ router.post('/apply-update', async (req, res) => {
   try {
     const debugInfo = getDebugInfo();
     console.log('[update] apply-update: ROOT_DIR=%s packageJson=%s', ROOT_DIR, PACKAGE_JSON);
+
+    // Signal to all clients that the server is about to restart (so they show overlay and reload when back)
+    mkdirSync(dirname(DB_PATH), { recursive: true });
+    writeFileSync(UPDATE_RESTARTING_FLAG, Date.now().toString(), 'utf8');
 
     if (!existsSync(BACKUPS_DIR)) {
       mkdirSync(BACKUPS_DIR, { recursive: true });

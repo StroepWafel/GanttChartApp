@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getAuthStatus, getMe } from './api';
+import { useState, useEffect, useRef } from 'react';
+import { getAuthStatus, getMe, getVersion } from './api';
 import AuthGate from './components/AuthGate';
 import ResetPassword from './components/ResetPassword';
 import ForceChangePassword from './components/ForceChangePassword';
@@ -15,11 +15,72 @@ function getResetToken(): string | null {
   return null;
 }
 
+const SLOW_POLL_MS = 25000;
+const AGGRESSIVE_POLL_MS = 2000;
+const RELOAD_DELAY_MS = 1500;
+const WAIT_TIMEOUT_MS = 120000;
+
 export default function App() {
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('gantt_token'));
   const [mustChangePassword, setMustChangePassword] = useState<boolean | null>(null);
   const [resetToken, setResetToken] = useState<string | null>(() => getResetToken());
+  const [updatePhase, setUpdatePhase] = useState<null | 'waiting' | 'reloading'>(null);
+  const [updateReloadTimedOut, setUpdateReloadTimedOut] = useState(false);
+  const updatePollRef = useRef<{ intervalId: ReturnType<typeof setInterval>; timeoutId: ReturnType<typeof setTimeout>; hasSeenFailure: boolean } | null>(null);
+
+  // Slow poll: all clients check periodically if server is about to restart
+  useEffect(() => {
+    if (updatePhase !== null) return;
+    const id = setInterval(async () => {
+      try {
+        const data = await getVersion();
+        if (data.updating) setUpdatePhase('waiting');
+      } catch {
+        // Connection error might mean server is restarting
+        setUpdatePhase('waiting');
+      }
+    }, SLOW_POLL_MS);
+    return () => clearInterval(id);
+  }, [updatePhase]);
+
+  // When waiting: aggressive poll until server is back, then reload
+  useEffect(() => {
+    if (updatePhase !== 'waiting') return;
+    setUpdateReloadTimedOut(false);
+    let hasSeenFailure = false;
+    const intervalId = setInterval(async () => {
+      try {
+        const data = await getVersion();
+        if (hasSeenFailure || !data.updating) {
+          if (updatePollRef.current) {
+            clearInterval(updatePollRef.current.intervalId);
+            clearTimeout(updatePollRef.current.timeoutId);
+            updatePollRef.current = null;
+          }
+          setUpdatePhase('reloading');
+          setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
+        }
+      } catch {
+        hasSeenFailure = true;
+      }
+    }, AGGRESSIVE_POLL_MS);
+    const timeoutId = setTimeout(() => {
+      setUpdateReloadTimedOut(true);
+      if (updatePollRef.current) {
+        clearInterval(updatePollRef.current.intervalId);
+        updatePollRef.current = null;
+      }
+    }, WAIT_TIMEOUT_MS);
+    updatePollRef.current = { intervalId, timeoutId, hasSeenFailure: false };
+    return () => {
+      if (updatePollRef.current) {
+        clearInterval(updatePollRef.current.intervalId);
+        clearTimeout(updatePollRef.current.timeoutId);
+        updatePollRef.current = null;
+      }
+    };
+  }, [updatePhase]);
 
   useEffect(() => {
     getAuthStatus()
@@ -63,45 +124,98 @@ export default function App() {
     return () => window.removeEventListener('popstate', handler);
   }, []);
 
+  const updateOverlay =
+    updatePhase && (
+      <div className="update-reload-overlay" role="alert" aria-live="polite">
+        <div className="update-reload-overlay-content">
+          {updatePhase === 'waiting' && (
+            <>
+              <p className="update-reload-title">Update in progress</p>
+              <p className="update-reload-message">The server is restarting. This page will reload automatically when it is back.</p>
+              {updateReloadTimedOut && (
+                <>
+                  <p className="update-reload-timeout">If the page did not reload, click below to refresh now.</p>
+                  <button type="button" className="btn-sm update-reload-refresh-btn" onClick={() => window.location.reload()}>
+                    Refresh now
+                  </button>
+                </>
+              )}
+            </>
+          )}
+          {updatePhase === 'reloading' && (
+            <>
+              <p className="update-reload-title">Application is reloading</p>
+              <p className="update-reload-message">The app was updated. Reloading now…</p>
+            </>
+          )}
+        </div>
+      </div>
+    );
+
   if (authEnabled === null) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        Loading...
-      </div>
+      <>
+        {updateOverlay}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+          Loading...
+        </div>
+      </>
     );
   }
 
   if (resetToken && authEnabled) {
-    return <ResetPassword token={resetToken} onSuccess={goToSignIn} />;
+    return (
+      <>
+        {updateOverlay}
+        <ResetPassword token={resetToken} onSuccess={goToSignIn} />
+      </>
+    );
   }
 
   if (authEnabled && !token) {
-    return <AuthGate onLogin={handleLogin} />;
+    return (
+      <>
+        {updateOverlay}
+        <AuthGate onLogin={handleLogin} />
+      </>
+    );
   }
 
   if (authEnabled && token && mustChangePassword === null) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        Loading...
-      </div>
+      <>
+        {updateOverlay}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+          Loading...
+        </div>
+      </>
     );
   }
 
   if (authEnabled && token && mustChangePassword === true) {
-    return <ForceChangePassword onComplete={handleForceChangeComplete} />;
+    return (
+      <>
+        {updateOverlay}
+        <ForceChangePassword onComplete={handleForceChangeComplete} />
+      </>
+    );
   }
 
   return (
-    <ModalProvider>
-      <MainView
-        authEnabled={authEnabled}
-        onLogout={() => {
-          localStorage.removeItem('gantt_token');
-          localStorage.removeItem('gantt_token_admin');
-          setToken(null);
-          setMustChangePassword(null);
-        }}
-      />
-    </ModalProvider>
+    <>
+      {updateOverlay}
+      <ModalProvider>
+        <MainView
+          authEnabled={authEnabled}
+          onLogout={() => {
+            localStorage.removeItem('gantt_token');
+            localStorage.removeItem('gantt_token_admin');
+            setToken(null);
+            setMustChangePassword(null);
+          }}
+          onUpdateApplySucceeded={() => setUpdatePhase('waiting')}
+        />
+      </ModalProvider>
+    </>
   );
 }

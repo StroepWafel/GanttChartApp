@@ -1,6 +1,6 @@
 import './load-env.js';
 import path from 'path';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
@@ -25,6 +25,19 @@ import apiRouter from './routes/api.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
 
+// Path for "server is restarting" flag (cleared on startup so new process does not report updating)
+const DEFAULT_DB_PATH = path.join(__dirname, '..', '..', 'data', 'gantt.db');
+const UPDATE_RESTARTING_FLAG = path.join(path.dirname(process.env.DB_PATH || DEFAULT_DB_PATH), 'update-restarting.flag');
+
+try {
+  if (existsSync(UPDATE_RESTARTING_FLAG)) {
+    unlinkSync(UPDATE_RESTARTING_FLAG);
+    console.log('[server] Cleared update-restarting flag');
+  }
+} catch (e) {
+  console.warn('[server] Could not clear update flag:', e?.message);
+}
+
 // Frontend dist: when running from backend/, it's ../frontend/dist
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 
@@ -47,7 +60,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/admin/update', updateRouter);
 app.use('/api/settings', optionalAuth, settingsRouter);
 
-// Version (public for update check UI) - reads root package.json
+// Version (public for update check UI) - reads root package.json; includes updating: true when server is about to restart
 app.get('/api/version', (req, res) => {
   try {
     const pkgPath = path.resolve(__dirname, '..', '..', 'package.json');
@@ -56,7 +69,8 @@ app.get('/api/version', (req, res) => {
     if (process.env.NODE_ENV !== 'production') {
       console.log('[version] path=%s version=%s', pkgPath, version);
     }
-    res.json({ version });
+    const updating = existsSync(UPDATE_RESTARTING_FLAG);
+    res.json({ version, ...(updating && { updating: true }) });
   } catch (err) {
     console.error('[version] read failed:', err?.message);
     res.json({ version: '1.0.0' });
