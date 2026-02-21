@@ -103,15 +103,15 @@ router.post('/onboard-user', async (req, res) => {
       return res.status(400).json({ error: 'email and username required' });
     }
     const emailTrim = email.trim();
-    const usernameTrim = username.trim();
-    if (!emailTrim || !usernameTrim) {
+    const usernameNorm = username.trim().toLowerCase();
+    if (!emailTrim || !usernameNorm) {
       return res.status(400).json({ error: 'email and username required' });
     }
     const config = getEmailOnboardingConfig();
     if (!config.enabled || !config.apiKey || !config.domain) {
       return res.status(400).json({ error: 'Email onboarding is not configured or enabled. Configure it in Settings > Email onboarding.' });
     }
-    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(usernameTrim);
+    const existing = db.prepare('SELECT id FROM users WHERE LOWER(username) = ?').get(usernameNorm);
     if (existing) {
       return res.status(400).json({ error: 'Username already exists' });
     }
@@ -127,11 +127,11 @@ router.post('/onboard-user', async (req, res) => {
     const result = db.prepare(`
       INSERT INTO users (username, password_hash, is_admin, api_key, email, must_change_password)
       VALUES (?, ?, 0, ?, ?, 1)
-    `).run(usernameTrim, hash, apiKey, emailNormalized);
+    `).run(usernameNorm, hash, apiKey, emailNormalized);
     const user = db.prepare('SELECT id, username, is_admin, api_key, created_at FROM users WHERE id = ?')
       .get(result.lastInsertRowid);
 
-    const body = renderOnboardingTemplate(config, { username: usernameTrim, password: temporaryPassword });
+    const body = renderOnboardingTemplate(config, { username: usernameNorm, password: temporaryPassword });
     const mailgunRes = await sendMailgunEmail(config, {
       to: emailTrim,
       subject: config.subject,

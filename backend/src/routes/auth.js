@@ -16,9 +16,13 @@ router.get('/login-hash', (req, res) => {
     if (!username || typeof username !== 'string') {
       return res.status(400).json({ error: 'Username required' });
     }
+    const normalized = username.trim().toLowerCase();
+    if (!normalized) {
+      return res.status(400).json({ error: 'Username required' });
+    }
     const user = db.prepare(
-      'SELECT password_hash FROM users WHERE username = ? AND is_active = 1'
-    ).get(username);
+      'SELECT password_hash FROM users WHERE LOWER(username) = ? AND is_active = 1'
+    ).get(normalized);
     const hash = user
       ? user.password_hash
       : bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);

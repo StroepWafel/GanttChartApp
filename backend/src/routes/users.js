@@ -46,7 +46,11 @@ router.post('/', optionalAuth, requireAdmin, async (req, res) => {
     if (!username || !temporaryPassword) {
       return res.status(400).json({ error: 'username and temporaryPassword required' });
     }
-    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+    const usernameNorm = username.trim().toLowerCase();
+    if (!usernameNorm) {
+      return res.status(400).json({ error: 'username and temporaryPassword required' });
+    }
+    const existing = db.prepare('SELECT id FROM users WHERE LOWER(username) = ?').get(usernameNorm);
     if (existing) {
       return res.status(400).json({ error: 'Username already exists' });
     }
@@ -62,7 +66,7 @@ router.post('/', optionalAuth, requireAdmin, async (req, res) => {
     const result = db.prepare(`
       INSERT INTO users (username, password_hash, is_admin, api_key, email)
       VALUES (?, ?, 0, ?, ?)
-    `).run(username, hash, apiKey, emailNorm);
+    `).run(usernameNorm, hash, apiKey, emailNorm);
     const user = db.prepare('SELECT id, username, is_admin, api_key, created_at FROM users WHERE id = ?')
       .get(result.lastInsertRowid);
     res.status(201).json({

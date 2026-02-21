@@ -146,6 +146,20 @@ export default function MainView({ authEnabled, onLogout }: Props) {
     api.getVersion().then((v) => setAppVersion(v.version)).catch(() => {});
   }, []);
 
+  // Automatic update check every ~10 minutes when enabled (admin only)
+  const AUTO_UPDATE_INTERVAL_MS = 10 * 60 * 1000;
+  useEffect(() => {
+    if (!autoUpdateEnabled || !currentUser?.isAdmin) return;
+    function runCheck() {
+      api.checkUpdate(false)
+        .then(setUpdateCheck)
+        .catch(() => setUpdateCheck({ updateAvailable: false, error: 'Check failed' }));
+    }
+    runCheck();
+    const id = setInterval(runCheck, AUTO_UPDATE_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [autoUpdateEnabled, currentUser?.isAdmin]);
+
   useEffect(() => {
     if (showSettings) setSettingsTab('personal');
   }, [showSettings]);

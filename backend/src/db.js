@@ -250,7 +250,7 @@ function assignOrphanRowsToAdmin() {
 function seedAdminUser() {
   const AUTH_ENABLED = process.env.AUTH_ENABLED === 'true';
   if (!AUTH_ENABLED) return;
-  const username = process.env.AUTH_USERNAME || process.env.AUTH_EMAIL || 'admin';
+  const username = (process.env.AUTH_USERNAME || process.env.AUTH_EMAIL || 'admin').trim().toLowerCase();
   const plainPassword = process.env.AUTH_PASSWORD;
   const passwordHash = process.env.AUTH_PASSWORD_HASH;
 

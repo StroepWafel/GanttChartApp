@@ -61,11 +61,17 @@ export function requireAuth(req, res, next) {
   next();
 }
 
+function normalizeUsername(s) {
+  return s && typeof s === 'string' ? s.trim().toLowerCase() : '';
+}
+
 export async function login(username, password) {
   if (!username || !password) return null;
+  const normalized = normalizeUsername(username);
+  if (!normalized) return null;
   const user = db.prepare(
-    'SELECT id, username, password_hash, is_admin, is_active, token_version, must_change_password FROM users WHERE username = ?'
-  ).get(username);
+    'SELECT id, username, password_hash, is_admin, is_active, token_version, must_change_password FROM users WHERE LOWER(username) = ?'
+  ).get(normalized);
   if (!user || user.is_active === 0) return null;
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return null;
@@ -84,9 +90,13 @@ export function requireApiKey(req, res, next) {
   if (!username || !apiKey) {
     return res.status(401).json({ error: 'X-API-Username and X-API-Key (or username and api_key query) required' });
   }
+  const normalized = normalizeUsername(username);
+  if (!normalized) {
+    return res.status(401).json({ error: 'Invalid API credentials' });
+  }
   const user = db.prepare(
-    'SELECT id, username, is_admin FROM users WHERE username = ? AND api_key = ?'
-  ).get(username, apiKey);
+    'SELECT id, username, is_admin FROM users WHERE LOWER(username) = ? AND api_key = ?'
+  ).get(normalized, apiKey);
   if (!user) {
     return res.status(401).json({ error: 'Invalid API credentials' });
   }
