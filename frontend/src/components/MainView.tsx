@@ -1691,7 +1691,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         value={githubTokenInput}
                         onChange={(e) => setGithubTokenInput(e.target.value)}
                         autoComplete="off"
-                        style={{ maxWidth: 750 }}
+                        style={{ minWidth: '420px', maxWidth: 560 }}
                       />
                       <button
                         type="button"
