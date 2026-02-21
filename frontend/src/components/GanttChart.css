@@ -87,6 +87,22 @@
   color: white;
 }
 
+@media (max-width: 768px) {
+  .gantt-toolbar {
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .gantt-toolbar button {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 13px;
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 /* Main layout: list | timeline */
 .gantt-main {
   flex: 1;
@@ -179,23 +195,23 @@
 @media (max-width: 768px) {
   .gantt-list-header {
     position: relative;
-    grid-template-columns: 68px minmax(100px, 1fr) 58px 58px;
+    grid-template-columns: 44px minmax(100px, 1fr) 58px 58px;
     gap: 6px;
     padding: 0 6px 0 8px;
     font-size: 10px;
-    height: 36px;
-    min-height: 36px;
+    height: 38px;
+    min-height: 38px;
   }
 }
 
 @media (max-width: 480px) {
   .gantt-list-header {
-    grid-template-columns: 68px minmax(60px, 1fr) 52px 52px;
+    grid-template-columns: 44px minmax(80px, 1fr) 52px 52px;
     gap: 4px;
     padding: 0 4px 0 6px;
     font-size: 9px;
-    height: 32px;
-    min-height: 32px;
+    height: 40px;
+    min-height: 40px;
   }
 }
 
@@ -220,23 +236,23 @@
 
 @media (max-width: 768px) {
   .gantt-list-row {
-    grid-template-columns: 68px minmax(100px, 1fr) 58px 58px;
+    grid-template-columns: 44px minmax(100px, 1fr) 58px 58px;
     gap: 6px;
     padding: 0 6px 0 8px;
     font-size: 11px;
-    height: 34px;
-    min-height: 34px;
+    height: 38px;
+    min-height: 38px;
   }
 }
 
 @media (max-width: 480px) {
   .gantt-list-row {
-    grid-template-columns: 68px minmax(60px, 1fr) 52px 52px;
+    grid-template-columns: 44px minmax(80px, 1fr) 52px 52px;
     gap: 4px;
     padding: 0 4px 0 6px;
     font-size: 10px;
-    height: 32px;
-    min-height: 32px;
+    height: 40px;
+    min-height: 40px;
   }
 }
 
@@ -295,15 +311,28 @@
   }
 
   .gantt-expand-btn {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     flex-shrink: 0;
+    font-size: 14px;
   }
 
   .gantt-expand-spacer {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     flex-shrink: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .gantt-expand-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .gantt-expand-spacer {
+    width: 44px;
+    height: 44px;
   }
 }
 

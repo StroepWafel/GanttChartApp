@@ -505,8 +505,8 @@ export default function GanttChart({
     );
   }
 
-  const rowHeight = isSmallMobile ? 32 : isMobile ? 34 : 36;
-  const listWidth = isSmallMobile ? 260 : isMobile ? 360 : 420;
+  const rowHeight = isSmallMobile ? 40 : isMobile ? 38 : 36;
+  const listWidth = isSmallMobile ? 280 : isMobile ? 320 : 420;
 
   return (
     <div className="gantt-chart-wrap">

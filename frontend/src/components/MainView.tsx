@@ -443,7 +443,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     <button
                       type="button"
                       className="sidebar-edit"
-                      onClick={() => { setEditCategory(c); setEditProject(null); setShowCatProj(true); }}
+                      onClick={() => { setEditCategory(c); setEditProject(null); setShowCatProj(true); if (isMobile) setSidebarCollapsed(true); }}
                       title="Edit category"
                       aria-label="Edit category"
                     >
@@ -465,7 +465,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       <button
                         type="button"
                         className="sidebar-edit"
-                        onClick={(e) => { e.stopPropagation(); setEditProject(p); setEditCategory(null); setShowCatProj(true); }}
+                        onClick={(e) => { e.stopPropagation(); setEditProject(p); setEditCategory(null); setShowCatProj(true); if (isMobile) setSidebarCollapsed(true); }}
                         title="Edit project"
                         aria-label="Edit project"
                       >
@@ -487,7 +487,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                   ))}
                 </div>
               ))}
-              <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
+              <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); if (isMobile) setSidebarCollapsed(true); }}>
                 + Category / Project
               </button>
             </section>
@@ -1698,6 +1698,16 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         className="btn-sm"
                         disabled={githubTokenSaving}
                         onClick={async () => {
+                          const isClear = !githubTokenInput.trim();
+                          if (isClear) {
+                            const ok = await modal.showConfirm({
+                              title: 'Clear GitHub token',
+                              message: 'Remove the saved token? Update checks will use the default rate limit (60 requests/hour).',
+                              confirmLabel: 'Clear token',
+                              variant: 'danger',
+                            });
+                            if (!ok) return;
+                          }
                           setGithubTokenSaving(true);
                           try {
                             await api.patchSettings({ github_token: githubTokenInput.trim() || '' });
