@@ -628,60 +628,73 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className={`modal settings-modal${settingsTab === 'emailOnboarding' ? ' settings-modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
-            <h3>Settings</h3>
-            <div className="settings-tabs" role="tablist">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={settingsTab === 'personal'}
-                className={`settings-tab ${settingsTab === 'personal' ? 'active' : ''}`}
-                onClick={() => setSettingsTab('personal')}
-              >
-                Personal
-              </button>
-              {currentUser?.isAdmin && (
+            <div className="settings-modal-header">
+              <div className="settings-modal-header-top">
+                <h3>Settings</h3>
+                <button
+                  type="button"
+                  className="btn-sm settings-modal-close"
+                  onClick={() => setShowSettings(false)}
+                  aria-label="Close settings"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="settings-tabs" role="tablist">
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={settingsTab === 'admin'}
-                  className={`settings-tab ${settingsTab === 'admin' ? 'active' : ''}`}
-                  onClick={() => setSettingsTab('admin')}
+                  aria-selected={settingsTab === 'personal'}
+                  className={`settings-tab ${settingsTab === 'personal' ? 'active' : ''}`}
+                  onClick={() => setSettingsTab('personal')}
                 >
-                  Admin
+                  Personal
                 </button>
-              )}
-              {currentUser?.isAdmin && (
+                {currentUser?.isAdmin && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === 'admin'}
+                    className={`settings-tab ${settingsTab === 'admin' ? 'active' : ''}`}
+                    onClick={() => setSettingsTab('admin')}
+                  >
+                    Admin
+                  </button>
+                )}
+                {currentUser?.isAdmin && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === 'emailOnboarding'}
+                    className={`settings-tab ${settingsTab === 'emailOnboarding' ? 'active' : ''}`}
+                    onClick={() => setSettingsTab('emailOnboarding')}
+                  >
+                    Email invite settings
+                  </button>
+                )}
+                {currentUser?.isAdmin && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === 'updates'}
+                    className={`settings-tab ${settingsTab === 'updates' ? 'active' : ''}`}
+                    onClick={() => setSettingsTab('updates')}
+                  >
+                    Updates
+                  </button>
+                )}
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={settingsTab === 'emailOnboarding'}
-                  className={`settings-tab ${settingsTab === 'emailOnboarding' ? 'active' : ''}`}
-                  onClick={() => setSettingsTab('emailOnboarding')}
+                  aria-selected={settingsTab === 'danger'}
+                  className={`settings-tab ${settingsTab === 'danger' ? 'active' : ''}`}
+                  onClick={() => setSettingsTab('danger')}
                 >
-                  Email invite settings
+                  Danger zone
                 </button>
-              )}
-              {currentUser?.isAdmin && (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={settingsTab === 'updates'}
-                  className={`settings-tab ${settingsTab === 'updates' ? 'active' : ''}`}
-                  onClick={() => setSettingsTab('updates')}
-                >
-                  Updates
-                </button>
-              )}
-              <button
-                type="button"
-                role="tab"
-                aria-selected={settingsTab === 'danger'}
-                className={`settings-tab ${settingsTab === 'danger' ? 'active' : ''}`}
-                onClick={() => setSettingsTab('danger')}
-              >
-                Danger zone
-              </button>
+              </div>
             </div>
+            <div className="settings-modal-body">
             {settingsTab === 'personal' && (
               <div className="settings-tab-content" role="tabpanel">
             {authEnabled && currentUser && (
@@ -695,6 +708,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 )}
                 <div className="settings-section">
                   <h5>Change password</h5>
+                  <p className="settings-desc">Set a new password for your account.</p>
                   <div className="change-password-form">
                     <input
                       type="password"
@@ -827,6 +841,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 </div>
                 <div className="settings-section">
                   <h4>Backup</h4>
+                  <p className="settings-desc">Download a copy of your data or restore from a previous backup.</p>
                   <div className="settings-actions">
                     <button className="btn-sm" onClick={handleDownloadBackup}>
                       Download backup
@@ -1670,7 +1685,6 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       Add a personal access token to raise the API rate limit from 60 to 5,000 requests/hour. 
                       Leave blank to use the default limit.
                     </p>
-
                     <p className="settings-desc">
                       To generate a token, go to{" "}
                       <a
@@ -1683,7 +1697,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       and create a new classic token. Set the expiration date to never and give it the{" "}
                       <code>public_repo</code> scope.
                     </p>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="settings-field-controls">
                       <input
                         type="password"
                         className="settings-input"
@@ -1824,8 +1838,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
             )}
             {settingsTab === 'danger' && (
               <div className="settings-tab-content" role="tabpanel">
-                <div className="settings-section">
+                <div className="settings-section danger-zone">
                   <h4>Danger zone</h4>
+                  <p className="settings-desc">Permanently remove all categories, projects, and tasks. This cannot be undone.</p>
                   <button
                     className="btn-danger"
                     onClick={() => setShowClearAllConfirm(true)}
@@ -1835,7 +1850,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 </div>
               </div>
             )}
-            <button className="btn-sm" onClick={() => setShowSettings(false)}>Close</button>
+            </div>
           </div>
         </div>
       )}
