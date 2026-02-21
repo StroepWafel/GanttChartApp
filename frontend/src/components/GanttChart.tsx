@@ -279,10 +279,11 @@ export default function GanttChart({
   }, [tasks, projects, categories, includeCompleted]);
 
   const { rangeStart, rangeEnd, columnWidth, totalWidth, totalColumns } = useMemo(() => {
-    const allTasks = taskRows.map((r) => r.task);
-    const allStarts = allTasks.map((t: Task) => new Date(t.start_date));
+    // Use all tasks (and projects) for the date range so the chart length includes collapsed items too
+    const tasksForRange = includeCompleted ? tasks : tasks.filter((t) => !t.completed);
+    const allStarts = tasksForRange.map((t: Task) => new Date(t.start_date));
     const relevantDates: Date[] = [];
-    for (const t of allTasks) {
+    for (const t of tasksForRange) {
       relevantDates.push(new Date(t.end_date));
       if (t.due_date) relevantDates.push(new Date(t.due_date));
       const proj = projects.find((p) => p.id === t.project_id);
@@ -345,7 +346,7 @@ export default function GanttChart({
       totalWidth: colCount * colWidth,
       totalColumns: colCount,
     };
-  }, [taskRows, projects, viewMode, isMobile, isSmallMobile]);
+  }, [tasks, projects, includeCompleted, viewMode, isMobile, isSmallMobile]);
 
   const [scrollState, setScrollState] = useState({ scrollLeft: 0, width: 800 });
   const scrollRef = useRef<HTMLDivElement>(null);
