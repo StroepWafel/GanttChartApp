@@ -125,8 +125,8 @@ router.post('/onboard-user', async (req, res) => {
     const hash = await bcrypt.hash(temporaryPassword, 10);
     const apiKey = randomUUID();
     const result = db.prepare(`
-      INSERT INTO users (username, password_hash, is_admin, api_key, email)
-      VALUES (?, ?, 0, ?, ?)
+      INSERT INTO users (username, password_hash, is_admin, api_key, email, must_change_password)
+      VALUES (?, ?, 0, ?, ?, 1)
     `).run(usernameTrim, hash, apiKey, emailNormalized);
     const user = db.prepare('SELECT id, username, is_admin, api_key, created_at FROM users WHERE id = ?')
       .get(result.lastInsertRowid);

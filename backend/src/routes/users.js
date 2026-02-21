@@ -11,7 +11,7 @@ router.get('/me', optionalAuth, (req, res) => {
     return res.status(401).json({ error: 'Authentication required' });
   }
   const user = db.prepare(
-    'SELECT id, username, is_admin, api_key, created_at, email FROM users WHERE id = ?'
+    'SELECT id, username, is_admin, api_key, created_at, email, must_change_password FROM users WHERE id = ?'
   ).get(req.user.userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({
@@ -21,6 +21,7 @@ router.get('/me', optionalAuth, (req, res) => {
     apiKey: user.api_key,
     createdAt: user.created_at,
     email: user.email ?? undefined,
+    mustChangePassword: !!(user.must_change_password),
   });
 });
 

@@ -34,11 +34,11 @@ router.post('/login', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
     }
-    const token = await login(username, password);
-    if (!token) {
+    const result = await login(username, password);
+    if (!result) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    res.json({ token });
+    res.json({ token: result.token, mustChangePassword: result.mustChangePassword ?? false });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -61,7 +61,7 @@ router.post('/change-password', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 8 characters' });
     }
     const hash = await bcrypt.hash(newPassword, 12);
-    db.prepare('UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?')
+    db.prepare('UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1, must_change_password = 0 WHERE id = ?')
       .run(hash, req.user.userId);
     res.json({ ok: true, message: 'Password changed' });
   } catch (err) {

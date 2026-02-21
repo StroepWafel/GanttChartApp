@@ -159,6 +159,9 @@ try {
   if (!userCols.some((c) => c.name === 'token_version')) {
     db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0');
   }
+  if (!userCols.some((c) => c.name === 'must_change_password')) {
+    db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0');
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (

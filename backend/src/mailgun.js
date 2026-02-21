@@ -44,19 +44,20 @@ export function getEmailOnboardingConfig() {
   const useDefaultTemplate = s.email_onboarding_use_default_template !== false;
   const DEFAULT_EMAIL_TEMPLATE = `Hi {{Username}},
 
-Your account for {{app_domain}} is ready.
+Welcome! Your account for {{app_domain}} is ready.
 
-You can log in with:
+Here are your sign-in details:
 
 Username: {{Username}}
 Password: {{password}}
 
-We recommend changing your password after your first login.
+You’ll be asked to set a new password the first time you sign in—this is required to keep your account secure.
 
-Start building your project timelines here: {{login_url}}
+Sign in and set your password here: {{login_url}}
 
-– {{your_name}}
-Gantt`;
+We’re glad to have you on board.
+
+– {{your_name}}`;
   return {
     enabled: !!s.email_onboarding_enabled,
     apiKey: s.email_onboarding_api_key || '',

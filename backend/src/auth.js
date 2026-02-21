@@ -64,16 +64,17 @@ export function requireAuth(req, res, next) {
 export async function login(username, password) {
   if (!username || !password) return null;
   const user = db.prepare(
-    'SELECT id, username, password_hash, is_admin, is_active, token_version FROM users WHERE username = ?'
+    'SELECT id, username, password_hash, is_admin, is_active, token_version, must_change_password FROM users WHERE username = ?'
   ).get(username);
   if (!user || user.is_active === 0) return null;
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return null;
-  return jwt.sign(
+  const token = jwt.sign(
     { userId: user.id, username: user.username, isAdmin: !!user.is_admin, tokenVersion: user.token_version ?? 0 },
     JWT_SECRET,
     { expiresIn: '24h' }
   );
+  return { token, mustChangePassword: !!(user.must_change_password) };
 }
 
 /** IoT API: require username + api_key (X-API-Username + X-API-Key, or query ?username=&api_key=) */

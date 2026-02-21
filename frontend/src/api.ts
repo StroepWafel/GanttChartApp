@@ -70,7 +70,17 @@ export async function changePassword(currentPassword: string, newPassword: strin
   return data;
 }
 
-export async function getMe() {
+export type MeResponse = {
+  id: number;
+  username: string;
+  isAdmin: boolean;
+  apiKey: string | null;
+  createdAt?: string;
+  email?: string;
+  mustChangePassword?: boolean;
+};
+
+export async function getMe(): Promise<MeResponse> {
   const res = await fetchApi('/users/me');
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to get user');

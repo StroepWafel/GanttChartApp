@@ -59,6 +59,7 @@ export default function MainView({ authEnabled, onLogout }: Props) {
   const [onboardResult, setOnboardResult] = useState<{ statusCode: number; status: string; body: unknown } | null>(null);
   const [changePasswordCurrent, setChangePasswordCurrent] = useState('');
   const [changePasswordNew, setChangePasswordNew] = useState('');
+  const [changePasswordConfirm, setChangePasswordConfirm] = useState('');
   const [masqueradeUserId, setMasqueradeUserId] = useState<string>('');
   const [userMgmtError, setUserMgmtError] = useState('');
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
@@ -666,15 +667,27 @@ export default function MainView({ authEnabled, onLogout }: Props) {
                       onChange={(e) => setChangePasswordNew(e.target.value)}
                       className="settings-input"
                     />
+                    <input
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={changePasswordConfirm}
+                      onChange={(e) => setChangePasswordConfirm(e.target.value)}
+                      className="settings-input"
+                    />
                     <button
                       type="button"
                       className="btn-sm"
                       onClick={async () => {
-                        if (!changePasswordCurrent || !changePasswordNew) return;
+                        if (!changePasswordCurrent || !changePasswordNew || !changePasswordConfirm) return;
+                        if (changePasswordNew !== changePasswordConfirm) {
+                          modal.showAlert({ title: 'Error', message: 'New password and confirmation do not match' });
+                          return;
+                        }
                         try {
                           await api.changePassword(changePasswordCurrent, changePasswordNew);
                           setChangePasswordCurrent('');
                           setChangePasswordNew('');
+                          setChangePasswordConfirm('');
                         } catch (err) {
                           modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to change password' });
                         }

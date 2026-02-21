@@ -4,7 +4,7 @@ import { getLoginHash, login, requestPasswordReset } from '../api';
 import './AuthGate.css';
 
 interface Props {
-  onLogin: (token: string) => void;
+  onLogin: (token: string | { token: string; mustChangePassword?: boolean }) => void;
 }
 
 export default function AuthGate({ onLogin }: Props) {
@@ -24,8 +24,11 @@ export default function AuthGate({ onLogin }: Props) {
     try {
       await getLoginHash(username);
       const data = await login(username, password);
-      if (data.token) onLogin(data.token);
-      else setError(data.error || 'Invalid credentials');
+      if (data.token) {
+        onLogin({ token: data.token, mustChangePassword: data.mustChangePassword ?? false });
+      } else {
+        setError(data.error || 'Invalid credentials');
+      }
     } catch (err) {
       setError('Login failed');
     } finally {
