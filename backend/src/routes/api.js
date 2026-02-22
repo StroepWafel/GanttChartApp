@@ -53,7 +53,7 @@ router.get('/most-important-task', (req, res) => {
       FROM tasks t
       JOIN projects p ON t.project_id = p.id AND p.user_id = ?
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE t.user_id = ? AND t.completed = 0
+      WHERE t.user_id = ? AND t.completed = 0 AND (t.base_priority IS NULL OR t.base_priority > 1)
     `).all(userId, userId, userId);
     const withUrgency = rows.map(r => ({ ...taskFromRow(r) }));
     const sorted = withUrgency.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));

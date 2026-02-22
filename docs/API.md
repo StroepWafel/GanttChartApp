@@ -122,7 +122,7 @@ Returns all tasks (completed and incomplete).
 
 ### GET /most-important-task
 
-Returns the single most urgent incomplete task based on priority and due date proximity.
+Returns the single most urgent incomplete task based on priority and due date proximity. Tasks with priority 1 (lowest) are excluded and never considered.
 
 **Response:** Object with `servertime` and task fields (when a task exists), or `servertime` and `data: null` (when none)
 
