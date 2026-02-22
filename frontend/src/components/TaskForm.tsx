@@ -31,6 +31,7 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
   const [endDate, setEndDate] = useState(today);
   const [dueDate, setDueDate] = useState('');
   const [basePriority, setBasePriority] = useState(5);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     if (task) {
@@ -42,6 +43,7 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
       setEndDate(task.end_date.slice(0, 10));
       setDueDate(task.due_date?.slice(0, 10) ?? '');
       setBasePriority(task.base_priority ?? 5);
+      setProgress(task.progress ?? 0);
     }
   }, [task, projects]);
 
@@ -70,6 +72,7 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
         end_date: endDate,
         due_date: dueDate || undefined,
         base_priority: basePriority,
+        progress,
       });
     } else {
       onCreate({
@@ -174,6 +177,23 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
               <span className="priority-value">{basePriority}</span>
             </div>
           </div>
+          {isEdit && (
+            <div className="form-row">
+              <label>Progress (%)</label>
+              <div className="priority-input">
+                <span className="priority-label">0</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={progress}
+                  onChange={(e) => setProgress(Number(e.target.value))}
+                />
+                <span className="priority-label">100</span>
+                <span className="priority-value">{progress}</span>
+              </div>
+            </div>
+          )}
           <div className="form-actions">
             <button type="submit">{isEdit ? 'Update' : 'Create'}</button>
             <button type="button" onClick={onClose}>Cancel</button>

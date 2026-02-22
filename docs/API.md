@@ -57,17 +57,20 @@ curl "https://your-domain.com/api/readonly/stats?username=admin&api_key=your_api
 
 ## Endpoints
 
-All responses include a `servertime` field (ISO 8601 UTC timestamp) indicating when the response was generated. For endpoints returning arrays, the payload is wrapped as `{ "servertime": "...", "data": [...] }`.
+All responses include `servertime` (ISO 8601 UTC) and `servertime_local` (ISO 8601 with timezone offset, using the server's local timezone). For endpoints returning arrays, the payload is wrapped as `{ "servertime": "...", "servertime_local": "...", "data": [...] }`.
+
+**Note:** Ensure the Node process runs with the correct timezone. On Linux, set `TZ=Australia/Adelaide` (or your zone) in the environment if the system default is wrong.
 
 ### GET /tasks
 
 Returns all tasks (completed and incomplete).
 
-**Response:** Object with `servertime` and `data` (array of task objects)
+**Response:** Object with `servertime`, `servertime_local`, and `data` (array of task objects)
 
 ```json
 {
   "servertime": "2025-02-23T12:00:00.000Z",
+  "servertime_local": "2025-02-23T22:30:00.000+10:30",
   "data": [
   {
     "id": 1,
@@ -104,6 +107,7 @@ Returns all tasks (completed and incomplete).
 | Field | Type | Description |
 |-------|------|-------------|
 | `servertime` | string | ISO 8601 UTC timestamp when the response was generated |
+| `servertime_local` | string | ISO 8601 timestamp in server's local timezone (e.g. `2026-02-23T02:07:15.123+10:30`) |
 | `data` | array | Array of task objects (see below) |
 | `data[].id` | number | Task ID |
 | `data[].project_id` | number | Parent project ID |

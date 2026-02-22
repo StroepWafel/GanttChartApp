@@ -10,6 +10,17 @@ function servertime() {
   return new Date().toISOString();
 }
 
+function servertimeLocal() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const offsetMin = -d.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? '+' : '-';
+  const oh = pad(Math.floor(Math.abs(offsetMin) / 60));
+  const om = pad(Math.abs(offsetMin) % 60);
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${ms}${sign}${oh}:${om}`;
+}
+
 function taskFromRow(row) {
   if (!row) return null;
   return {
@@ -39,7 +50,7 @@ router.get('/tasks', (req, res) => {
       WHERE t.user_id = ?
       ORDER BY t.start_date
     `).all(userId, userId, userId);
-    res.json({ servertime: servertime(), data: rows.map(taskFromRow) });
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows.map(taskFromRow) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -58,7 +69,7 @@ router.get('/most-important-task', (req, res) => {
     const withUrgency = rows.map(r => ({ ...taskFromRow(r) }));
     const sorted = withUrgency.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
     const task = sorted[0] || null;
-    res.json(task ? { servertime: servertime(), ...task } : { servertime: servertime(), data: null });
+    res.json(task ? { servertime: servertime(), servertime_local: servertimeLocal(), ...task } : { servertime: servertime(), servertime_local: servertimeLocal(), data: null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -71,7 +82,7 @@ router.get('/stats', (req, res) => {
     const completed = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ? AND completed = 1').get(userId).c;
     const todo = total - completed;
     const efficiency = total > 0 ? Math.round((completed / total) * 100) : 0;
-    res.json({ servertime: servertime(), total, completed, todo, efficiency });
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), total, completed, todo, efficiency });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -83,7 +94,7 @@ router.get('/efficiency', (req, res) => {
     const total = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ?').get(userId).c;
     const completed = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ? AND completed = 1').get(userId).c;
     const ratio = total > 0 ? completed / total : 0;
-    res.json({ servertime: servertime(), efficiency: Math.round(ratio * 100), ratio, completed, total });
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), efficiency: Math.round(ratio * 100), ratio, completed, total });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -101,7 +112,7 @@ router.get('/by-category', (req, res) => {
       GROUP BY c.id
       ORDER BY c.display_order, c.name
     `).all(userId, userId, userId);
-    res.json({ servertime: servertime(), data: rows });
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -118,7 +129,7 @@ router.get('/overdue', (req, res) => {
       WHERE t.user_id = ? AND t.completed = 0 AND t.due_date IS NOT NULL AND date(t.due_date) < date('now')
       ORDER BY t.due_date
     `).all(userId, userId, userId);
-    res.json({ servertime: servertime(), data: rows.map(taskFromRow) });
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows.map(taskFromRow) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -138,7 +149,7 @@ router.get('/upcoming', (req, res) => {
         AND date(t.due_date) <= date('now', ? || ' days')
       ORDER BY t.due_date
     `).all(userId, userId, userId, days);
-    res.json({ servertime: servertime(), data: rows.map(taskFromRow) });
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows.map(taskFromRow) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -156,7 +167,7 @@ router.get('/projects', (req, res) => {
       WHERE p.user_id = ?
       ORDER BY c.display_order, p.name
     `).all(userId, userId, userId, userId);
-    res.json({ servertime: servertime(), data: rows });
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -171,7 +182,7 @@ router.get('/categories', (req, res) => {
       WHERE c.user_id = ?
       ORDER BY c.display_order, c.name
     `).all(userId, userId, userId);
-    res.json({ servertime: servertime(), data: rows });
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
