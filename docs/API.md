@@ -57,14 +57,18 @@ curl "https://your-domain.com/api/readonly/stats?username=admin&api_key=your_api
 
 ## Endpoints
 
+All responses include a `servertime` field (ISO 8601 UTC timestamp) indicating when the response was generated. For endpoints returning arrays, the payload is wrapped as `{ "servertime": "...", "data": [...] }`.
+
 ### GET /tasks
 
 Returns all tasks (completed and incomplete).
 
-**Response:** Array of task objects
+**Response:** Object with `servertime` and `data` (array of task objects)
 
 ```json
-[
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "data": [
   {
     "id": 1,
     "project_id": 1,
@@ -93,23 +97,26 @@ Returns all tasks (completed and incomplete).
     "base_priority": 5,
     "urgency": 0
   }
-]
+  ]
+}
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | number | Task ID |
-| `project_id` | number | Parent project ID |
-| `parent_id` | number \| null | Parent task ID if split from another task |
-| `name` | string | Task name |
-| `start_date` | string | Start date (YYYY-MM-DD) |
-| `end_date` | string | End date (YYYY-MM-DD) |
-| `due_date` | string \| null | Due date (YYYY-MM-DD) |
-| `progress` | number | Progress 0–100 |
-| `completed` | boolean | Whether task is completed |
-| `completed_at` | string \| null | ISO timestamp when completed |
-| `base_priority` | number | User-set priority 1–10 |
-| `urgency` | number | Computed urgency (higher = more urgent, 0 when completed) |
+| `servertime` | string | ISO 8601 UTC timestamp when the response was generated |
+| `data` | array | Array of task objects (see below) |
+| `data[].id` | number | Task ID |
+| `data[].project_id` | number | Parent project ID |
+| `data[].parent_id` | number \| null | Parent task ID if split from another task |
+| `data[].name` | string | Task name |
+| `data[].start_date` | string | Start date (YYYY-MM-DD) |
+| `data[].end_date` | string | End date (YYYY-MM-DD) |
+| `data[].due_date` | string \| null | Due date (YYYY-MM-DD) |
+| `data[].progress` | number | Progress 0–100 |
+| `data[].completed` | boolean | Whether task is completed |
+| `data[].completed_at` | string \| null | ISO timestamp when completed |
+| `data[].base_priority` | number | User-set priority 1–10 |
+| `data[].urgency` | number | Computed urgency (higher = more urgent, 0 when completed) |
 
 ---
 
@@ -117,10 +124,11 @@ Returns all tasks (completed and incomplete).
 
 Returns the single most urgent incomplete task based on priority and due date proximity.
 
-**Response:** Task object or `null` if no incomplete tasks
+**Response:** Object with `servertime` and task fields (when a task exists), or `servertime` and `data: null` (when none)
 
 ```json
 {
+  "servertime": "2025-02-23T12:00:00.000Z",
   "id": 3,
   "project_id": 2,
   "parent_id": null,
@@ -139,7 +147,10 @@ Returns the single most urgent incomplete task based on priority and due date pr
 **Empty state (no tasks):**
 
 ```json
-null
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "data": null
+}
 ```
 
 ---
@@ -152,6 +163,7 @@ Returns aggregate counts and efficiency.
 
 ```json
 {
+  "servertime": "2025-02-23T12:00:00.000Z",
   "total": 12,
   "completed": 5,
   "todo": 7,
@@ -161,6 +173,7 @@ Returns aggregate counts and efficiency.
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `servertime` | string | ISO 8601 UTC timestamp when the response was generated |
 | `total` | number | Total task count |
 | `completed` | number | Completed task count |
 | `todo` | number | Incomplete task count |
@@ -176,6 +189,7 @@ Returns efficiency metrics in more detail.
 
 ```json
 {
+  "servertime": "2025-02-23T12:00:00.000Z",
   "efficiency": 42,
   "ratio": 0.4166666666666667,
   "completed": 5,
@@ -185,6 +199,7 @@ Returns efficiency metrics in more detail.
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `servertime` | string | ISO 8601 UTC timestamp when the response was generated |
 | `efficiency` | number | Rounded percentage (0–100) |
 | `ratio` | number | completed / total (0–1) |
 | `completed` | number | Completed task count |
@@ -199,25 +214,30 @@ Returns task counts grouped by category.
 **Response:**
 
 ```json
-[
-  {
-    "id": 1,
-    "name": "Work",
-    "task_count": 8
-  },
-  {
-    "id": 2,
-    "name": "Personal",
-    "task_count": 4
-  }
-]
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "data": [
+    {
+      "id": 1,
+      "name": "Work",
+      "task_count": 8
+    },
+    {
+      "id": 2,
+      "name": "Personal",
+      "task_count": 4
+    }
+  ]
+}
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | number | Category ID |
-| `name` | string | Category name |
-| `task_count` | number | Number of tasks in this category |
+| `servertime` | string | ISO 8601 UTC timestamp when the response was generated |
+| `data` | array | Array of category objects (see below) |
+| `data[].id` | number | Category ID |
+| `data[].name` | string | Category name |
+| `data[].task_count` | number | Number of tasks in this category |
 
 ---
 
@@ -225,25 +245,28 @@ Returns task counts grouped by category.
 
 Returns incomplete tasks whose due date has passed.
 
-**Response:** Array of task objects (same shape as `/tasks`)
+**Response:** Object with `servertime` and `data` (array of task objects, same shape as `/tasks`)
 
 ```json
-[
-  {
-    "id": 5,
-    "project_id": 1,
-    "parent_id": null,
-    "name": "Review PR",
-    "start_date": "2025-02-01",
-    "end_date": "2025-02-05",
-    "due_date": "2025-02-05",
-    "progress": 0,
-    "completed": false,
-    "completed_at": null,
-    "base_priority": 6,
-    "urgency": 15
-  }
-]
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "data": [
+    {
+      "id": 5,
+      "project_id": 1,
+      "parent_id": null,
+      "name": "Review PR",
+      "start_date": "2025-02-01",
+      "end_date": "2025-02-05",
+      "due_date": "2025-02-05",
+      "progress": 0,
+      "completed": false,
+      "completed_at": null,
+      "base_priority": 6,
+      "urgency": 15
+    }
+  ]
+}
 ```
 
 ---
@@ -264,10 +287,12 @@ Returns incomplete tasks due within the next N days.
 GET /api/readonly/upcoming?days=3
 ```
 
-**Response:** Array of task objects (same shape as `/tasks`)
+**Response:** Object with `servertime` and `data` (array of task objects, same shape as `/tasks`)
 
 ```json
-[
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "data": [
   {
     "id": 6,
     "project_id": 2,
@@ -282,7 +307,8 @@ GET /api/readonly/upcoming?days=3
     "base_priority": 9,
     "urgency": 14.2
   }
-]
+  ]
+}
 ```
 
 ---
@@ -294,7 +320,9 @@ Returns all projects with task counts.
 **Response:**
 
 ```json
-[
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "data": [
   {
     "id": 1,
     "category_id": 1,
@@ -304,18 +332,21 @@ Returns all projects with task counts.
     "task_count": 6,
     "completed_count": 3
   }
-]
+  ]
+}
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | number | Project ID |
-| `category_id` | number | Category ID |
-| `name` | string | Project name |
-| `created_at` | string | ISO timestamp |
-| `category_name` | string | Category name |
-| `task_count` | number | Total tasks in project |
-| `completed_count` | number | Completed tasks in project |
+| `servertime` | string | ISO 8601 UTC timestamp when the response was generated |
+| `data` | array | Array of project objects (see below) |
+| `data[].id` | number | Project ID |
+| `data[].category_id` | number | Category ID |
+| `data[].name` | string | Project name |
+| `data[].created_at` | string | ISO timestamp |
+| `data[].category_name` | string | Category name |
+| `data[].task_count` | number | Total tasks in project |
+| `data[].completed_count` | number | Completed tasks in project |
 
 ---
 
@@ -326,24 +357,29 @@ Returns all categories with task counts.
 **Response:**
 
 ```json
-[
-  {
-    "id": 1,
-    "name": "Work",
-    "display_order": 0,
-    "created_at": "2025-02-01T10:00:00.000Z",
-    "task_count": 8
-  }
-]
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "data": [
+    {
+      "id": 1,
+      "name": "Work",
+      "display_order": 0,
+      "created_at": "2025-02-01T10:00:00.000Z",
+      "task_count": 8
+    }
+  ]
+}
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | number | Category ID |
-| `name` | string | Category name |
-| `display_order` | number | Sort order |
-| `created_at` | string | ISO timestamp |
-| `task_count` | number | Total tasks in category |
+| `servertime` | string | ISO 8601 UTC timestamp when the response was generated |
+| `data` | array | Array of category objects (see below) |
+| `data[].id` | number | Category ID |
+| `data[].name` | string | Category name |
+| `data[].display_order` | number | Sort order |
+| `data[].created_at` | string | ISO timestamp |
+| `data[].task_count` | number | Total tasks in category |
 
 ---
 
@@ -376,7 +412,7 @@ curl -s -H "X-API-Username: $API_USER" -H "X-API-Key: $API_KEY" https://your-ser
 
 ```bash
 OVERDUE=$(curl -s -H "X-API-Username: $API_USER" -H "X-API-Key: $API_KEY" https://your-server/api/readonly/overdue)
-if [ "$(echo $OVERDUE | jq length)" -gt 0 ]; then
+if [ "$(echo $OVERDUE | jq '.data | length')" -gt 0 ]; then
   # Turn on warning LED
   echo 1 > /sys/class/gpio/gpio17/value
 else
