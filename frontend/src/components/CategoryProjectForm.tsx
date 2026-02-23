@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Category, Project } from '../types';
+import { useModal } from '../context/ModalContext';
 
 interface Props {
   categories: Category[];
@@ -26,6 +27,7 @@ export default function CategoryProjectForm({
   onRequestDeleteProject,
   onClose,
 }: Props) {
+  const modal = useModal();
   const [mode, setMode] = useState<'category' | 'project'>('category');
   const [catName, setCatName] = useState('');
   const [projName, setProjName] = useState('');
@@ -64,13 +66,18 @@ export default function CategoryProjectForm({
   async function handleCategorySubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!catName.trim()) return;
-    if (isEditCat && editingCategory) {
-      await onUpdateCategory(editingCategory.id, catName.trim());
-    } else {
-      await onAddCategory(catName.trim());
+    try {
+      if (isEditCat && editingCategory) {
+        await onUpdateCategory(editingCategory.id, catName.trim());
+      } else {
+        await onAddCategory(catName.trim());
+      }
+      reset();
+      onClose();
+    } catch (err) {
+      console.error('Category save failed:', err);
+      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save category' });
     }
-    reset();
-    onClose();
   }
 
   async function handleProjectSubmit(e: React.FormEvent) {
@@ -78,13 +85,18 @@ export default function CategoryProjectForm({
     if (!projName.trim()) return;
     const start = projStartDate.trim() || undefined;
     const due = projDueDate.trim() || undefined;
-    if (isEditProj && editingProject) {
-      await onUpdateProject(editingProject.id, projName.trim(), catId, due ?? null, start ?? null);
-    } else {
-      await onAddProject(projName.trim(), catId, due, start);
+    try {
+      if (isEditProj && editingProject) {
+        await onUpdateProject(editingProject.id, projName.trim(), catId, due ?? null, start ?? null);
+      } else {
+        await onAddProject(projName.trim(), catId, due, start);
+      }
+      reset();
+      onClose();
+    } catch (err) {
+      console.error('Project save failed:', err);
+      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save project' });
     }
-    reset();
-    onClose();
   }
 
   function handleDeleteCategory() {

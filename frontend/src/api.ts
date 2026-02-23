@@ -300,7 +300,9 @@ export async function updateCategory(id: number, data: { name?: string; display_
     method: 'PATCH',
     body: JSON.stringify(data),
   });
-  return res.json();
+  const dataOut = await res.json();
+  if (!res.ok) throw new Error((dataOut as { error?: string }).error || 'Failed to update category');
+  return dataOut;
 }
 
 export async function deleteCategory(id: number) {
@@ -326,7 +328,9 @@ export async function updateProject(id: number, data: { name?: string; category_
     method: 'PATCH',
     body: JSON.stringify(data),
   });
-  return res.json();
+  const dataOut = await res.json();
+  if (!res.ok) throw new Error((dataOut as { error?: string }).error || 'Failed to update project');
+  return dataOut;
 }
 
 export async function deleteProject(id: number) {

@@ -228,6 +228,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
 
   async function handleUpdateCategory(id: number, name: string) {
     await api.updateCategory(id, { name });
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
     await load();
   }
 
@@ -244,6 +245,11 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       due_date: dueDate ?? undefined,
       start_date: startDate ?? undefined,
     });
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, name, category_id: categoryId, due_date: dueDate ?? p.due_date, start_date: startDate ?? p.start_date } : p
+      )
+    );
     await load();
   }
 
