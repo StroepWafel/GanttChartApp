@@ -72,7 +72,7 @@ router.patch('/:id', (req, res) => {
     if (start_date !== undefined) { updates.push('start_date = ?'); params.push(start_date || null); }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
     if (userId) {
-      params.push(userId, id);
+      params.push(id, userId);
       db.prepare(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...params);
     } else {
       params.push(id);

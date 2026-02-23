@@ -46,7 +46,7 @@ router.patch('/:id', (req, res) => {
     if (display_order !== undefined) { updates.push('display_order = ?'); params.push(display_order); }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
     if (userId) {
-      params.push(userId, id);
+      params.push(id, userId);
       db.prepare(`UPDATE categories SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...params);
     } else {
       params.push(id);
