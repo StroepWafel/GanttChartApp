@@ -20,7 +20,20 @@ on:
         required: false
         type: string
       release_name:
-        description: 'Custom release name (defaults to version tag)'
+        description: 'Custom release name. Leave empty for AI-derived from release notes'
+        required: false
+        type: string
+      detail_level:
+        description: 'Release notes depth: brief, standard, or detailed'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - brief
+          - standard
+          - detailed
+      compatibility:
+        description: 'e.g. Node 20+, npm 10+'
         required: false
         type: string
 
@@ -136,9 +149,11 @@ jobs:
           groq_api_key: ${{ secrets.GROQ_API_KEY }}
           tag_name: ${{ steps.version.outputs.version }}
           previous_tag: ${{ github.event.inputs.from_tag }}
-          release_name: ${{ github.event.inputs.release_name || steps.version.outputs.version }}
+          release_name: ${{ github.event.inputs.release_name }}
           draft: false
           prerelease: false
+          detail_level: ${{ github.event.inputs.detail_level || 'standard' }}
+          compatibility: ${{ github.event.inputs.compatibility }}
           files: gantt-app-${{ steps.version.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
