@@ -33,7 +33,7 @@ on:
           - standard
           - detailed
       compatibility:
-        description: 'e.g. Node 20+, npm 10+'
+        description: 'Compatibility. e.g. Node 20+, npm 10+'
         required: false
         type: string
 
