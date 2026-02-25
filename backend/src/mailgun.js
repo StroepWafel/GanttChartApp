@@ -44,7 +44,7 @@ export function getEmailOnboardingConfig() {
   const useDefaultTemplate = s.email_onboarding_use_default_template !== false;
   const DEFAULT_EMAIL_TEMPLATE = `Hi {{Username}},
 
-Congratulations! Your account for {{app_domain}} is ready.
+Congratulations! Your account for {{app_domain}} is ready!
 
 Here are your sign-in details:
 
