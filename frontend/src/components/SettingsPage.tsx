@@ -35,16 +35,16 @@ export default function SettingsPage({ tab, onTabChange, sections, children }: P
 
   return (
     <div className="mobile-page settings-page">
-      {isMobile && (
+      {isMobile && !sidebarOpen && (
         <div className="settings-page-header">
           <button
             type="button"
-            className={`settings-page-sidebar-toggle ${sidebarOpen ? 'open' : ''}`}
-            onClick={() => setSidebarOpen((v) => !v)}
-            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={sidebarOpen}
+            className="settings-page-sidebar-toggle"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={false}
           >
-            {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
+            <Menu size={22} />
           </button>
           <h2 className="settings-page-title">Settings</h2>
         </div>
@@ -57,6 +57,19 @@ export default function SettingsPage({ tab, onTabChange, sections, children }: P
         />
       )}
       <aside className={`settings-page-sidebar ${sidebarOpen ? 'open' : ''}`} aria-label="Settings sections">
+        {isMobile && (
+          <div className="settings-sidebar-header">
+            <button
+              type="button"
+              className="settings-sidebar-close"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close menu"
+            >
+              <X size={22} />
+            </button>
+            <h2 className="settings-sidebar-title">Settings</h2>
+          </div>
+        )}
         <nav className="settings-sidebar-nav">
           {visibleSections.map((s) => (
             <button
