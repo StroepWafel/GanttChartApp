@@ -8,9 +8,11 @@ interface Props {
   onClose: () => void;
   onComplete: (id: number) => void;
   onDelete: (id: number, cascade: boolean) => void;
+  /** When true, render as page content without modal overlay (for mobile) */
+  embedded?: boolean;
 }
 
-export default function CompletedTasks({ onClose, onComplete, onDelete }: Props) {
+export default function CompletedTasks({ onClose, onComplete, onDelete, embedded = false }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<Task | null>(null);
 
@@ -31,9 +33,9 @@ export default function CompletedTasks({ onClose, onComplete, onDelete }: Props)
     }
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal completed-modal" onClick={(e) => e.stopPropagation()}>
+  const content = (
+    <>
+      <div className={embedded ? 'completed-content-embedded' : 'modal completed-modal'} onClick={embedded ? undefined : (e: React.MouseEvent) => e.stopPropagation()}>
         <h3>Completed Tasks</h3>
         <div className="completed-list">
           {tasks.length === 0 ? (
@@ -64,7 +66,7 @@ export default function CompletedTasks({ onClose, onComplete, onDelete }: Props)
             ))
           )}
         </div>
-        <button className="btn-sm" onClick={onClose}>Close</button>
+        {!embedded && <button className="btn-sm" onClick={onClose}>Close</button>}
       </div>
 
       {deleteConfirmTask && (
@@ -82,6 +84,19 @@ export default function CompletedTasks({ onClose, onComplete, onDelete }: Props)
           variant="danger"
         />
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="mobile-page completed-page">
+        {content}
+      </div>
+    );
+  }
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      {content}
     </div>
   );
 }

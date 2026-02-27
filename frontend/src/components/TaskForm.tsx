@@ -8,6 +8,8 @@ interface Props {
   projects: Project[];
   task?: Task | null;
   onClose: () => void;
+  /** When true, render as page content without modal overlay (for mobile) */
+  embedded?: boolean;
   onCreate: (data: {
     project_id: number;
     name: string;
@@ -19,7 +21,7 @@ interface Props {
   onUpdate?: (id: number, data: Parameters<typeof updateTask>[1]) => void;
 }
 
-export default function TaskForm({ categories, projects, task, onClose, onCreate, onUpdate }: Props) {
+export default function TaskForm({ categories, projects, task, onClose, embedded = false, onCreate, onUpdate }: Props) {
   const modal = useModal();
   const today = new Date().toISOString().slice(0, 10);
   const isEdit = !!task;
@@ -87,10 +89,9 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
     onClose();
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal task-form" onClick={(e) => e.stopPropagation()}>
-        <h3>{isEdit ? 'Edit Task' : 'New Task'}</h3>
+  const formContent = (
+    <div className={embedded ? 'task-form-embedded' : 'modal task-form'} onClick={embedded ? undefined : (e: React.MouseEvent) => e.stopPropagation()}>
+      <h3>{isEdit ? 'Edit Task' : 'New Task'}</h3>
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <label>Category</label>
@@ -199,7 +200,15 @@ export default function TaskForm({ categories, projects, task, onClose, onCreate
             <button type="button" onClick={onClose}>Cancel</button>
           </div>
         </form>
-      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return <div className="mobile-page add-task-page">{formContent}</div>;
+  }
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      {formContent}
     </div>
   );
 }

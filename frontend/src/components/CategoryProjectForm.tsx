@@ -13,6 +13,8 @@ interface Props {
   onRequestDeleteCategory: (cat: Category) => void;
   onRequestDeleteProject: (proj: Project) => void;
   onClose: () => void;
+  /** When true, render as embedded content without modal overlay (for mobile page) */
+  embedded?: boolean;
 }
 
 export default function CategoryProjectForm({
@@ -26,6 +28,7 @@ export default function CategoryProjectForm({
   onRequestDeleteCategory,
   onRequestDeleteProject,
   onClose,
+  embedded = false,
 }: Props) {
   const modal = useModal();
   const [mode, setMode] = useState<'category' | 'project'>('category');
@@ -109,9 +112,8 @@ export default function CategoryProjectForm({
     onRequestDeleteProject(editingProject);
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+  const formContent = (
+    <div className={embedded ? 'category-form-embedded' : 'modal'} onClick={embedded ? undefined : (e: React.MouseEvent) => e.stopPropagation()}>
         <div className="form-tabs">
           <button
             className={mode === 'category' ? 'active' : ''}
@@ -199,7 +201,15 @@ export default function CategoryProjectForm({
             </div>
           </form>
         )}
-      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return formContent;
+  }
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      {formContent}
     </div>
   );
 }

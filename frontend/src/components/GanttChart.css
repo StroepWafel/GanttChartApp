@@ -367,35 +367,35 @@
 
 @media (max-width: 768px) {
   .gantt-row-expand {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 28px;
+    min-height: 28px;
     justify-content: flex-start;
     align-items: center;
   }
 
   .gantt-expand-btn {
-    width: 44px;
-    height: 44px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .gantt-expand-spacer {
-    width: 44px;
-    height: 44px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
   }
 }
 
 @media (max-width: 480px) {
   .gantt-expand-btn {
-    width: 44px;
-    height: 44px;
+    width: 22px;
+    height: 22px;
   }
 
   .gantt-expand-spacer {
-    width: 44px;
-    height: 44px;
+    width: 22px;
+    height: 22px;
   }
 }
 
@@ -817,16 +817,27 @@
   margin-bottom: 4px;
 }
 
-.gantt-task-card-header input[type="checkbox"] {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
-}
-
 .gantt-task-card-name {
+  flex: 1;
   font-weight: 500;
   font-size: 13px;
+  min-width: 0;
+}
+
+.gantt-task-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.gantt-task-card-actions .gantt-task-action {
+  padding: 4px;
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .gantt-task-card-meta {

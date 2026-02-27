@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Pencil, Split, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Split, Trash2, RotateCcw, Check } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
@@ -24,6 +24,8 @@ interface Props {
   onTaskDelete: (id: number, cascade: boolean) => void;
   onTaskSplit: (task: Task) => void;
   onTaskEdit: (task: Task) => void;
+  /** When set (e.g. by mobile page), forces chart or list view - no internal toggle */
+  forceViewMode?: 'chart' | 'list';
 }
 
 interface ExpandedState {
@@ -181,6 +183,7 @@ export default function GanttChart({
   onTaskDelete,
   onTaskSplit,
   onTaskEdit,
+  forceViewMode,
 }: Props) {
   const { isMobile, isSmallMobile } = useMediaQuery();
 
@@ -194,6 +197,7 @@ export default function GanttChart({
   );
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   const [mobileViewMode, setMobileViewMode] = useState<'list' | 'chart'>('list');
+  const effectiveViewMode = forceViewMode ?? (isMobile ? mobileViewMode : 'chart');
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<Task | null>(null);
@@ -507,10 +511,10 @@ export default function GanttChart({
   }
 
   const rowHeight = isSmallMobile ? 34 : isMobile ? 34 : 36;
-  const isMobileChartSlim = isMobile && mobileViewMode === 'chart';
+  const isMobileChartSlim = isMobile && effectiveViewMode === 'chart';
   const listWidth = isMobileChartSlim ? 100 : isSmallMobile ? 260 : isMobile ? 300 : 420;
 
-  if (isMobile && mobileViewMode === 'list') {
+  if (isMobile && effectiveViewMode === 'list') {
     return (
       <div className="gantt-chart-wrap gantt-mobile-list-wrap">
         <div className="chart-legend chart-legend-mobile">
@@ -523,14 +527,16 @@ export default function GanttChart({
               />
               Completed
             </label>
-            <div className="gantt-toolbar gantt-toolbar-inline">
-              <button className="active" onClick={() => setMobileViewMode('list')}>
-                List
-              </button>
-              <button onClick={() => setMobileViewMode('chart')}>
-                Chart
-              </button>
-            </div>
+            {!forceViewMode && (
+              <div className="gantt-toolbar gantt-toolbar-inline">
+                <button className="active" onClick={() => setMobileViewMode('list')}>
+                  List
+                </button>
+                <button onClick={() => setMobileViewMode('chart')}>
+                  Chart
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <div className="gantt-task-list-cards">
@@ -557,17 +563,48 @@ export default function GanttChart({
                 }}
               >
                 <div className="gantt-task-card-header">
-                  <input
-                    type="checkbox"
-                    checked={row.task.completed}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      row.task.completed ? onTaskUncomplete(row.task.id) : onTaskComplete(row.task.id);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    aria-label={row.task.completed ? 'Mark incomplete' : 'Mark complete'}
-                  />
                   <span className="gantt-task-card-name">{row.task.name}</span>
+                  <div className="gantt-task-card-actions">
+                    {row.task.completed ? (
+                      <button
+                        type="button"
+                        className="btn-sm gantt-task-action"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTaskUncomplete(row.task.id);
+                        }}
+                        title="Mark incomplete"
+                        aria-label="Mark incomplete"
+                      >
+                        <RotateCcw size={14} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-sm gantt-task-action"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTaskComplete(row.task.id);
+                        }}
+                        title="Mark complete"
+                        aria-label="Mark complete"
+                      >
+                        <Check size={14} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn-sm gantt-task-action"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmTask(row.task);
+                      }}
+                      title="Delete"
+                      aria-label="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
                 <div className="gantt-task-card-meta">
                   {cat && <span className="gantt-task-card-cat">{cat.name}</span>}
@@ -655,20 +692,22 @@ export default function GanttChart({
               />
               Completed
             </label>
-            <div className="gantt-toolbar gantt-toolbar-inline">
-              <button
-                className={mobileViewMode === 'list' ? 'active' : ''}
-                onClick={() => setMobileViewMode('list')}
-              >
-                List
-              </button>
-              <button
-                className={mobileViewMode === 'chart' ? 'active' : ''}
-                onClick={() => setMobileViewMode('chart')}
-              >
-                Chart
-              </button>
-            </div>
+            {!forceViewMode && (
+              <div className="gantt-toolbar gantt-toolbar-inline">
+                <button
+                  className={effectiveViewMode === 'list' ? 'active' : ''}
+                  onClick={() => setMobileViewMode('list')}
+                >
+                  List
+                </button>
+                <button
+                  className={effectiveViewMode === 'chart' ? 'active' : ''}
+                  onClick={() => setMobileViewMode('chart')}
+                >
+                  Chart
+                </button>
+              </div>
+            )}
             <div className="gantt-toolbar gantt-toolbar-inline gantt-view-modes">
               {(['Day', 'Week', 'Month'] as const).map((m) => (
                 <button
@@ -793,7 +832,7 @@ export default function GanttChart({
                       <span className="gantt-expand-spacer" />
                     )}
                   </div>
-                  <span className="gantt-list-name" style={{ paddingLeft: 8 }}>{row.project.name}</span>
+                  <span className="gantt-list-name" style={{ paddingLeft: 16 }}>{row.project.name}</span>
                   {!isMobileChartSlim && (
                     <>
                       <span className="gantt-list-date">
@@ -830,7 +869,7 @@ export default function GanttChart({
                     <span className="gantt-expand-spacer" />
                   )}
                 </div>
-                <span className="gantt-list-name" style={{ paddingLeft: 8 + row.indent * 14 }}>{row.task.name}</span>
+                <span className="gantt-list-name" style={{ paddingLeft: 16 + row.indent * 14 }}>{row.task.name}</span>
                 {!isMobileChartSlim && (
                   <>
                     <span className="gantt-list-date">

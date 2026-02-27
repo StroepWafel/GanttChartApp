@@ -164,6 +164,19 @@ input, select, textarea {
   flex-direction: column;
 }
 
+.completed-content-embedded {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 20px 16px;
+  overflow: hidden;
+}
+
+.completed-content-embedded h3 {
+  margin: 0 0 16px;
+}
+
 .completed-list {
   overflow-y: auto;
   flex: 1;
@@ -174,7 +187,7 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
+  padding: 12px 0 12px 16px;
   border-bottom: 1px solid var(--border);
 }
 
