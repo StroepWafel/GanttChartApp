@@ -193,6 +193,7 @@ export default function GanttChart({
     [isMobile, isSmallMobile]
   );
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
+  const [mobileViewMode, setMobileViewMode] = useState<'list' | 'chart'>('list');
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<Task | null>(null);
@@ -505,64 +506,235 @@ export default function GanttChart({
     );
   }
 
-  const rowHeight = isSmallMobile ? 40 : isMobile ? 38 : 36;
-  const listWidth = isSmallMobile ? 280 : isMobile ? 320 : 420;
+  const rowHeight = isSmallMobile ? 34 : isMobile ? 34 : 36;
+  const isMobileChartSlim = isMobile && mobileViewMode === 'chart';
+  const listWidth = isMobileChartSlim ? 100 : isSmallMobile ? 260 : isMobile ? 300 : 420;
+
+  if (isMobile && mobileViewMode === 'list') {
+    return (
+      <div className="gantt-chart-wrap gantt-mobile-list-wrap">
+        <div className="chart-legend chart-legend-mobile">
+          <div className="chart-legend-mobile-row">
+            <label className="filter-row">
+              <input
+                type="checkbox"
+                checked={includeCompleted}
+                onChange={(e) => onIncludeCompletedChange(e.target.checked)}
+              />
+              Completed
+            </label>
+            <div className="gantt-toolbar gantt-toolbar-inline">
+              <button className="active" onClick={() => setMobileViewMode('list')}>
+                List
+              </button>
+              <button onClick={() => setMobileViewMode('chart')}>
+                Chart
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="gantt-task-list-cards">
+          {taskRows.map((row) => {
+            const proj = projects.find((p) => p.id === row.task.project_id);
+            const cat = proj ? categories.find((c) => c.id === proj.category_id) : undefined;
+            const colors = priorityColors[row.task.base_priority ?? 5] ?? DEFAULT_PRIORITY_COLORS[row.task.base_priority ?? 5];
+            return (
+              <div
+                key={row.task.id}
+                className={`gantt-task-card ${row.task.completed ? 'completed' : ''}`}
+                onClick={() => !row.task.completed && onTaskEdit(row.task)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ task: row.task, x: e.clientX, y: e.clientY });
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onTaskEdit(row.task);
+                  }
+                }}
+              >
+                <div className="gantt-task-card-header">
+                  <input
+                    type="checkbox"
+                    checked={row.task.completed}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      row.task.completed ? onTaskUncomplete(row.task.id) : onTaskComplete(row.task.id);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={row.task.completed ? 'Mark incomplete' : 'Mark complete'}
+                  />
+                  <span className="gantt-task-card-name">{row.task.name}</span>
+                </div>
+                <div className="gantt-task-card-meta">
+                  {cat && <span className="gantt-task-card-cat">{cat.name}</span>}
+                  {proj && <span className="gantt-task-card-proj">{proj.name}</span>}
+                  <span className="gantt-task-card-dates">
+                    {formatDate(new Date(row.task.start_date))} – {formatDate(new Date(row.task.end_date))}
+                  </span>
+                </div>
+                <div className="gantt-task-card-progress-wrap">
+                  <div
+                    className="gantt-task-card-progress-fill"
+                    style={{
+                      width: `${row.task.progress ?? 0}%`,
+                      backgroundColor: colors.bg,
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {contextMenu && (
+          <>
+            <div
+              className="modal-overlay"
+              style={{ background: 'transparent' }}
+              onClick={() => setContextMenu(null)}
+              aria-hidden
+            />
+            <div
+              className="gantt-context-menu"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              <button onClick={() => { onTaskEdit(contextMenu.task); setContextMenu(null); }}>Edit</button>
+              {!contextMenu.task.completed && (
+                <button onClick={() => { onTaskComplete(contextMenu.task.id); setContextMenu(null); }}>Complete</button>
+              )}
+              {contextMenu.task.completed && (
+                <button onClick={() => { onTaskUncomplete(contextMenu.task.id); setContextMenu(null); }}>Uncomplete</button>
+              )}
+              {!contextMenu.task.completed && (
+                <button onClick={() => { onTaskSplit(contextMenu.task); setContextMenu(null); }}>Split</button>
+              )}
+              <button
+                className="danger"
+                onClick={() => { setDeleteConfirmTask(contextMenu.task); setContextMenu(null); }}
+              >
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+        {deleteConfirmTask && (
+          <ConfirmModal
+            title="Delete task"
+            message={
+              <p className="confirm-modal-message">
+                Delete <strong>{deleteConfirmTask.name}</strong>? This cannot be undone.
+              </p>
+            }
+            confirmLabel="Delete"
+            onConfirm={async () => {
+              if (deleteConfirmTask) {
+                await onTaskDelete(deleteConfirmTask.id, false);
+                setDeleteConfirmTask(null);
+              }
+            }}
+            onCancel={() => setDeleteConfirmTask(null)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="gantt-chart-wrap">
-      <div className="chart-legend">
-        <label className="filter-row">
-          <input
-            type="checkbox"
-            checked={includeCompleted}
-            onChange={(e) => onIncludeCompletedChange(e.target.checked)}
-          />
-          Show completed in chart
-        </label>
-        <div className="priority-strip">
-          <span className="priority-label">Priority:</span>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((p) => {
-            const colors = priorityColors[p] ?? DEFAULT_PRIORITY_COLORS[p];
-            return (
-              <span
-                key={p}
-                className="priority-swatch"
-                style={{ backgroundColor: colors.bg }}
-                title={String(p)}
+      <div className={`chart-legend ${isMobile ? 'chart-legend-mobile' : ''}`}>
+        {isMobile ? (
+          <div className="chart-legend-mobile-row">
+            <label className="filter-row">
+              <input
+                type="checkbox"
+                checked={includeCompleted}
+                onChange={(e) => onIncludeCompletedChange(e.target.checked)}
               />
-            );
-          })}
-          <span className="priority-range">1 low → 10 high</span>
+              Completed
+            </label>
+            <div className="gantt-toolbar gantt-toolbar-inline">
+              <button
+                className={mobileViewMode === 'list' ? 'active' : ''}
+                onClick={() => setMobileViewMode('list')}
+              >
+                List
+              </button>
+              <button
+                className={mobileViewMode === 'chart' ? 'active' : ''}
+                onClick={() => setMobileViewMode('chart')}
+              >
+                Chart
+              </button>
+            </div>
+            <div className="gantt-toolbar gantt-toolbar-inline gantt-view-modes">
+              {(['Day', 'Week', 'Month'] as const).map((m) => (
+                <button
+                  key={m}
+                  className={viewMode === m ? 'active' : ''}
+                  onClick={() => setViewMode(m)}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            <label className="filter-row">
+              <input
+                type="checkbox"
+                checked={includeCompleted}
+                onChange={(e) => onIncludeCompletedChange(e.target.checked)}
+              />
+              Show completed in chart
+            </label>
+            <div className="priority-strip">
+              <span className="priority-label">Priority:</span>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((p) => {
+                const colors = priorityColors[p] ?? DEFAULT_PRIORITY_COLORS[p];
+                return (
+                  <span
+                    key={p}
+                    className="priority-swatch"
+                    style={{ backgroundColor: colors.bg }}
+                    title={String(p)}
+                  />
+                );
+              })}
+              <span className="priority-range">1 low → 10 high</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {!isMobile && (
+        <div className="gantt-toolbar">
+          {(['Day', 'Week', 'Month'] as const).map((m) => (
+            <button
+              key={m}
+              className={viewMode === m ? 'active' : ''}
+              onClick={() => setViewMode(m)}
+            >
+              {m}
+            </button>
+          ))}
         </div>
-      </div>
+      )}
 
-      <div className="gantt-toolbar">
-        {(['Day', 'Week', 'Month'] as const).map((m) => (
-          <button
-            key={m}
-            className={viewMode === m ? 'active' : ''}
-            onClick={() => setViewMode(m)}
-          >
-            {m}
-          </button>
-        ))}
-      </div>
-
-      <div
-        ref={scrollRef}
-        className="gantt-main"
-        onScroll={handleScroll}
-      >
+      <div ref={scrollRef} className="gantt-main" onScroll={handleScroll}>
         <div
           className="gantt-inner"
-          style={{ minWidth: listWidth + totalWidth, minHeight: 40 + hierarchicalRows.length * rowHeight }}
+          style={{ minWidth: listWidth + totalWidth, minHeight: 32 + hierarchicalRows.length * rowHeight }}
         >
-        <div className="gantt-list" style={{ width: listWidth }}>
+        <div className={`gantt-list ${isMobileChartSlim ? 'gantt-list-slim' : ''}`} style={{ width: listWidth }}>
           <div className="gantt-list-header">
             <span />
             <span className="gantt-hdr-task">Task</span>
-            <span className="gantt-hdr-from">From</span>
-            <span className="gantt-hdr-to">To</span>
+            {!isMobileChartSlim && <span className="gantt-hdr-from">From</span>}
+            {!isMobileChartSlim && <span className="gantt-hdr-to">To</span>}
           </div>
           {hierarchicalRows.map((row) => {
             if (row.type === 'category') {
@@ -587,12 +759,16 @@ export default function GanttChart({
                     )}
                   </div>
                   <span className="gantt-list-name">{row.category.name}</span>
-                  <span className="gantt-list-date">
-                    {catSpan ? formatDate(new Date(catSpan.start)) : '—'}
-                  </span>
-                  <span className="gantt-list-date">
-                    {catSpan ? formatDate(new Date(catSpan.end)) : '—'}
-                  </span>
+                  {!isMobileChartSlim && (
+                    <>
+                      <span className="gantt-list-date">
+                        {catSpan ? formatDate(new Date(catSpan.start)) : '—'}
+                      </span>
+                      <span className="gantt-list-date">
+                        {catSpan ? formatDate(new Date(catSpan.end)) : '—'}
+                      </span>
+                    </>
+                  )}
                 </div>
               );
             }
@@ -618,12 +794,16 @@ export default function GanttChart({
                     )}
                   </div>
                   <span className="gantt-list-name" style={{ paddingLeft: 8 }}>{row.project.name}</span>
-                  <span className="gantt-list-date">
-                    {span ? formatDate(new Date(span.start)) : '—'}
-                  </span>
-                  <span className="gantt-list-date">
-                    {span ? formatDate(new Date(span.end)) : '—'}
-                  </span>
+                  {!isMobileChartSlim && (
+                    <>
+                      <span className="gantt-list-date">
+                        {span ? formatDate(new Date(span.start)) : '—'}
+                      </span>
+                      <span className="gantt-list-date">
+                        {span ? formatDate(new Date(span.end)) : '—'}
+                      </span>
+                    </>
+                  )}
                 </div>
               );
             }
@@ -651,12 +831,16 @@ export default function GanttChart({
                   )}
                 </div>
                 <span className="gantt-list-name" style={{ paddingLeft: 8 + row.indent * 14 }}>{row.task.name}</span>
-                <span className="gantt-list-date">
-                  {formatDate(new Date(row.task.start_date))}
-                </span>
-                <span className="gantt-list-date">
-                  {formatDate(new Date(row.task.end_date))}
-                </span>
+                {!isMobileChartSlim && (
+                  <>
+                    <span className="gantt-list-date">
+                      {formatDate(new Date(row.task.start_date))}
+                    </span>
+                    <span className="gantt-list-date">
+                      {formatDate(new Date(row.task.end_date))}
+                    </span>
+                  </>
+                )}
               </div>
             );
           })}

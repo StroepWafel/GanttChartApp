@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, MoreVertical } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -10,6 +10,7 @@ import CategoryProjectForm from './CategoryProjectForm';
 import ClearAllConfirmModal from './ClearAllConfirmModal';
 import ClearEveryoneConfirmModal from './ClearEveryoneConfirmModal';
 import ConfirmModal from './ConfirmModal';
+import BottomNav from './BottomNav';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useModal } from '../context/ModalContext';
 import { useAdminAlerts } from '../context/AdminAlertsContext';
@@ -113,8 +114,21 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
   );
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
 
   const isSidebarOverlay = isMobile && !sidebarCollapsed;
+
+  useEffect(() => {
+    if (!showHeaderMenu) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setShowHeaderMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showHeaderMenu]);
 
   const load = useCallback(async () => {
     const [cats, projs, t] = await Promise.all([
@@ -430,60 +444,99 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         </button>
       )}
       <header className="main-header">
-        <button
-          className="sidebar-toggle"
-          onClick={() => setSidebarCollapsed((c) => !c)}
-          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+        {!isMobile && (
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed((c) => !c)}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        )}
         <h1>Gantt Chart</h1>
-        <div className="header-actions">
-          <button
-            className="btn-sm"
-            onClick={() => setShowAddTask(true)}
-            disabled={projects.length === 0}
-            title={projects.length === 0 ? 'Add a project first' : 'Add task'}
-            aria-label={projects.length === 0 ? 'Add a project first' : 'Add task'}
-          >
-            + Task
-          </button>
-          <button
-            className="btn-sm btn-sm-completed"
-            onClick={() => setShowCompleted(true)}
-            title="Completed tasks"
-            aria-label="Completed tasks"
-          >
-            <CheckSquare size={16} />
-            <span className="btn-sm-label">Completed</span>
-          </button>
-          {(mobileAppEnabled || currentUser?.isAdmin || !authEnabled) && (
-            <button
-              type="button"
-              className="btn-sm btn-sm-settings"
-              title={mobileBuildStatus.status === 'failed' ? 'App — build failed (see Settings > App)' : 'App installation & settings'}
-              aria-label={mobileBuildStatus.status === 'failed' ? 'App (build failed)' : 'App'}
-              onClick={() => { settingsOpenToTabRef.current = 'app'; setShowSettings(true); }}
-              style={mobileBuildStatus.status === 'failed' ? { borderColor: 'var(--danger, #dc3545)', boxShadow: '0 0 0 1px var(--danger, #dc3545)' } : undefined}
-            >
-              <Smartphone size={16} />
-              <span className="btn-sm-label">App</span>
-            </button>
-          )}
-          <button
-            className="btn-sm btn-sm-settings"
-            onClick={() => setShowSettings(true)}
-            title="Settings"
-            aria-label="Settings"
-          >
-            <Settings size={16} />
-            <span className="btn-sm-label">Settings</span>
-          </button>
-          {authEnabled && onLogout && (
-            <button className="btn-sm" onClick={onLogout} aria-label="Logout">
-              Logout
-            </button>
+        <div className={`header-actions ${isMobile ? 'header-actions-mobile' : ''}`}>
+          {isMobile ? (
+            <div className="header-menu-wrap" ref={headerMenuRef}>
+              <button
+                type="button"
+                className="btn-sm header-menu-trigger"
+                onClick={() => setShowHeaderMenu((v) => !v)}
+                title="More options"
+                aria-label="More options"
+                aria-expanded={showHeaderMenu}
+              >
+                <MoreVertical size={20} />
+              </button>
+              {showHeaderMenu && (
+                <div className="header-menu-dropdown">
+                  {(mobileAppEnabled || currentUser?.isAdmin || !authEnabled) && (
+                    <button
+                      type="button"
+                      className="header-menu-item"
+                      onClick={() => { settingsOpenToTabRef.current = 'app'; setShowSettings(true); setShowHeaderMenu(false); }}
+                      style={mobileBuildStatus.status === 'failed' ? { borderColor: 'var(--danger)', color: 'var(--danger)' } : undefined}
+                    >
+                      <Smartphone size={16} />
+                      App
+                    </button>
+                  )}
+                  {authEnabled && onLogout && (
+                    <button type="button" className="header-menu-item" onClick={() => { onLogout(); setShowHeaderMenu(false); }} aria-label="Logout">
+                      Logout
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <button
+                className="btn-sm"
+                onClick={() => setShowAddTask(true)}
+                disabled={projects.length === 0}
+                title={projects.length === 0 ? 'Add a project first' : 'Add task'}
+                aria-label={projects.length === 0 ? 'Add a project first' : 'Add task'}
+              >
+                + Task
+              </button>
+              <button
+                className="btn-sm btn-sm-completed"
+                onClick={() => setShowCompleted(true)}
+                title="Completed tasks"
+                aria-label="Completed tasks"
+              >
+                <CheckSquare size={16} />
+                <span className="btn-sm-label">Completed</span>
+              </button>
+              {(mobileAppEnabled || currentUser?.isAdmin || !authEnabled) && (
+                <button
+                  type="button"
+                  className="btn-sm btn-sm-settings"
+                  title={mobileBuildStatus.status === 'failed' ? 'App — build failed (see Settings > App)' : 'App installation & settings'}
+                  aria-label={mobileBuildStatus.status === 'failed' ? 'App (build failed)' : 'App'}
+                  onClick={() => { settingsOpenToTabRef.current = 'app'; setShowSettings(true); }}
+                  style={mobileBuildStatus.status === 'failed' ? { borderColor: 'var(--danger, #dc3545)', boxShadow: '0 0 0 1px var(--danger, #dc3545)' } : undefined}
+                >
+                  <Smartphone size={16} />
+                  <span className="btn-sm-label">App</span>
+                </button>
+              )}
+              <button
+                className="btn-sm btn-sm-settings"
+                onClick={() => setShowSettings(true)}
+                title="Settings"
+                aria-label="Settings"
+              >
+                <Settings size={16} />
+                <span className="btn-sm-label">Settings</span>
+              </button>
+              {authEnabled && onLogout && (
+                <button className="btn-sm" onClick={onLogout} aria-label="Logout">
+                  Logout
+                </button>
+              )}
+            </>
           )}
         </div>
       </header>
@@ -507,7 +560,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         )}
         {!sidebarCollapsed && (
           <aside
-            className={`sidebar ${isSidebarOverlay ? 'sidebar-overlay' : ''}`}
+            className={`sidebar ${isSidebarOverlay ? (isMobile ? 'sidebar-bottomsheet' : 'sidebar-overlay') : ''}`}
             aria-label="Categories and projects"
           >
             <section className="sidebar-section">
@@ -588,6 +641,16 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           />
         </main>
       </div>
+
+      {isMobile && (
+        <BottomNav
+          onCategories={() => setSidebarCollapsed(false)}
+          onAddTask={() => setShowAddTask(true)}
+          onCompleted={() => setShowCompleted(true)}
+          onSettings={() => setShowSettings(true)}
+          projectsLength={projects.length}
+        />
+      )}
 
       {(showAddTask || editTask) && (
         <TaskForm

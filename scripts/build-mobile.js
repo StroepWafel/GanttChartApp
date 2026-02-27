@@ -170,11 +170,33 @@ console.log('Copied build to mobile/dist');
       const sharps = ico.sharpsFromIco(faviconPath);
       if (sharps.length > 0) {
         const best = sharps[sharps.length - 1];
+
         await Promise.all([
           best.resize(192, 192).png().toFile(path.join(iconsDir, 'icon-192.png')),
           best.resize(512, 512).png().toFile(path.join(iconsDir, 'icon-512.png')),
         ]);
-        console.log('Generated app icons from favicon');
+        console.log('Generated PWA app icons from favicon');
+
+        const androidResDir = path.join(mobileDir, 'android', 'app', 'src', 'main', 'res');
+        if (fs.existsSync(androidResDir)) {
+          const densities = [
+            { dir: 'mipmap-mdpi', launcher: 48, foreground: 108 },
+            { dir: 'mipmap-hdpi', launcher: 72, foreground: 162 },
+            { dir: 'mipmap-xhdpi', launcher: 96, foreground: 216 },
+            { dir: 'mipmap-xxhdpi', launcher: 144, foreground: 324 },
+            { dir: 'mipmap-xxxhdpi', launcher: 192, foreground: 432 },
+          ];
+          for (const d of densities) {
+            const dirPath = path.join(androidResDir, d.dir);
+            if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+            await Promise.all([
+              best.resize(d.launcher, d.launcher).png().toFile(path.join(dirPath, 'ic_launcher.png')),
+              best.resize(d.launcher, d.launcher).png().toFile(path.join(dirPath, 'ic_launcher_round.png')),
+              best.resize(d.foreground, d.foreground).png().toFile(path.join(dirPath, 'ic_launcher_foreground.png')),
+            ]);
+          }
+          console.log('Generated Android launcher icons from favicon');
+        }
       }
     } catch (err) {
       console.warn('build-mobile: Could not generate icons from favicon:', err.message);
