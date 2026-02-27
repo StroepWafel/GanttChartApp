@@ -68,7 +68,7 @@ log "Running npm install in backend"
 # Build mobile app if enabled and frontend source available (requires .env: MOBILE_APP_ENABLED=true, PUBLIC_URL=...)
 if [ -f "$ROOT/.env" ] && grep -qE '^MOBILE_APP_ENABLED=true' "$ROOT/.env" 2>/dev/null && [ -d "$ROOT/frontend/src" ]; then
   echo "=== Building mobile app ==="
-  (cd "$ROOT" && npm run build:mobile 2>&1) | tee -a "$LOG_FILE" || log "build:mobile failed or skipped"
+  (cd "$ROOT" && npm run build:android 2>&1) | tee -a "$LOG_FILE" || log "build:android failed or skipped"
 fi
 
 echo "=== Restarting (PM2) ==="

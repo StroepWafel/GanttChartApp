@@ -1,6 +1,9 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const API = API_BASE ? `${API_BASE}/api` : '/api';
 
+/** URL for APK download - under /api so it bypasses SPA static/catch-all. */
+export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download` : '/api/mobile-app/download';
+
 /** Parse response as JSON, or throw a user-friendly error when body is empty/invalid (e.g. HTML error page) */
 async function safeJson<T = unknown>(res: Response): Promise<T> {
   const text = await res.text();

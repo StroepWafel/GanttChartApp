@@ -1085,6 +1085,31 @@ label.input-label,
   gap: 6px;
 }
 
+.btn-sm-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  text-decoration: none;
+}
+
+.btn-sm-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: white;
+}
+
+@media (max-width: 480px) {
+  a.btn-sm-primary {
+    display: inline-flex;
+    min-height: 44px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .btn-sm-danger-outline {
   color: var(--danger);
   border-color: var(--danger);

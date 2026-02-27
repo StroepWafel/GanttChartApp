@@ -26,7 +26,7 @@ A full-stack Gantt chart application with optional multi-user auth, persistent s
 
 - Node.js 18+ (Node 22+ recommended for mobile app builds—[Capacitor requires Node 22+](https://capacitorjs.com/docs/getting-started/environment-setup))
 - On **Windows**: better-sqlite3 requires build tools. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with "Desktop development with C++" workload, or use WSL.
-- For **mobile app** (Android): [Android Studio](https://developer.android.com/studio) (or JDK 17+ and Android SDK). Run `npm run setup:android` to auto-install: Windows (winget), Linux (apt/dnf/pacman + snap).
+- For **mobile app** (Android): [Android Studio](https://developer.android.com/studio) (or JDK 17+ and Android SDK). Run `npm run setup:android` to auto-install, or `npm run build:android` to setup and build in one command (Windows: winget, Linux: apt/dnf/pacman + snap).
 
 ### Setup
 

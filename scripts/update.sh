@@ -72,7 +72,7 @@ NODE_ENV=development npm run build 2>&1 | tee -a "$LOG_FILE"
 # Build mobile app if enabled (requires .env: MOBILE_APP_ENABLED=true, PUBLIC_URL=...)
 if [ -f ".env" ] && grep -qE '^MOBILE_APP_ENABLED=true' .env 2>/dev/null; then
   echo "=== Building mobile app ==="
-  npm run build:mobile 2>&1 | tee -a "$LOG_FILE" || log "build:mobile failed or skipped"
+  npm run build:android 2>&1 | tee -a "$LOG_FILE" || log "build:android failed or skipped"
 fi
 
 echo "=== Restarting (PM2) ==="

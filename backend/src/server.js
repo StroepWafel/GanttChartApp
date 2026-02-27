@@ -127,19 +127,6 @@ try {
   console.warn('[server] Could not load mobile-landing.html:', e?.message);
 }
 
-// Serve APK download
-app.get('/mobile-app/download/app.apk', (req, res) => {
-  if (!isMobileAppEnabled()) {
-    return res.status(403).send('Mobile app is not enabled.');
-  }
-  if (!existsSync(apkPath)) {
-    return res.status(404).send('APK not available. Build the app or run the GitHub workflow to generate it.');
-  }
-  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-  res.setHeader('Content-Disposition', 'attachment; filename="gantt-chart.apk"');
-  res.sendFile(apkPath);
-});
-
 // Serve landing page at /mobile-app and /mobile-app/
 app.get(['/mobile-app', '/mobile-app/'], (req, res) => {
   if (!isMobileAppEnabled()) {
@@ -149,7 +136,7 @@ app.get(['/mobile-app', '/mobile-app/'], (req, res) => {
   }
   const apkAvailable = existsSync(apkPath);
   const apkSection = apkAvailable
-    ? '<a href="/mobile-app/download/app.apk" class="btn">Download Android app (APK)</a>'
+    ? '<a href="/api/mobile-app/download" class="btn" download="gantt-chart.apk">Download Android app (APK)</a>'
     : '<p><em>APK available after build. Use "Build now" in Settings → App or run the GitHub workflow.</em></p>';
   const html = mobileLandingTemplate.replace('{{APK_SECTION}}', apkSection);
   res.setHeader('Content-Type', 'text/html');
@@ -157,8 +144,7 @@ app.get(['/mobile-app', '/mobile-app/'], (req, res) => {
 });
 
 // Redirect other /mobile-app paths to landing page
-app.get('/mobile-app/*', (req, res, next) => {
-  if (req.path === '/mobile-app/download/app.apk') return next();
+app.get('/mobile-app/*', (req, res) => {
   res.redirect(302, '/mobile-app/');
 });
 

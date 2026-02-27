@@ -12,6 +12,32 @@ const { execSync } = require('child_process');
 
 const isWindows = process.platform === 'win32';
 
+/** Find Android SDK for Gradle */
+function findAndroidSdk() {
+  if (process.env.ANDROID_HOME && fs.existsSync(process.env.ANDROID_HOME)) return process.env.ANDROID_HOME;
+  if (process.env.ANDROID_SDK_ROOT && fs.existsSync(process.env.ANDROID_SDK_ROOT)) return process.env.ANDROID_SDK_ROOT;
+  const candidates = [];
+  if (isWindows) {
+    const localAppData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
+    candidates.push(path.join(localAppData, 'Android', 'Sdk'));
+    const androidStudio = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Android', 'Android Studio');
+    if (fs.existsSync(androidStudio)) {
+      candidates.push(path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Android', 'Sdk'));
+    }
+  } else {
+    const home = process.env.HOME || '';
+    candidates.push(path.join(home, 'Android', 'Sdk'), '/opt/android-sdk', '/usr/local/android-sdk', path.join(home, 'Library', 'Android', 'sdk'));
+  }
+  for (const d of candidates) {
+    if (d && fs.existsSync(d)) {
+      const buildTools = path.join(d, 'build-tools');
+      const platforms = path.join(d, 'platforms');
+      if (fs.existsSync(buildTools) || fs.existsSync(platforms)) return d;
+    }
+  }
+  return null;
+}
+
 /** Find Java 11+ for Gradle (Android Gradle Plugin 8.x requires Java 11+) */
 function findJavaHome() {
   const tryDirs = [];
@@ -203,6 +229,19 @@ console.log('Copied build to mobile/dist');
     } else {
       console.warn('build-mobile: Java 11+ not found. Run: npm run setup:android');
       console.warn('Or add to .env: JAVA_HOME=C:\\Program Files\\Android\\Android Studio\\jbr');
+    }
+    const androidSdk = findAndroidSdk();
+    if (androidSdk) {
+      gradleEnv.ANDROID_HOME = androidSdk;
+      gradleEnv.ANDROID_SDK_ROOT = androidSdk;
+      const localProps = path.join(androidDir, 'local.properties');
+      const sdkDirLine = 'sdk.dir=' + androidSdk.replace(/\\/g, '/');
+      fs.writeFileSync(localProps, sdkDirLine + '\n', 'utf8');
+      console.log('Using Android SDK at', androidSdk);
+    } else {
+      console.error('build-mobile: Android SDK not found. Set ANDROID_HOME or run Android Studio once to install the SDK.');
+      console.error('Default SDK path: %LOCALAPPDATA%\\Android\\Sdk (Windows) or ~/Android/Sdk (Linux/Mac)');
+      process.exit(1);
     }
     try {
       execSync(`${gradleCmd} assembleDebug --no-daemon`, { cwd: androidDir, stdio: 'inherit', env: gradleEnv });

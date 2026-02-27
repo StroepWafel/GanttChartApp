@@ -192,10 +192,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       .then((d) => setUpdateCheck(normalizeUpdateCheck(d)))
       .catch((err) => {
         const msg = err instanceof Error ? err.message : 'Check failed';
-        adminAlerts.addAlert('Updates', 'Error', msg);
         setUpdateCheck({ updateAvailable: false, error: msg });
       });
-  }, [authEnabled, currentUser?.isAdmin, adminAlerts, normalizeUpdateCheck]);
+  }, [authEnabled, currentUser?.isAdmin, normalizeUpdateCheck]);
 
   // Automatic update check every ~10 minutes when enabled (admin only)
   const AUTO_UPDATE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
@@ -206,14 +205,13 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         .then((d) => setUpdateCheck(normalizeUpdateCheck(d)))
         .catch((err) => {
           const msg = err instanceof Error ? err.message : 'Check failed';
-          adminAlerts.addAlert('Updates', 'Error', msg);
           setUpdateCheck({ updateAvailable: false, error: msg });
         });
     }
     runCheck();
     const id = setInterval(runCheck, AUTO_UPDATE_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [autoUpdateEnabled, currentUser?.isAdmin, adminAlerts, normalizeUpdateCheck]);
+  }, [autoUpdateEnabled, currentUser?.isAdmin, normalizeUpdateCheck]);
 
   useEffect(() => {
     if (showSettings) {
@@ -984,10 +982,10 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     <>
                       {mobileApkAvailable ? (
                         <a
-                          href="/mobile-app/download/app.apk"
+                          href={api.APK_DOWNLOAD_URL}
                           className="btn-sm btn-sm-primary"
                           style={{ display: 'inline-block', marginTop: '0.5rem' }}
-                          download
+                          download="gantt-chart.apk"
                         >
                           Download Android app (APK)
                         </a>
@@ -1004,10 +1002,10 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     <>
                       {mobileApkAvailable && (
                         <a
-                          href="/mobile-app/download/app.apk"
+                          href={api.APK_DOWNLOAD_URL}
                           className="btn-sm btn-sm-primary"
                           style={{ display: 'inline-block', marginTop: '0.5rem' }}
-                          download
+                          download="gantt-chart.apk"
                         >
                           Download Android app (APK)
                         </a>
@@ -2119,7 +2117,6 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                           setUpdateCheck(normalizeUpdateCheck(data));
                         } catch (err) {
                           const msg = err instanceof Error ? err.message : 'Check failed';
-                          adminAlerts.addAlert('Updates', 'Error', msg);
                           setUpdateCheck({ updateAvailable: false, error: msg });
                         }
                       }}
@@ -2138,7 +2135,6 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                           setShowUpdateDebug(true);
                         } catch (err) {
                           const msg = err instanceof Error ? err.message : 'Check failed';
-                          adminAlerts.addAlert('Updates', 'Error', msg);
                           setUpdateCheck({ updateAvailable: false, error: msg });
                         }
                       }}
