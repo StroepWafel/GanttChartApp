@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.11.3",
   "scripts": {
-    "build": "bash ../scripts/build-mobile.sh",
+    "build": "node ../scripts/build-mobile.js",
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap add android",
     "cap:ios": "npx cap add ios"
@@ -16,5 +16,8 @@
   },
   "capacitor": {
     "disabled": false
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

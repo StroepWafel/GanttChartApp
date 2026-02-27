@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -12,6 +12,7 @@ import ClearEveryoneConfirmModal from './ClearEveryoneConfirmModal';
 import ConfirmModal from './ConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useModal } from '../context/ModalContext';
+import { useAdminAlerts } from '../context/AdminAlertsContext';
 import {
   loadPriorityColors,
   savePriorityColors,
@@ -82,7 +83,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [githubTokenSet, setGithubTokenSet] = useState(false);
   const [githubTokenInput, setGithubTokenInput] = useState('');
   const [githubTokenSaving, setGithubTokenSaving] = useState(false);
-  type SettingsTab = 'personal' | 'app' | 'admin' | 'emailOnboarding' | 'updates' | 'danger';
+  type SettingsTab = 'personal' | 'app' | 'admin' | 'status' | 'emailOnboarding' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
   const settingsOpenToTabRef = useRef<SettingsTab | null>(null);
   const [emailOnboardingSettings, setEmailOnboardingSettings] = useState<api.EmailOnboardingSettings>({});
@@ -92,11 +93,23 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [testOnboardEmailResponse, setTestOnboardEmailResponse] = useState<string | null>(null);
   const [templateValidationError, setTemplateValidationError] = useState<string | null>(null);
   const [mobileAppEnabled, setMobileAppEnabled] = useState(false);
+  const [mobileApkAvailable, setMobileApkAvailable] = useState(false);
   const [mobileAppEnabledSetting, setMobileAppEnabledSetting] = useState(false);
   const [publicUrl, setPublicUrl] = useState('');
   const [mobileBuildInProgress, setMobileBuildInProgress] = useState(false);
+  const [mobileBuildStatus, setMobileBuildStatus] = useState<{ status: 'idle' | 'success' | 'failed'; message?: string }>(() => {
+    try {
+      const s = localStorage.getItem('gantt_mobile_build_status');
+      if (s) {
+        const parsed = JSON.parse(s) as { status: 'idle' | 'success' | 'failed'; message?: string };
+        if (parsed.status === 'failed' && parsed.message) return parsed;
+      }
+    } catch {}
+    return { status: 'idle' };
+  });
   const { isMobile } = useMediaQuery();
   const modal = useModal();
+  const adminAlerts = useAdminAlerts();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
   );
@@ -163,30 +176,44 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   }, []);
 
   useEffect(() => {
-    api.getMobileAppStatus().then((s) => setMobileAppEnabled(s.enabled)).catch(() => setMobileAppEnabled(false));
+    api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); }).catch(() => { setMobileAppEnabled(false); setMobileApkAvailable(false); });
   }, []);
+
+  const normalizeUpdateCheck = useCallback((d: { updateAvailable?: boolean; currentVersion?: string; latestVersion?: string; releaseName?: string | null; releaseUrl?: string; error?: string; _debug?: unknown }) => ({
+    ...d,
+    updateAvailable: d.updateAvailable ?? false,
+    _debug: d._debug != null && typeof d._debug === 'object' && !Array.isArray(d._debug) ? (d._debug as Record<string, unknown>) : undefined,
+  }), []);
 
   // One-time update check when admin loads (so we can show "Update available" in corner)
   useEffect(() => {
     if (!authEnabled || !currentUser?.isAdmin) return;
     api.checkUpdate(false)
-      .then(setUpdateCheck)
-      .catch(() => setUpdateCheck({ updateAvailable: false, error: 'Check failed' }));
-  }, [authEnabled, currentUser?.isAdmin]);
+      .then((d) => setUpdateCheck(normalizeUpdateCheck(d)))
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : 'Check failed';
+        adminAlerts.addAlert('Updates', 'Error', msg);
+        setUpdateCheck({ updateAvailable: false, error: msg });
+      });
+  }, [authEnabled, currentUser?.isAdmin, adminAlerts, normalizeUpdateCheck]);
 
   // Automatic update check every ~10 minutes when enabled (admin only)
-  const AUTO_UPDATE_INTERVAL_MS = 10 * 60 * 1000;
+  const AUTO_UPDATE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
   useEffect(() => {
     if (!autoUpdateEnabled || !currentUser?.isAdmin) return;
     function runCheck() {
       api.checkUpdate(false)
-        .then(setUpdateCheck)
-        .catch(() => setUpdateCheck({ updateAvailable: false, error: 'Check failed' }));
+        .then((d) => setUpdateCheck(normalizeUpdateCheck(d)))
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : 'Check failed';
+          adminAlerts.addAlert('Updates', 'Error', msg);
+          setUpdateCheck({ updateAvailable: false, error: msg });
+        });
     }
     runCheck();
     const id = setInterval(runCheck, AUTO_UPDATE_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [autoUpdateEnabled, currentUser?.isAdmin]);
+  }, [autoUpdateEnabled, currentUser?.isAdmin, adminAlerts, normalizeUpdateCheck]);
 
   useEffect(() => {
     if (showSettings) {
@@ -300,7 +327,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       setShowClearEveryoneConfirm(false);
       setShowSettings(false);
     } catch (err) {
-      setClearEveryoneError(err instanceof Error ? err.message : 'Failed to clear all data');
+      const msg = err instanceof Error ? err.message : 'Failed to clear all data';
+      adminAlerts.addAlert('Danger zone', 'Error', msg);
+      setClearEveryoneError(msg);
     }
   }
 
@@ -318,7 +347,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to download backup' });
+      const msg = err instanceof Error ? err.message : 'Failed to download backup';
+      adminAlerts.addAlert('Backup', 'Error', msg);
+      modal.showAlert({ title: 'Error', message: msg });
     }
   }
 
@@ -331,11 +362,13 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       try {
         const data = JSON.parse(reader.result as string) as Record<string, unknown>;
         if (!Array.isArray(data.categories) || !Array.isArray(data.projects) || !Array.isArray(data.tasks)) {
+          adminAlerts.addAlert('Restore', 'Error', 'Invalid backup file');
           modal.showAlert({ title: 'Error', message: 'Invalid backup file' });
           return;
         }
         setRestoreConfirmData(data);
       } catch {
+        adminAlerts.addAlert('Restore', 'Error', 'Invalid backup file');
         modal.showAlert({ title: 'Error', message: 'Invalid backup file' });
       }
     };
@@ -378,7 +411,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       setRestoreConfirmData(null);
       setShowSettings(false);
     } catch (err) {
-      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to restore backup' });
+      const msg = err instanceof Error ? err.message : 'Failed to restore backup';
+      adminAlerts.addAlert('Restore', 'Error', msg);
+      modal.showAlert({ title: 'Error', message: msg });
     }
   }
 
@@ -425,13 +460,14 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
             <CheckSquare size={16} />
             <span className="btn-sm-label">Completed</span>
           </button>
-          {mobileAppEnabled && (
+          {(mobileAppEnabled || currentUser?.isAdmin || !authEnabled) && (
             <button
               type="button"
               className="btn-sm btn-sm-settings"
-              title="App installation & settings"
-              aria-label="App"
+              title={mobileBuildStatus.status === 'failed' ? 'App — build failed (see Settings > App)' : 'App installation & settings'}
+              aria-label={mobileBuildStatus.status === 'failed' ? 'App (build failed)' : 'App'}
               onClick={() => { settingsOpenToTabRef.current = 'app'; setShowSettings(true); }}
+              style={mobileBuildStatus.status === 'failed' ? { borderColor: 'var(--danger, #dc3545)', boxShadow: '0 0 0 1px var(--danger, #dc3545)' } : undefined}
             >
               <Smartphone size={16} />
               <span className="btn-sm-label">App</span>
@@ -622,7 +658,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         const data = await api.onboardUser(onboardPreviewData!.email, onboardPreviewData!.username);
                         setOnboardResult(data.mailgunResponse);
                       } catch (err) {
-                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to onboard user' });
+                        const msg = err instanceof Error ? err.message : 'Failed to onboard user';
+                        adminAlerts.addAlert('User management', 'Error', msg);
+                        modal.showAlert({ title: 'Error', message: msg });
                       } finally {
                         setOnboardSending(false);
                       }
@@ -693,7 +731,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 >
                   Personal
                 </button>
-                {mobileAppEnabled && (
+                {(mobileAppEnabled || currentUser?.isAdmin || !authEnabled) && (
                   <button
                     type="button"
                     role="tab"
@@ -702,6 +740,20 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     onClick={() => setSettingsTab('app')}
                   >
                     App
+                  </button>
+                )}
+                {(currentUser?.isAdmin || !authEnabled) && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === 'status'}
+                    className={`settings-tab ${settingsTab === 'status' ? 'active' : ''}`}
+                    onClick={() => setSettingsTab('status')}
+                  >
+                    Status
+                    {adminAlerts.alerts.length > 0 && (
+                      <span style={{ marginLeft: 4, background: 'var(--danger)', color: 'white', borderRadius: 10, padding: '0 6px', fontSize: 11 }}>{adminAlerts.alerts.length}</span>
+                    )}
                   </button>
                 )}
                 {currentUser?.isAdmin && (
@@ -791,7 +843,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       onClick={async () => {
                         if (!changePasswordCurrent || !changePasswordNew || !changePasswordConfirm) return;
                         if (changePasswordNew !== changePasswordConfirm) {
-                          modal.showAlert({ title: 'Error', message: 'New password and confirmation do not match' });
+                          const msg = 'New password and confirmation do not match';
+                          adminAlerts.addAlert('User management', 'Error', msg);
+                          modal.showAlert({ title: 'Error', message: msg });
                           return;
                         }
                         try {
@@ -800,7 +854,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                           setChangePasswordNew('');
                           setChangePasswordConfirm('');
                         } catch (err) {
-                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to change password' });
+                          const msg = err instanceof Error ? err.message : 'Failed to change password';
+                          adminAlerts.addAlert('User management', 'Error', msg);
+                          modal.showAlert({ title: 'Error', message: msg });
                         }
                       }}
                     >
@@ -911,28 +967,85 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     </label>
                   </div>
                 </div>
+                <a href="https://github.com/StroepWafel/GanttChartApp" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub" style={{ display: 'inline-block', color: 'var(--muted)', marginTop: 8 }}>
+                  <Github size={20} />
+                </a>
               </div>
             )}
-            {settingsTab === 'app' && mobileAppEnabled && (
+            {settingsTab === 'app' && (mobileAppEnabled || currentUser?.isAdmin || !authEnabled) && (
               <div className="settings-tab-content" role="tabpanel">
+                {mobileAppEnabled && (
                 <div className="settings-section">
                   <h4>Mobile app</h4>
                   <p className="settings-desc">
-                    Add the Gantt Chart app to your home screen for quick access, faster loading, and offline support.
+                    Download the native Android app for Gantt Chart. Built with Capacitor.
                   </p>
-                  <a
-                    href="/mobile-app/"
-                    className="btn-sm btn-sm-primary"
-                    style={{ display: 'inline-block', marginTop: '0.5rem' }}
-                  >
-                    Open app to install
-                  </a>
-                  <p className="settings-desc" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
-                    On your phone, open the link above and use &quot;Add to Home Screen&quot; in your browser menu.
-                  </p>
+                  {(currentUser?.isAdmin || !authEnabled) ? (
+                    <>
+                      {mobileApkAvailable ? (
+                        <a
+                          href="/mobile-app/download/app.apk"
+                          className="btn-sm btn-sm-primary"
+                          style={{ display: 'inline-block', marginTop: '0.5rem' }}
+                          download
+                        >
+                          Download Android app (APK)
+                        </a>
+                      ) : (
+                        <p className="settings-desc" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
+                          APK available after build. Use &quot;Build now&quot; below or run the GitHub workflow.
+                        </p>
+                      )}
+                      <p className="settings-desc" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+                        APK is generated by the build or via the GitHub workflow. To install: enable &quot;Unknown sources&quot; in Android settings, then open the APK file.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      {mobileApkAvailable && (
+                        <a
+                          href="/mobile-app/download/app.apk"
+                          className="btn-sm btn-sm-primary"
+                          style={{ display: 'inline-block', marginTop: '0.5rem' }}
+                          download
+                        >
+                          Download Android app (APK)
+                        </a>
+                      )}
+                      <p className="settings-desc" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+                        APK is generated by the server. To install: enable &quot;Unknown sources&quot; in Android settings, then open the APK file.
+                      </p>
+                      <p className="settings-desc" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
+                        Do not download APKs from sources you do not trust.
+                      </p>
+                    </>
+                  )}
                 </div>
-                {currentUser?.isAdmin && (
+                )}
+                {(currentUser?.isAdmin || !authEnabled) && (
                   <>
+                    {mobileBuildStatus.status === 'failed' && (
+                      <div className="settings-section mobile-build-failed-banner">
+                        <p style={{ margin: 0, color: 'var(--text)' }}>
+                          Last build failed. Go to{' '}
+                          <button
+                            type="button"
+                            className="btn-link btn-link-inline"
+                            onClick={() => { settingsOpenToTabRef.current = 'status'; setShowSettings(true); setSettingsTab('status'); }}
+                          >
+                            Status
+                          </button>
+                          {' '}to see more details.
+                        </p>
+                        <button type="button" className="btn-sm" style={{ marginTop: '8px' }} onClick={() => { setMobileBuildStatus({ status: 'idle' }); localStorage.removeItem('gantt_mobile_build_status'); }}>Dismiss</button>
+                      </div>
+                    )}
+                    {mobileBuildStatus.status === 'success' && (
+                      <div className="settings-section" style={{ background: 'var(--success-bg, rgba(25, 135, 84, 0.15))', border: '1px solid var(--success, #198754)', borderRadius: 'var(--radius)', padding: '12px' }}>
+                        <p style={{ margin: 0, color: 'var(--success, #198754)' }}>Last build succeeded. Users can access the app at /mobile-app/</p>
+                        <button type="button" className="btn-sm" style={{ marginTop: '8px' }} onClick={() => { setMobileBuildStatus({ status: 'idle' }); localStorage.removeItem('gantt_mobile_build_status'); }}>Dismiss</button>
+                      </div>
+                    )}
                     <div className="settings-section">
                       <h5>Admin: availability</h5>
                       <div className="settings-checkbox-row" style={{ marginBottom: '0.75rem' }}>
@@ -945,10 +1058,12 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                               setMobileAppEnabledSetting(v);
                               try {
                                 await api.patchSettings({ mobile_app_enabled: v });
-                                api.getMobileAppStatus().then((s) => setMobileAppEnabled(s.enabled)).catch(() => {});
+                                api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); }).catch(() => {});
                               } catch (err) {
                                 setMobileAppEnabledSetting(!v);
-                                modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                                const msg = err instanceof Error ? err.message : 'Failed to save';
+                                adminAlerts.addAlert('Mobile app', 'Error', msg);
+                                modal.showAlert({ title: 'Error', message: msg });
                               }
                             }}
                           />
@@ -970,7 +1085,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                           try {
                             await api.patchSettings({ public_url: v || null });
                           } catch (err) {
-                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            const msg = err instanceof Error ? err.message : 'Failed to save';
+                            adminAlerts.addAlert('Mobile app', 'Error', msg);
+                            modal.showAlert({ title: 'Error', message: msg });
                           }
                         }}
                         className="settings-input"
@@ -983,19 +1100,34 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         style={{ marginTop: '0.75rem' }}
                         onClick={async () => {
                           setMobileBuildInProgress(true);
+                          setMobileBuildStatus({ status: 'idle' });
                           try {
                             const result = await api.buildMobileApp();
+                            const msg = result.ok
+                              ? 'The mobile app was built successfully. Users can access it at /mobile-app/'
+                              : (result.output || result.message || 'Unknown error');
+                            const status = { status: result.ok ? 'success' as const : 'failed' as const, message: msg };
+                            setMobileBuildStatus(status);
+                            if (status.status === 'failed') {
+                              localStorage.setItem('gantt_mobile_build_status', JSON.stringify(status));
+                              adminAlerts.addAlert('Mobile app', 'Build failed', msg);
+                            } else {
+                              localStorage.removeItem('gantt_mobile_build_status');
+                            }
                             modal.showAlert({
                               title: result.ok ? 'Build complete' : 'Build failed',
-                              message: result.ok
-                                ? 'The mobile app was built successfully. Users can access it at /mobile-app/'
-                                : (result.output || result.message || 'Unknown error'),
+                              message: result.ok ? msg : 'See Settings → Status for details.',
                             });
                             if (result.ok) {
-                              api.getMobileAppStatus().then((s) => setMobileAppEnabled(s.enabled)).catch(() => {});
+                              api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); }).catch(() => {});
                             }
                           } catch (err) {
-                            modal.showAlert({ title: 'Build failed', message: err instanceof Error ? err.message : 'Unknown error' });
+                            const msg = err instanceof Error ? err.message : 'Unknown error';
+                            const status = { status: 'failed' as const, message: msg };
+                            setMobileBuildStatus(status);
+                            localStorage.setItem('gantt_mobile_build_status', JSON.stringify(status));
+                            adminAlerts.addAlert('Mobile app', 'Build failed', msg);
+                            modal.showAlert({ title: 'Build failed', message: 'See Settings → Status for details.' });
                           } finally {
                             setMobileBuildInProgress(false);
                           }
@@ -1006,6 +1138,36 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     </div>
                   </>
                 )}
+              </div>
+            )}
+            {settingsTab === 'status' && (currentUser?.isAdmin || !authEnabled) && (
+              <div className="settings-tab-content" role="tabpanel">
+                <div className="settings-section">
+                  <h4>Error status</h4>
+                  <p className="settings-desc">Recent errors and failures across the app. Dismiss when resolved.</p>
+                  {adminAlerts.alerts.length === 0 ? (
+                    <p className="settings-desc" style={{ color: 'var(--success)' }}>No errors recorded.</p>
+                  ) : (
+                    <>
+                      {adminAlerts.alerts.slice().reverse().map((a) => (
+                        <div
+                          key={a.id}
+                          style={{ marginBottom: 12, padding: 12, background: 'rgba(220, 53, 69, 0.1)', border: '1px solid var(--danger)', borderRadius: 'var(--radius)' }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                            <div>
+                              <strong>{a.source}: {a.title}</strong>
+                              <pre style={{ margin: '8px 0 0', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)' }}>{a.message}</pre>
+                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{new Date(a.timestamp).toLocaleString()}</span>
+                            </div>
+                            <button type="button" className="btn-sm btn-sm-danger-outline" onClick={() => adminAlerts.dismissAlert(a.id)}>Dismiss</button>
+                          </div>
+                        </div>
+                      ))}
+                      <button type="button" className="btn-sm btn-sm-danger-outline" onClick={() => adminAlerts.dismissAll()}>Dismiss all</button>
+                    </>
+                  )}
+                </div>
               </div>
             )}
             {settingsTab === 'admin' && currentUser?.isAdmin && (
@@ -1051,7 +1213,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                       setEditUserEmailValue('');
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
-                                      setUserMgmtError(err instanceof Error ? err.message : 'Failed to update email');
+                                      const msg = err instanceof Error ? err.message : 'Failed to update email';
+                                      adminAlerts.addAlert('User management', 'Error', msg);
+                                      setUserMgmtError(msg);
                                     }
                                   }}
                                 >
@@ -1096,7 +1260,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                       await api.updateUser(u.id, { isActive: !u.isActive });
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
-                                      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to update user' });
+                                      const msg = err instanceof Error ? err.message : 'Failed to update user';
+                                      adminAlerts.addAlert('User management', 'Error', msg);
+                                      modal.showAlert({ title: 'Error', message: msg });
                                     }
                                   }}
                                 >
@@ -1120,7 +1286,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                       await api.updateUser(u.id, { revokeApiKey: true });
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
-                                      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to revoke API key' });
+                                      const msg = err instanceof Error ? err.message : 'Failed to revoke API key';
+                                      adminAlerts.addAlert('User management', 'Error', msg);
+                                      modal.showAlert({ title: 'Error', message: msg });
                                     }
                                   }}
                                 >
@@ -1135,7 +1303,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                       await api.updateUser(u.id, { regenerateApiKey: true });
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
-                                      modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to regenerate API key' });
+                                      const msg = err instanceof Error ? err.message : 'Failed to regenerate API key';
+                                      adminAlerts.addAlert('User management', 'Error', msg);
+                                      modal.showAlert({ title: 'Error', message: msg });
                                     }
                                   }}
                                 >
@@ -1158,7 +1328,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                         await api.deleteUser(u.id);
                                         api.getUsers().then(setUsers);
                                       } catch (err) {
-                                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to delete user' });
+                                        const msg = err instanceof Error ? err.message : 'Failed to delete user';
+                                        adminAlerts.addAlert('User management', 'Error', msg);
+                                        modal.showAlert({ title: 'Error', message: msg });
                                       }
                                     }}
                                   >
@@ -1203,7 +1375,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                   setOnboardPreviewData({ email, username, subject: preview.subject, body: preview.body });
                                   setOnboardResult(null);
                                 } catch (err) {
-                                  setUserMgmtError(err instanceof Error ? err.message : 'Failed to preview');
+                                  const msg = err instanceof Error ? err.message : 'Failed to preview';
+                                  adminAlerts.addAlert('User management', 'Error', msg);
+                                  setUserMgmtError(msg);
                                 }
                               }}
                             >
@@ -1245,7 +1419,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                       setNewManualEmail('');
                                       api.getUsers().then(setUsers);
                                     } catch (err) {
-                                      setUserMgmtError(err instanceof Error ? err.message : 'Failed to create user');
+                                      const msg = err instanceof Error ? err.message : 'Failed to create user';
+                                      adminAlerts.addAlert('User management', 'Error', msg);
+                                      setUserMgmtError(msg);
                                     }
                                   }}
                                 >
@@ -1290,7 +1466,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                       setNewManualEmail('');
                                       api.getUsers().then(setUsers);
                                 } catch (err) {
-                                  setUserMgmtError(err instanceof Error ? err.message : 'Failed to create user');
+                                  const msg = err instanceof Error ? err.message : 'Failed to create user';
+                                  adminAlerts.addAlert('User management', 'Error', msg);
+                                  setUserMgmtError(msg);
                                 }
                               }}
                             >
@@ -1328,7 +1506,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                           setMasqueradeUserId('');
                           window.location.reload();
                         } catch (err) {
-                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Masquerade failed' });
+                          const msg = err instanceof Error ? err.message : 'Masquerade failed';
+                          adminAlerts.addAlert('User management', 'Error', msg);
+                          modal.showAlert({ title: 'Error', message: msg });
                         }
                       }}
                     >
@@ -1352,7 +1532,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         a.click();
                         URL.revokeObjectURL(url);
                       } catch (err) {
-                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to download full backup' });
+                        const msg = err instanceof Error ? err.message : 'Failed to download full backup';
+                        adminAlerts.addAlert('Backup', 'Error', msg);
+                        modal.showAlert({ title: 'Error', message: msg });
                       }
                     }}
                   >
@@ -1398,7 +1580,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             await api.patchSettings({ email_onboarding_enabled: v });
                             setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_enabled: v }));
                           } catch (err) {
-                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            const msg = err instanceof Error ? err.message : 'Failed to save';
+                            adminAlerts.addAlert('Settings', 'Error', msg);
+                            modal.showAlert({ title: 'Error', message: msg });
                           } finally {
                             setEmailOnboardingSaving(false);
                           }
@@ -1424,7 +1608,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       try {
                         await api.patchSettings({ email_onboarding_api_key: v });
                       } catch (err) {
-                        modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                        const msg = err instanceof Error ? err.message : 'Failed to save';
+                        adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                        modal.showAlert({ title: 'Error', message: msg });
                       } finally {
                         setEmailOnboardingSaving(false);
                       }
@@ -1442,7 +1628,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         try {
                           await api.patchSettings({ email_onboarding_region: v });
                         } catch (err) {
-                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                          const msg = err instanceof Error ? err.message : 'Failed to save';
+                          adminAlerts.addAlert('Settings', 'Error', msg);
+                          modal.showAlert({ title: 'Error', message: msg });
                         } finally {
                           setEmailOnboardingSaving(false);
                         }
@@ -1464,7 +1652,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         try {
                           await api.patchSettings({ email_onboarding_domain: v });
                         } catch (err) {
-                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                          const msg = err instanceof Error ? err.message : 'Failed to save';
+                          adminAlerts.addAlert('Settings', 'Error', msg);
+                          modal.showAlert({ title: 'Error', message: msg });
                         } finally {
                           setEmailOnboardingSaving(false);
                         }
@@ -1484,7 +1674,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         try {
                           await api.patchSettings({ email_onboarding_sending_username: v });
                         } catch (err) {
-                          modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                          const msg = err instanceof Error ? err.message : 'Failed to save';
+                          adminAlerts.addAlert('Settings', 'Error', msg);
+                          modal.showAlert({ title: 'Error', message: msg });
                         } finally {
                           setEmailOnboardingSaving(false);
                         }
@@ -1513,7 +1705,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                           try {
                             await api.patchSettings({ email_onboarding_use_default_template: v });
                           } catch (err) {
-                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            const msg = err instanceof Error ? err.message : 'Failed to save';
+                            adminAlerts.addAlert('Settings', 'Error', msg);
+                            modal.showAlert({ title: 'Error', message: msg });
                           } finally {
                             setEmailOnboardingSaving(false);
                           }
@@ -1549,7 +1743,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                               try {
                                 await api.patchSettings({ email_onboarding_subject: v });
                               } catch (err) {
-                                modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                                const msg = err instanceof Error ? err.message : 'Failed to save';
+                                adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                                modal.showAlert({ title: 'Error', message: msg });
                               } finally {
                                 setEmailOnboardingSaving(false);
                               }
@@ -1578,7 +1774,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             try {
                               await api.patchSettings({ email_onboarding_template: v });
                             } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally {
                               setEmailOnboardingSaving(false);
                             }
@@ -1602,7 +1800,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_app_domain: v }));
                             setEmailOnboardingSaving(true);
                             try { await api.patchSettings({ email_onboarding_app_domain: v }); } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally { setEmailOnboardingSaving(false); }
                           }}
                           className="email-var-input"
@@ -1618,7 +1818,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_your_name: v }));
                             setEmailOnboardingSaving(true);
                             try { await api.patchSettings({ email_onboarding_your_name: v }); } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally { setEmailOnboardingSaving(false); }
                           }}
                           className="email-var-input"
@@ -1634,7 +1836,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             setEmailOnboardingSettings((s) => ({ ...s, email_onboarding_login_url: v }));
                             setEmailOnboardingSaving(true);
                             try { await api.patchSettings({ email_onboarding_login_url: v }); } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally { setEmailOnboardingSaving(false); }
                           }}
                           className="email-var-input"
@@ -1662,7 +1866,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             try {
                               await api.patchSettings({ email_onboarding_app_domain: v });
                             } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally {
                               setEmailOnboardingSaving(false);
                             }
@@ -1682,7 +1888,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             try {
                               await api.patchSettings({ email_onboarding_your_name: v });
                             } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally {
                               setEmailOnboardingSaving(false);
                             }
@@ -1702,7 +1910,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             try {
                               await api.patchSettings({ email_onboarding_login_url: v });
                             } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally {
                               setEmailOnboardingSaving(false);
                             }
@@ -1722,7 +1932,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             try {
                               await api.patchSettings({ password_reset_base_url: v });
                             } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally {
                               setEmailOnboardingSaving(false);
                             }
@@ -1743,7 +1955,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             try {
                               await api.patchSettings({ email_onboarding_subject: v });
                             } catch (err) {
-                              modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              const msg = err instanceof Error ? err.message : 'Failed to save';
+                              adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                              modal.showAlert({ title: 'Error', message: msg });
                             } finally {
                               setEmailOnboardingSaving(false);
                             }
@@ -1780,7 +1994,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             `Status: ${r.statusCode} ${r.status}\n\nResponse:\n${JSON.stringify(r.body, null, 2)}`
                           );
                         } catch (err) {
-                          setTestOnboardEmailResponse(`Error: ${err instanceof Error ? err.message : 'Failed to send'}`);
+                          const msg = err instanceof Error ? err.message : 'Failed to send';
+                          adminAlerts.addAlert('Email onboarding', 'Error', msg);
+                          setTestOnboardEmailResponse(`Error: ${msg}`);
                         }
                       }}
                     >
@@ -1821,7 +2037,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             await api.patchSettings({ auto_update_enabled: v });
                           } catch (err) {
                             setAutoUpdateEnabled(!v);
-                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            const msg = err instanceof Error ? err.message : 'Failed to save';
+                            adminAlerts.addAlert('Updates', 'Error', msg);
+                            modal.showAlert({ title: 'Error', message: msg });
                           }
                         }}
                       />
@@ -1878,7 +2096,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             setGithubTokenInput('');
                             modal.showAlert({ message: githubTokenInput.trim() ? 'Token saved.' : 'Token cleared.' });
                           } catch (err) {
-                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                            const msg = err instanceof Error ? err.message : 'Failed to save';
+                            adminAlerts.addAlert('Updates', 'Error', msg);
+                            modal.showAlert({ title: 'Error', message: msg });
                           } finally {
                             setGithubTokenSaving(false);
                           }
@@ -1896,9 +2116,11 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         setUpdateCheck(null);
                         try {
                           const data = await api.checkUpdate(false);
-                          setUpdateCheck(data);
+                          setUpdateCheck(normalizeUpdateCheck(data));
                         } catch (err) {
-                          setUpdateCheck({ updateAvailable: false, error: err instanceof Error ? err.message : 'Check failed' });
+                          const msg = err instanceof Error ? err.message : 'Check failed';
+                          adminAlerts.addAlert('Updates', 'Error', msg);
+                          setUpdateCheck({ updateAvailable: false, error: msg });
                         }
                       }}
                     >
@@ -1912,10 +2134,12 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         setUpdateCheck(null);
                         try {
                           const data = await api.checkUpdate(true);
-                          setUpdateCheck(data);
+                          setUpdateCheck(normalizeUpdateCheck(data));
                           setShowUpdateDebug(true);
                         } catch (err) {
-                          setUpdateCheck({ updateAvailable: false, error: err instanceof Error ? err.message : 'Check failed' });
+                          const msg = err instanceof Error ? err.message : 'Check failed';
+                          adminAlerts.addAlert('Updates', 'Error', msg);
+                          setUpdateCheck({ updateAvailable: false, error: msg });
                         }
                       }}
                     >
@@ -1939,7 +2163,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                             onUpdateApplySucceeded?.();
                           } catch (err) {
                             setApplyingUpdate(false);
-                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to apply update' });
+                            const msg = err instanceof Error ? err.message : 'Failed to apply update';
+                            adminAlerts.addAlert('Updates', 'Error', msg);
+                            modal.showAlert({ title: 'Error', message: msg });
                           }
                         }}
                       >

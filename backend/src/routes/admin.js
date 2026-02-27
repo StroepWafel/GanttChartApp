@@ -1,6 +1,7 @@
 import express from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import { randomUUID, randomBytes } from 'crypto';
@@ -394,7 +395,7 @@ router.post('/full-restore', (req, res) => {
 /** Manually trigger mobile app build (admin only) */
 router.post('/build-mobile', (req, res) => {
   try {
-    const rootDir = path.resolve(__dirname, '../..');
+    let rootDir = path.resolve(__dirname, '../../..');
     const publicUrlRow = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('public_url');
     let publicUrl = process.env.PUBLIC_URL || '';
     if (publicUrlRow?.value) {
@@ -410,7 +411,16 @@ router.post('/build-mobile', (req, res) => {
     if (!env.PUBLIC_URL) {
       return res.status(400).json({ error: 'Public URL is required. Set it in Settings > Admin > Mobile app, or in .env as PUBLIC_URL.' });
     }
-    const buildScript = path.join(rootDir, 'scripts', 'build-mobile.js');
+    let buildScript = path.join(rootDir, 'scripts', 'build-mobile.js');
+    if (!existsSync(buildScript)) {
+      // Fallback: repo root may be parent of cwd when server runs from backend/
+      const cwdParent = path.resolve(process.cwd(), '..');
+      const altScript = path.join(cwdParent, 'scripts', 'build-mobile.js');
+      if (existsSync(altScript)) {
+        buildScript = altScript;
+        rootDir = cwdParent;
+      }
+    }
     const proc = spawn('node', [buildScript], { cwd: rootDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';

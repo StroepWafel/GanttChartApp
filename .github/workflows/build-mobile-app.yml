@@ -1,0 +1,76 @@
+name: Build Mobile App
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_url:
+        description: 'Public URL for the app (e.g. https://gantt.example.com)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+    # Only run on tags; skip for workflow_dispatch with tags (handled above)
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm --prefix backend install
+          npm --prefix frontend install
+          npm --prefix mobile install
+
+      - name: Get PUBLIC_URL
+        id: url
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "url=${{ github.event.inputs.public_url }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ secrets.PUBLIC_URL }}" ]; then
+            echo "url=${{ secrets.PUBLIC_URL }}" >> $GITHUB_OUTPUT
+          else
+            echo "::error::PUBLIC_URL required. For tag pushes, set PUBLIC_URL secret. For manual runs, provide it as input."
+            exit 1
+          fi
+
+      - name: Build mobile app
+        env:
+          MOBILE_APP_ENABLED: 'true'
+          PUBLIC_URL: ${{ steps.url.outputs.url }}
+        run: npm run build:mobile
+
+      - name: Add Android platform (if missing)
+        run: |
+          cd mobile
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+          npx cap sync
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build APK
+        run: |
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gantt-chart-app-debug
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk

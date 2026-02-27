@@ -11,12 +11,15 @@
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
     "build:mobile": "node scripts/build-mobile.js",
+    "setup:android": "node scripts/setup-android.js",
     "start": "cd backend && npm start",
     "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
     "update": "bash scripts/update.sh"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "dotenv": "^17.3.1"
+    "dotenv": "^17.3.1",
+    "sharp": "^0.34.5",
+    "sharp-ico": "^0.1.5"
   }
 }

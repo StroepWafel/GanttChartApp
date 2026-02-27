@@ -1,12 +1,93 @@
 #!/usr/bin/env node
 /**
- * Build mobile app (PWA) with hardcoded server URL. Run from repo root via npm run build:mobile.
+ * Build mobile app (Capacitor) with hardcoded server URL. Run from repo root via npm run build:mobile.
  * Requires: .env with PUBLIC_URL and MOBILE_APP_ENABLED=true
+ * Produces: mobile/dist (web bundle), runs cap sync, builds APK at mobile/releases/app.apk
+ * Requires: Java/Android SDK for APK build (Android Studio or JDK + Android SDK)
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+
+const isWindows = process.platform === 'win32';
+
+/** Find Java 11+ for Gradle (Android Gradle Plugin 8.x requires Java 11+) */
+function findJavaHome() {
+  const tryDirs = [];
+  if (process.env.JAVA_HOME) tryDirs.push(process.env.JAVA_HOME);
+  if (isWindows) {
+    const progFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const progFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    for (const pf of [progFiles, progFilesX86]) {
+      const androidStudio = path.join(pf, 'Android', 'Android Studio');
+      if (fs.existsSync(androidStudio)) {
+        tryDirs.push(path.join(androidStudio, 'jbr'));
+        tryDirs.push(path.join(androidStudio, 'jre'));
+        const entries = fs.readdirSync(androidStudio).filter((e) => /^jbr|jre$/i.test(e));
+        for (const e of entries) tryDirs.push(path.join(androidStudio, e));
+      }
+    }
+    for (const base of [
+      path.join(progFiles, 'Eclipse Adoptium'),
+      path.join(progFiles, 'Microsoft'),
+      path.join(progFiles, 'Java'),
+      path.join(progFiles, 'OpenJDK'),
+    ]) {
+      if (fs.existsSync(base)) {
+        const entries = fs.readdirSync(base);
+        const jdk = entries.find((e) => /^jdk-(17|21|11)/i.test(e));
+        if (jdk) tryDirs.push(path.join(base, jdk));
+      }
+    }
+    const localAppData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
+    const localPrograms = path.join(localAppData, 'Programs');
+    if (fs.existsSync(localPrograms)) {
+      try {
+        const subdirs = fs.readdirSync(localPrograms);
+        for (const sub of subdirs) {
+          if (/Eclipse Adoptium|Microsoft|OpenJDK/i.test(sub)) {
+            const base = path.join(localPrograms, sub);
+            const entries = fs.readdirSync(base);
+            const jdk = entries.find((e) => /^jdk-(17|21|11)/i.test(e));
+            if (jdk) tryDirs.push(path.join(base, jdk));
+          }
+        }
+      } catch {}
+    }
+  } else {
+    const jvmBase = '/usr/lib/jvm';
+    if (fs.existsSync(jvmBase)) {
+      const entries = fs.readdirSync(jvmBase);
+      for (const e of entries) {
+        if (/java-(17|21|11)/.test(e)) tryDirs.push(path.join(jvmBase, e));
+      }
+    }
+    tryDirs.push('/opt/java/jdk-17', '/usr/lib/jvm/java-17-openjdk', '/usr/lib/jvm/java-11-openjdk');
+  }
+  for (const d of tryDirs) {
+    if (!d || !fs.existsSync(d)) continue;
+    const javaBin = path.join(d, 'bin', 'java' + (isWindows ? '.exe' : ''));
+    if (!fs.existsSync(javaBin)) continue;
+    try {
+      const out = execSync(`"${javaBin}" -version 2>&1`, { encoding: 'utf8', maxBuffer: 1024 });
+      const match = out.match(/version "(\d+)/);
+      if (match && parseInt(match[1], 10) >= 11) return d;
+    } catch {}
+  }
+  // Fallback: use system java if it's 11+
+  try {
+    const out = execSync('java -version 2>&1', { encoding: 'utf8', maxBuffer: 1024 });
+    const match = out.match(/version "(\d+)/);
+    if (match && parseInt(match[1], 10) >= 11 && process.env.JAVA_HOME && fs.existsSync(process.env.JAVA_HOME)) {
+      return process.env.JAVA_HOME;
+    }
+  } catch {}
+  return null;
+}
+
+const sharp = require('sharp');
+const ico = require('sharp-ico');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -26,21 +107,22 @@ if (!PUBLIC_URL || PUBLIC_URL === 'null') {
 }
 
 const frontendDir = path.join(ROOT, 'frontend');
-const mobileDistDir = path.join(ROOT, 'mobile', 'dist');
+const mobileDir = path.join(ROOT, 'mobile');
+const mobileDistDir = path.join(mobileDir, 'dist');
 
 if (!fs.existsSync(path.join(frontendDir, 'src')) || !fs.existsSync(path.join(frontendDir, 'package.json'))) {
   console.log('build-mobile: frontend source not found, skipping');
   process.exit(0);
 }
 
-console.log('=== Building mobile app ===');
-console.log('Building frontend with VITE_API_URL=' + PUBLIC_URL + ' VITE_BASE_PATH=/mobile-app/');
+console.log('=== Building mobile app (Capacitor) ===');
+console.log('Building frontend with VITE_API_URL=' + PUBLIC_URL + ' VITE_BASE_PATH=/');
 
 try {
   execSync('npm run build', {
     cwd: frontendDir,
     stdio: 'inherit',
-    env: { ...process.env, VITE_API_URL: PUBLIC_URL, VITE_BASE_PATH: '/mobile-app/' },
+    env: { ...process.env, VITE_API_URL: PUBLIC_URL, VITE_BASE_PATH: '/' },
   });
 } catch (e) {
   console.error('build-mobile: Frontend build failed');
@@ -51,25 +133,98 @@ if (fs.existsSync(mobileDistDir)) fs.rmSync(mobileDistDir, { recursive: true });
 fs.cpSync(path.join(frontendDir, 'dist'), mobileDistDir, { recursive: true });
 console.log('Copied build to mobile/dist');
 
-const manifest = {
-  name: 'Gantt Chart',
-  short_name: 'Gantt',
-  description: 'Gantt chart app',
-  start_url: PUBLIC_URL + '/mobile-app/',
-  display: 'standalone',
-  background_color: '#ffffff',
-  theme_color: '#333333',
-};
-fs.writeFileSync(path.join(mobileDistDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
-console.log('Created manifest.json');
-
-const indexPath = path.join(mobileDistDir, 'index.html');
-if (fs.existsSync(indexPath)) {
-  let html = fs.readFileSync(indexPath, 'utf8');
-  if (!html.includes('rel="manifest"')) {
-    html = html.replace('<head>', '<head>\n    <link rel="manifest" href="/mobile-app/manifest.json">');
-    fs.writeFileSync(indexPath, html);
+(async () => {
+  // Generate app icons from favicon (for Capacitor app icon / resources)
+  const iconsDir = path.join(mobileDistDir, 'icons');
+  if (fs.existsSync(iconsDir)) fs.rmSync(iconsDir, { recursive: true });
+  fs.mkdirSync(iconsDir, { recursive: true });
+  const faviconPath = path.join(mobileDistDir, 'favicon.ico');
+  if (fs.existsSync(faviconPath)) {
+    try {
+      const sharps = ico.sharpsFromIco(faviconPath);
+      if (sharps.length > 0) {
+        const best = sharps[sharps.length - 1];
+        await Promise.all([
+          best.resize(192, 192).png().toFile(path.join(iconsDir, 'icon-192.png')),
+          best.resize(512, 512).png().toFile(path.join(iconsDir, 'icon-512.png')),
+        ]);
+        console.log('Generated app icons from favicon');
+      }
+    } catch (err) {
+      console.warn('build-mobile: Could not generate icons from favicon:', err.message);
+    }
   }
-}
 
-console.log('=== Mobile app build complete ===');
+  const manifest = {
+    name: 'Gantt Chart',
+    short_name: 'Gantt',
+    description: 'Gantt chart app',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#ffffff',
+    theme_color: '#333333',
+    icons: [
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+  };
+  fs.writeFileSync(path.join(mobileDistDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+  console.log('Created manifest.json');
+
+  const indexPath = path.join(mobileDistDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    let html = fs.readFileSync(indexPath, 'utf8');
+    if (!html.includes('rel="manifest"')) {
+      html = html.replace('<head>', '<head>\n    <link rel="manifest" href="/manifest.json">');
+      fs.writeFileSync(indexPath, html);
+    }
+  }
+
+  try {
+    execSync('npx cap sync', { cwd: mobileDir, stdio: 'inherit' });
+    console.log('Capacitor sync complete');
+  } catch (e) {
+    console.warn('build-mobile: cap sync failed (run "cd mobile && npx cap add android" if android/ missing):', e.message);
+  }
+
+  // Build APK and copy to mobile/releases/ for server download
+  const androidDir = path.join(mobileDir, 'android');
+  const releasesDir = path.join(mobileDir, 'releases');
+  const apkOutput = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+  const apkDest = path.join(releasesDir, 'app.apk');
+
+  if (fs.existsSync(androidDir)) {
+    const gradleCmd = isWindows ? 'gradlew.bat' : './gradlew';
+    const gradleEnv = { ...process.env };
+    const javaHome = findJavaHome();
+    if (javaHome) {
+      gradleEnv.JAVA_HOME = javaHome;
+      console.log('Using Java at', javaHome);
+    } else {
+      console.warn('build-mobile: Java 11+ not found. Run: npm run setup:android');
+      console.warn('Or add to .env: JAVA_HOME=C:\\Program Files\\Android\\Android Studio\\jbr');
+    }
+    try {
+      execSync(`${gradleCmd} assembleDebug --no-daemon`, { cwd: androidDir, stdio: 'inherit', env: gradleEnv });
+    } catch (e) {
+      console.error('build-mobile: Gradle build failed. Install Android Studio (or JDK 17 + Android SDK) to build APKs locally.');
+      console.error('Alternatively, run the GitHub workflow "Build Mobile App" to produce an APK artifact.');
+      process.exit(1);
+    }
+    if (fs.existsSync(apkOutput)) {
+      if (!fs.existsSync(releasesDir)) fs.mkdirSync(releasesDir, { recursive: true });
+      fs.copyFileSync(apkOutput, apkDest);
+      console.log('APK built and copied to mobile/releases/app.apk');
+    } else {
+      console.error('build-mobile: APK not found after Gradle build');
+      process.exit(1);
+    }
+  } else {
+    console.warn('build-mobile: android/ folder missing; run "cd mobile && npx cap add android"');
+  }
+
+  console.log('=== Mobile app build complete ===');
+})().catch((err) => {
+  console.error('build-mobile:', err);
+  process.exit(1);
+});

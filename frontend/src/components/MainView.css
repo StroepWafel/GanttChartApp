@@ -270,6 +270,20 @@
   text-decoration: underline;
 }
 
+.btn-link-inline {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+.mobile-build-failed-banner {
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  border-left: 3px solid var(--danger);
+}
+
 .gantt-area {
   flex: 1;
   min-width: 0;

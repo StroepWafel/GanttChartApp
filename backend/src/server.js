@@ -45,7 +45,8 @@ const SERVER_BOOT_ID = crypto.randomUUID();
 
 // Frontend dist: when running from backend/, it's ../frontend/dist
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
-const mobileDist = path.resolve(__dirname, '../../mobile/dist');
+const mobileReleasesDir = path.resolve(__dirname, '../../mobile/releases');
+const apkPath = path.join(mobileReleasesDir, 'app.apk');
 
 const app = express();
 app.use(cors());
@@ -99,10 +100,7 @@ app.use('/api/gantt-expanded', optionalAuth, ganttExpandedRouter);
 app.use('/api/clear', optionalAuth, clearRouter);
 app.use('/api/backup', optionalAuth, backupRouter);
 
-// Serve frontend in production
-app.use(express.static(frontendDist));
-
-// Serve mobile app at /mobile-app when enabled and built (checked per-request so admin toggle works without restart)
+// Serve mobile app landing page and APK at /mobile-app when enabled
 function isMobileAppEnabled() {
   try {
     const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('mobile_app_enabled');
@@ -119,15 +117,53 @@ function isMobileAppEnabled() {
   }
 }
 
-app.use('/mobile-app', (req, res, next) => {
-  if (!existsSync(mobileDist) || !isMobileAppEnabled()) return next();
-  express.static(mobileDist)(req, res, next);
-});
-app.get(/^\/mobile-app(\/.*)?$/, (req, res, next) => {
-  if (!existsSync(mobileDist) || !isMobileAppEnabled()) return next();
-  res.sendFile(path.join(mobileDist, 'index.html'));
+const mobileLandingPath = path.join(__dirname, 'mobile-landing.html');
+let mobileLandingTemplate = '';
+try {
+  if (existsSync(mobileLandingPath)) {
+    mobileLandingTemplate = readFileSync(mobileLandingPath, 'utf8');
+  }
+} catch (e) {
+  console.warn('[server] Could not load mobile-landing.html:', e?.message);
+}
+
+// Serve APK download
+app.get('/mobile-app/download/app.apk', (req, res) => {
+  if (!isMobileAppEnabled()) {
+    return res.status(403).send('Mobile app is not enabled.');
+  }
+  if (!existsSync(apkPath)) {
+    return res.status(404).send('APK not available. Build the app or run the GitHub workflow to generate it.');
+  }
+  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+  res.setHeader('Content-Disposition', 'attachment; filename="gantt-chart.apk"');
+  res.sendFile(apkPath);
 });
 
+// Serve landing page at /mobile-app and /mobile-app/
+app.get(['/mobile-app', '/mobile-app/'], (req, res) => {
+  if (!isMobileAppEnabled()) {
+    return res.status(503).send(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mobile app</title></head><body style="font-family:system-ui,sans-serif;margin:2rem;max-width:480px"><h1>Mobile app</h1><p>The mobile app is not enabled.</p><p>An admin can enable and build it in <strong>Settings → App</strong>.</p><p><a href="/">← Back to app</a></p></body></html>`
+    );
+  }
+  const apkAvailable = existsSync(apkPath);
+  const apkSection = apkAvailable
+    ? '<a href="/mobile-app/download/app.apk" class="btn">Download Android app (APK)</a>'
+    : '<p><em>APK available after build. Use "Build now" in Settings → App or run the GitHub workflow.</em></p>';
+  const html = mobileLandingTemplate.replace('{{APK_SECTION}}', apkSection);
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+});
+
+// Redirect other /mobile-app paths to landing page
+app.get('/mobile-app/*', (req, res, next) => {
+  if (req.path === '/mobile-app/download/app.apk') return next();
+  res.redirect(302, '/mobile-app/');
+});
+
+// Serve main frontend
+app.use(express.static(frontendDist));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(frontendDist, 'index.html'));

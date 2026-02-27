@@ -1,6 +1,23 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const API = API_BASE ? `${API_BASE}/api` : '/api';
 
+/** Parse response as JSON, or throw a user-friendly error when body is empty/invalid (e.g. HTML error page) */
+async function safeJson<T = unknown>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    throw new Error(res.ok ? 'Server returned empty response' : `Request failed (${res.status} ${res.statusText})`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      res.ok
+        ? 'Server returned invalid response'
+        : `Request failed (${res.status} ${res.statusText}). Response may be an error page.`
+    );
+  }
+}
+
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('gantt_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -183,7 +200,7 @@ export async function getVersion(): Promise<{ version: string; updating?: boolea
   return res.json();
 }
 
-export async function getMobileAppStatus(): Promise<{ enabled: boolean }> {
+export async function getMobileAppStatus(): Promise<{ enabled: boolean; apkAvailable?: boolean }> {
   const base = API_BASE || '';
   const url = base ? `${base}/api/mobile-app/status` : '/api/mobile-app/status';
   const res = await fetch(url);
@@ -194,9 +211,12 @@ export async function getMobileAppStatus(): Promise<{ enabled: boolean }> {
 
 export async function buildMobileApp(): Promise<{ ok: boolean; message: string; output?: string }> {
   const res = await fetchApi('/admin/build-mobile', { method: 'POST' });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Build failed');
-  return data;
+  const data = await safeJson<{ ok?: boolean; error?: string; output?: string; message?: string }>(res);
+  // Don't throw on failure: return error details so the caller can show output (build logs)
+  if (!res.ok) {
+    return { ok: false, message: data.error || 'Build failed', output: data.output };
+  }
+  return { ok: data.ok ?? true, message: data.message ?? 'Build complete', output: data.output };
 }
 
 export async function getSettings() {
@@ -286,7 +306,7 @@ export async function sendTestOnboardEmail(toEmail: string) {
 export async function checkUpdate(debug = false) {
   const url = debug ? '/admin/update/check-update?debug=1' : '/admin/update/check-update';
   const res = await fetchApi(url);
-  const data = await res.json();
+  const data = await safeJson<{ error?: string; updateAvailable?: boolean; currentVersion?: string; latestVersion?: string; releaseName?: string; releaseUrl?: string; _debug?: unknown }>(res);
   if (!res.ok) throw new Error(data.error || 'Failed to check for updates');
   return data;
 }
@@ -294,7 +314,7 @@ export async function checkUpdate(debug = false) {
 export async function applyUpdate(debug = false) {
   const url = debug ? '/admin/update/apply-update?debug=1' : '/admin/update/apply-update';
   const res = await fetchApi(url, { method: 'POST' });
-  const data = await res.json();
+  const data = await safeJson<{ error?: string; ok?: boolean; message?: string }>(res);
   if (!res.ok) throw new Error(data.error || 'Failed to apply update');
   return data;
 }
