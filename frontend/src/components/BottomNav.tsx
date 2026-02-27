@@ -41,11 +41,11 @@ export default function BottomNav({
         className={`bottom-nav-item bottom-nav-add ${currentPage === 'add-task' ? 'active' : ''}`}
         onClick={() => onPageChange('add-task')}
         disabled={projectsLength === 0}
-        title={projectsLength === 0 ? 'Add a project first' : 'Add task'}
-        aria-label={projectsLength === 0 ? 'Add a project first' : 'Add task'}
+        title={projectsLength === 0 ? 'Click Categories to add a category and project first' : 'Add task'}
+        aria-label={projectsLength === 0 ? 'Click Categories to add a category and project first' : 'Add task'}
       >
         <Plus size={20} strokeWidth={2.5} />
-        <span className="bottom-nav-label">Add</span>
+        <span className="bottom-nav-label">Task</span>
       </button>
       <button
         type="button"

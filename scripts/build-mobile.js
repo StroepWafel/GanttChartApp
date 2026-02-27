@@ -137,6 +137,13 @@ if (!PUBLIC_URL || PUBLIC_URL === 'null') {
   process.exit(0);
 }
 
+let APP_VERSION = '0.0.0';
+try {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  APP_VERSION = pkg.version || '0.0.0';
+} catch {}
+env.VITE_APP_VERSION = APP_VERSION;
+
 const frontendDir = path.join(ROOT, 'frontend');
 const mobileDir = path.join(ROOT, 'mobile');
 const mobileDistDir = path.join(mobileDir, 'dist');
@@ -153,7 +160,7 @@ try {
   execSync('npm run build', {
     cwd: frontendDir,
     stdio: 'inherit',
-    env: { ...process.env, VITE_API_URL: PUBLIC_URL, VITE_BASE_PATH: '/' },
+    env: { ...process.env, VITE_API_URL: PUBLIC_URL, VITE_BASE_PATH: '/', VITE_APP_VERSION: APP_VERSION },
   });
 } catch (e) {
   console.error('build-mobile: Frontend build failed');

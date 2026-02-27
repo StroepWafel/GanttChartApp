@@ -42,7 +42,7 @@ export default function CategoriesPage({
     <div className="mobile-page categories-page">
       <div className="categories-page-content">
         {categories.length === 0 ? (
-          <p className="muted">No categories yet. Add one below.</p>
+          <p className="muted">No categories yet. Click the button below to add a new category.</p>
         ) : (
           categories.map((c) => (
             <div key={c.id} className="cat-block-page">

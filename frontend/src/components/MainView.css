@@ -945,6 +945,38 @@ label.input-label,
   color: var(--text-muted);
 }
 
+.mobile-app-prompt-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.mobile-app-prompt-banner span {
+  color: var(--text-muted);
+}
+
+.mobile-app-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-app-update-banner {
+  background: var(--bg-elevated, rgba(59, 130, 246, 0.15));
+  border-bottom-color: var(--primary, #3b82f6);
+}
+
+.mobile-app-update-banner span {
+  color: var(--text);
+  font-weight: 500;
+}
+
 .masquerade-settings-line {
   display: flex;
   align-items: center;

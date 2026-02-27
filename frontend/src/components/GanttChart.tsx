@@ -504,7 +504,7 @@ export default function GanttChart({
     return (
       <div className="gantt-chart-wrap">
         <div className="gantt-empty">
-          No tasks yet. Add a category, then a project, then create a task.
+          No tasks yet. Click Categories to add a category, then a project, then create a task.
         </div>
       </div>
     );

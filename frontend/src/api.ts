@@ -203,6 +203,22 @@ export async function getVersion(): Promise<{ version: string; updating?: boolea
   return res.json();
 }
 
+/** Compare semver strings; returns 1 if a>b, -1 if a<b, 0 if equal */
+export function compareVersions(a: string, b: string): number {
+  const normalize = (v: string) =>
+    (v || '0').replace(/^[vV]+/, '').replace(/^[^0-9.]+/, '') || '0.0.0';
+  const parts = (v: string) => normalize(v).split('.').map((n) => parseInt(n, 10) || 0);
+  const pa = parts(a);
+  const pb = parts(b);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
 export async function getMobileAppStatus(): Promise<{ enabled: boolean; apkAvailable?: boolean }> {
   const base = API_BASE || '';
   const url = base ? `${base}/api/mobile-app/status` : '/api/mobile-app/status';
