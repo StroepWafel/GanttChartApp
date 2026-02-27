@@ -589,22 +589,20 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 <div className="settings-section">
                   <h5>Admin: availability</h5>
                   <div className="settings-checkbox-row" style={{ marginBottom: '0.75rem' }}>
-                    <label>
-                      <input type="checkbox" checked={!!mobileAppEnabledSetting} onChange={async (e) => {
-                        const v = e.target.checked;
-                        setMobileAppEnabledSetting(v);
-                        try {
-                          await api.patchSettings({ mobile_app_enabled: v });
-                          api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); }).catch(() => {});
-                        } catch (err) {
-                          setMobileAppEnabledSetting(!v);
-                          const msg = err instanceof Error ? err.message : 'Failed to save';
-                          adminAlerts.addAlert('Mobile app', 'Error', msg);
-                          modal.showAlert({ title: 'Error', message: msg });
-                        }
-                      }} />
-                      <span>Allow users to install the app</span>
-                    </label>
+                    <input type="checkbox" checked={!!mobileAppEnabledSetting} onChange={async (e) => {
+                      const v = e.target.checked;
+                      setMobileAppEnabledSetting(v);
+                      try {
+                        await api.patchSettings({ mobile_app_enabled: v });
+                        api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); }).catch(() => {});
+                      } catch (err) {
+                        setMobileAppEnabledSetting(!v);
+                        const msg = err instanceof Error ? err.message : 'Failed to save';
+                        adminAlerts.addAlert('Mobile app', 'Error', msg);
+                        modal.showAlert({ title: 'Error', message: msg });
+                      }
+                    }} />
+                    <span>Allow users to install the app</span>
                   </div>
                 </div>
                 <div className="settings-section">
