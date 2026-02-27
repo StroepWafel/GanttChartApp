@@ -195,8 +195,10 @@ if (isLinux && !sdkPath) {
         }
         if (!hasCommand('unzip')) {
           console.log('Installing unzip...');
-          if (!run('apt-get update && apt-get install -y unzip')) {
-            console.log('Need unzip. Install with: apt-get install unzip (or sudo apt install unzip)');
+          const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+          const unzipCmd = isRoot ? 'apt-get update && apt-get install -y unzip' : 'sudo apt-get update && sudo apt-get install -y unzip';
+          if (!run(unzipCmd) && !run('apk add --no-cache unzip')) {
+            console.log('Need unzip. Install with: sudo apt install unzip (Debian/Ubuntu) or apk add unzip (Alpine)');
             process.exit(1);
           }
         }
