@@ -193,6 +193,13 @@ if (isLinux && !sdkPath) {
           console.log('Need wget or curl to download. Install with: sudo apt install wget');
           process.exit(1);
         }
+        if (!hasCommand('unzip')) {
+          console.log('Installing unzip...');
+          if (!run('apt-get update && apt-get install -y unzip')) {
+            console.log('Need unzip. Install with: apt-get install unzip (or sudo apt install unzip)');
+            process.exit(1);
+          }
+        }
         fs.mkdirSync(sdkRoot, { recursive: true });
         const downloadCmd = hasCommand('wget') ? `wget -q -O "${zipPath}" "${CMDLINE_URL}"` : `curl -sL -o "${zipPath}" "${CMDLINE_URL}"`;
         execSync(downloadCmd, { stdio: 'inherit' });
