@@ -15,12 +15,12 @@ on:
           - minor
           - major
         default: patch
-      from_tag:
-        description: 'Previous tag to compare from (e.g., v1.0.0). Leave empty to auto-detect'
-        required: false
-        type: string
       release_name:
         description: 'Custom release name. Leave empty for AI-derived from release notes'
+        required: false
+        type: string
+      from_tag:
+        description: 'Previous tag to compare from (e.g., v1.0.0). Leave empty to auto-detect'
         required: false
         type: string
       detail_level:
