@@ -182,31 +182,12 @@ console.log('Copied build to mobile/dist');
       const sharps = ico.sharpsFromIco(faviconPath);
       if (sharps.length > 0) {
         const best = sharps[sharps.length - 1];
-        // Maskable safe zone: center 80% of icon (outer 10% can be cropped by circle/shape masks)
-        const safeZoneScale = 0.8;
 
-        const makeMaskableIcon = async (size) => {
-          const inner = Math.round(size * safeZoneScale);
-          const offset = Math.round((size - inner) / 2);
-          const resized = best.resize(inner, inner);
-          const base = sharp({
-            create: {
-              width: size,
-              height: size,
-              channels: 4,
-              background: { r: 51, g: 51, b: 51, alpha: 1 },
-            },
-          });
-          return base.composite([{ input: await resized.toBuffer(), left: offset, top: offset }]).png();
-        };
-
-        const icon192 = await makeMaskableIcon(192);
-        const icon512 = await makeMaskableIcon(512);
         await Promise.all([
-          icon192.toFile(path.join(iconsDir, 'icon-192.png')),
-          icon512.toFile(path.join(iconsDir, 'icon-512.png')),
+          best.resize(192, 192).png().toFile(path.join(iconsDir, 'icon-192.png')),
+          best.resize(512, 512).png().toFile(path.join(iconsDir, 'icon-512.png')),
         ]);
-        console.log('Generated PWA maskable icons from favicon (with safe zone)');
+        console.log('Generated PWA app icons from favicon');
 
         const androidResDir = path.join(mobileDir, 'android', 'app', 'src', 'main', 'res');
         if (fs.existsSync(androidResDir)) {
@@ -220,51 +201,13 @@ console.log('Copied build to mobile/dist');
           for (const d of densities) {
             const dirPath = path.join(androidResDir, d.dir);
             if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
-            const innerL = Math.round(d.launcher * safeZoneScale);
-            const offsetL = Math.round((d.launcher - innerL) / 2);
-            const innerF = Math.round(d.foreground * safeZoneScale);
-            const offsetF = Math.round((d.foreground - innerF) / 2);
-            const resizedL = best.resize(innerL, innerL);
-            const resizedF = best.resize(innerF, innerF);
-            const launcherBuf = await resizedL.toBuffer();
-            const foregroundBuf = await resizedF.toBuffer();
             await Promise.all([
-              sharp({
-                create: {
-                  width: d.launcher,
-                  height: d.launcher,
-                  channels: 4,
-                  background: { r: 51, g: 51, b: 51, alpha: 1 },
-                },
-              })
-                .composite([{ input: launcherBuf, left: offsetL, top: offsetL }])
-                .png()
-                .toFile(path.join(dirPath, 'ic_launcher.png')),
-              sharp({
-                create: {
-                  width: d.launcher,
-                  height: d.launcher,
-                  channels: 4,
-                  background: { r: 51, g: 51, b: 51, alpha: 1 },
-                },
-              })
-                .composite([{ input: launcherBuf, left: offsetL, top: offsetL }])
-                .png()
-                .toFile(path.join(dirPath, 'ic_launcher_round.png')),
-              sharp({
-                create: {
-                  width: d.foreground,
-                  height: d.foreground,
-                  channels: 4,
-                  background: { r: 51, g: 51, b: 51, alpha: 1 },
-                },
-              })
-                .composite([{ input: foregroundBuf, left: offsetF, top: offsetF }])
-                .png()
-                .toFile(path.join(dirPath, 'ic_launcher_foreground.png')),
+              best.resize(d.launcher, d.launcher).png().toFile(path.join(dirPath, 'ic_launcher.png')),
+              best.resize(d.launcher, d.launcher).png().toFile(path.join(dirPath, 'ic_launcher_round.png')),
+              best.resize(d.foreground, d.foreground).png().toFile(path.join(dirPath, 'ic_launcher_foreground.png')),
             ]);
           }
-          console.log('Generated Android launcher icons from favicon (with safe zone)');
+          console.log('Generated Android launcher icons from favicon');
         }
       }
     } catch (err) {
@@ -278,11 +221,11 @@ console.log('Copied build to mobile/dist');
     description: 'Gantt chart app',
     start_url: '/',
     display: 'standalone',
-    background_color: '#333333',
+    background_color: '#ffffff',
     theme_color: '#333333',
     icons: [
-      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
   };
   fs.writeFileSync(path.join(mobileDistDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
