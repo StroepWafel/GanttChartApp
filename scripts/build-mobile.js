@@ -156,11 +156,21 @@ if (!fs.existsSync(path.join(frontendDir, 'src')) || !fs.existsSync(path.join(fr
 console.log('=== Building mobile app (Capacitor) ===');
 console.log('Building frontend with VITE_API_URL=' + PUBLIC_URL + ' VITE_BASE_PATH=/');
 
+// Build to frontend/dist-mobile so we don't overwrite frontend/dist (used by PC/server)
+const frontendMobileDist = path.join(frontendDir, 'dist-mobile');
+if (fs.existsSync(frontendMobileDist)) fs.rmSync(frontendMobileDist, { recursive: true });
+
 try {
   execSync('npm run build', {
     cwd: frontendDir,
     stdio: 'inherit',
-    env: { ...process.env, VITE_API_URL: PUBLIC_URL, VITE_BASE_PATH: '/', VITE_APP_VERSION: APP_VERSION },
+    env: {
+      ...process.env,
+      VITE_API_URL: PUBLIC_URL,
+      VITE_BASE_PATH: '/',
+      VITE_APP_VERSION: APP_VERSION,
+      VITE_OUT_DIR: 'dist-mobile',
+    },
   });
 } catch (e) {
   console.error('build-mobile: Frontend build failed');
@@ -168,7 +178,7 @@ try {
 }
 
 if (fs.existsSync(mobileDistDir)) fs.rmSync(mobileDistDir, { recursive: true });
-fs.cpSync(path.join(frontendDir, 'dist'), mobileDistDir, { recursive: true });
+fs.cpSync(frontendMobileDist, mobileDistDir, { recursive: true });
 console.log('Copied build to mobile/dist');
 
 (async () => {
