@@ -27,6 +27,8 @@ function findAndroidSdk() {
   } else {
     const home = process.env.HOME || '';
     candidates.push(path.join(home, 'Android', 'Sdk'), '/opt/android-sdk', '/usr/local/android-sdk', path.join(home, 'Library', 'Android', 'sdk'));
+    // Snap Android Studio may store SDK in android-studio subdir or user home
+    candidates.push('/snap/android-studio/current/android-studio/sdk', path.join(home, 'snap', 'android-studio', 'current', 'Android', 'Sdk'));
   }
   for (const d of candidates) {
     if (d && fs.existsSync(d)) {
@@ -90,6 +92,9 @@ function findJavaHome() {
       }
     }
     tryDirs.push('/opt/java/jdk-17', '/usr/lib/jvm/java-17-openjdk', '/usr/lib/jvm/java-11-openjdk');
+    // Snap-installed Android Studio (JBR bundled)
+    const snapPaths = ['/snap/android-studio/current/android-studio/jbr', '/snap/android-studio/current/jbr', '/snap/android-studio/current/android-studio/jre'];
+    for (const p of snapPaths) tryDirs.push(p);
   }
   for (const d of tryDirs) {
     if (!d || !fs.existsSync(d)) continue;
@@ -228,18 +233,10 @@ console.log('Copied build to mobile/dist');
     }
   }
 
-  // Ensure mobile deps are installed (needed for cap CLI)
-  const capCliDir = path.join(mobileDir, 'node_modules', '@capacitor', 'cli');
-  if (!fs.existsSync(capCliDir)) {
-    console.log('Installing mobile dependencies...');
-    execSync('npm install', { cwd: mobileDir, stdio: 'inherit' });
-  }
-
-  // Add Android platform if missing (required before cap sync)
   const androidDir = path.join(mobileDir, 'android');
   if (!fs.existsSync(androidDir)) {
-    console.log('Adding Android platform...');
-    execSync('npx cap add android', { cwd: mobileDir, stdio: 'inherit' });
+    console.error('build-mobile: android/ missing. Run: npm run setup:android');
+    process.exit(1);
   }
 
   try {
@@ -263,7 +260,11 @@ console.log('Copied build to mobile/dist');
       console.log('Using Java at', javaHome);
     } else {
       console.warn('build-mobile: Java 11+ not found. Run: npm run setup:android');
-      console.warn('Or add to .env: JAVA_HOME=C:\\Program Files\\Android\\Android Studio\\jbr');
+      console.warn(
+        isWindows
+          ? 'Or add to .env: JAVA_HOME=C:\\Program Files\\Android\\Android Studio\\jbr'
+          : 'Or add to .env: JAVA_HOME=/snap/android-studio/current/android-studio/jbr (snap) or JAVA_HOME=/usr/lib/jvm/java-17-openjdk (apt)',
+      );
     }
     const androidSdk = findAndroidSdk();
     if (androidSdk) {
@@ -275,7 +276,11 @@ console.log('Copied build to mobile/dist');
       console.log('Using Android SDK at', androidSdk);
     } else {
       console.error('build-mobile: Android SDK not found. Set ANDROID_HOME or run Android Studio once to install the SDK.');
-      console.error('Default SDK path: %LOCALAPPDATA%\\Android\\Sdk (Windows) or ~/Android/Sdk (Linux/Mac)');
+      console.error(
+        isWindows
+          ? 'Default SDK path: %LOCALAPPDATA%\\Android\\Sdk'
+          : 'Default SDK path: ~/Android/Sdk (run Android Studio once to download, or use command-line tools)',
+      );
       process.exit(1);
     }
     try {

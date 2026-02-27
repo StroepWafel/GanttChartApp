@@ -1,17 +1,29 @@
 #!/usr/bin/env node
 /**
- * Attempt to install Android Studio (or JDK 17 + Android SDK) for mobile builds.
- * Run from repo root: node scripts/setup-android.js
- * Windows: requires admin/elevated shell. Linux: may require sudo.
+ * Full Android/mobile build environment setup. Run from repo root: node scripts/setup-android.js
+ * Installs: Java 17+, Android SDK (or command-line tools), mobile npm deps, Capacitor Android platform.
+ * Updates .env with JAVA_HOME and ANDROID_HOME when detected.
+ * Windows: may require admin for Java/Android Studio. Linux: may require sudo for apt.
  */
 
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
+const ROOT = path.resolve(__dirname, '..');
 const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
 const isMac = process.platform === 'darwin';
+
+function appendToEnv(key, value) {
+  const envPath = path.join(ROOT, '.env');
+  if (!fs.existsSync(envPath) || fs.readFileSync(envPath, 'utf8').includes(key + '=')) return;
+  let content = fs.readFileSync(envPath, 'utf8').trimEnd();
+  if (!content.endsWith('\n')) content += '\n';
+  content += `\n# Added by setup-android\n${key}=${value}\n`;
+  fs.writeFileSync(envPath, content);
+}
 
 function run(cmd, opts = {}) {
   try {
@@ -53,7 +65,7 @@ console.log('=== Android build environment setup ===\n');
 const androidStudioJbr = isWindows
   ? path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Android', 'Android Studio', 'jbr')
   : path.join(process.env.HOME || '', 'android-studio', 'jbr');
-const linuxPaths = ['/opt/android-studio/jbr', '/usr/lib/jvm/java-17-openjdk-amd64', '/usr/lib/jvm/java-17-openjdk', '/usr/lib/jvm/java-11-openjdk-amd64', '/usr/lib/jvm/default-java'];
+const linuxPaths = ['/opt/android-studio/jbr', '/usr/lib/jvm/java-17-openjdk-amd64', '/usr/lib/jvm/java-17-openjdk', '/usr/lib/jvm/java-11-openjdk-amd64', '/usr/lib/jvm/default-java', '/snap/android-studio/current/android-studio/jbr', '/snap/android-studio/current/jbr'];
 function hasJavaInPath() {
   if (!hasCommand('java')) return false;
   try {
@@ -64,15 +76,20 @@ function hasJavaInPath() {
     return false;
   }
 }
-const hasJava17 =
-  hasJavaInPath() ||
-  (isWindows && fs.existsSync(path.join(androidStudioJbr, 'bin', 'java.exe'))) ||
-  (isLinux && linuxPaths.some((p) => fs.existsSync(p) && checkJavaVersion(p))) ||
-  (isMac && fs.existsSync('/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java')) ||
-  (process.env.JAVA_HOME && checkJavaVersion(process.env.JAVA_HOME));
+function findJavaHome() {
+  if (process.env.JAVA_HOME && checkJavaVersion(process.env.JAVA_HOME)) return process.env.JAVA_HOME;
+  if (isWindows && fs.existsSync(path.join(androidStudioJbr, 'bin', 'java.exe'))) return androidStudioJbr;
+  if (isLinux) for (const p of linuxPaths) if (fs.existsSync(p) && checkJavaVersion(p)) return p;
+  if (isMac && fs.existsSync('/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java')) return '/Applications/Android Studio.app/Contents/jbr/Contents/Home';
+  if (hasJavaInPath() && process.env.JAVA_HOME) return process.env.JAVA_HOME;
+  return null;
+}
+const javaHome = findJavaHome();
+const hasJava17 = !!javaHome || hasJavaInPath();
 
 if (hasJava17) {
-  console.log('Java 17+ appears to be available.\n');
+  console.log('Java 17+ found' + (javaHome ? ' at ' + javaHome : ' (in PATH)') + '\n');
+  if (javaHome) appendToEnv('JAVA_HOME', javaHome);
 } else {
   console.log('Java 17 not found. Attempting to install...\n');
   let installed = false;
@@ -134,7 +151,94 @@ if (hasJava17) {
   }
 }
 
-// 2. Check for Android Studio / SDK
+// 2. Check for Android SDK (must have build-tools or platforms)
+function findAndroidSdk() {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const candidates = isWindows
+    ? [path.join(process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'Android', 'Sdk'), path.join(home, 'Android', 'Sdk')]
+    : [path.join(home, 'Android', 'Sdk'), '/opt/android-sdk', '/usr/local/android-sdk'];
+  for (const d of candidates) {
+    if (d && fs.existsSync(d)) {
+      const buildTools = path.join(d, 'build-tools');
+      const platforms = path.join(d, 'platforms');
+      if (fs.existsSync(buildTools) || fs.existsSync(platforms)) return d;
+    }
+  }
+  return null;
+}
+let sdkPath = process.env.ANDROID_HOME && fs.existsSync(process.env.ANDROID_HOME) && (fs.existsSync(path.join(process.env.ANDROID_HOME, 'build-tools')) || fs.existsSync(path.join(process.env.ANDROID_HOME, 'platforms')))
+  ? process.env.ANDROID_HOME
+  : findAndroidSdk();
+
+if (sdkPath) {
+  console.log('Android SDK found at', sdkPath);
+  appendToEnv('ANDROID_HOME', sdkPath);
+}
+
+// 3. On Linux headless: install SDK command-line tools (if not found)
+if (isLinux && !sdkPath) {
+  const sdkRoot = path.join(process.env.HOME || '/root', 'Android', 'Sdk');
+  const cmdlineDir = path.join(sdkRoot, 'cmdline-tools', 'latest');
+  const sdkManagerPath = path.join(cmdlineDir, 'bin', 'sdkmanager');
+  const needsInstall = !fs.existsSync(sdkManagerPath);
+  const needsPackages = needsInstall || !fs.existsSync(path.join(sdkRoot, 'platforms')) || !fs.existsSync(path.join(sdkRoot, 'build-tools'));
+  if (needsInstall || needsPackages) {
+    if (needsInstall) console.log('Android SDK not found. Installing command-line tools (headless)...\n');
+    else console.log('Installing SDK packages (platform-tools, platforms, build-tools)...\n');
+    const CMDLINE_URL = 'https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip';
+    const zipPath = path.join(os.tmpdir(), 'cmdline-tools.zip');
+    try {
+      if (needsInstall) {
+        if (!hasCommand('wget') && !hasCommand('curl')) {
+          console.log('Need wget or curl to download. Install with: sudo apt install wget');
+          process.exit(1);
+        }
+        fs.mkdirSync(sdkRoot, { recursive: true });
+        const downloadCmd = hasCommand('wget') ? `wget -q -O "${zipPath}" "${CMDLINE_URL}"` : `curl -sL -o "${zipPath}" "${CMDLINE_URL}"`;
+        execSync(downloadCmd, { stdio: 'inherit' });
+        const extractDir = path.join(os.tmpdir(), 'cmdline-extract');
+        if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true });
+        fs.mkdirSync(extractDir, { recursive: true });
+        execSync(`unzip -q -o "${zipPath}" -d "${extractDir}"`, { stdio: 'inherit' });
+        const extracted = path.join(extractDir, 'cmdline-tools');
+        fs.mkdirSync(path.dirname(cmdlineDir), { recursive: true });
+        if (fs.existsSync(cmdlineDir)) fs.rmSync(cmdlineDir, { recursive: true });
+        fs.renameSync(extracted, cmdlineDir);
+        fs.unlinkSync(zipPath);
+        fs.rmSync(extractDir, { recursive: true });
+      }
+      console.log('Installing platform-tools, platforms;android-34, build-tools;34.0.0...');
+      const javaHome = process.env.JAVA_HOME || (fs.existsSync('/usr/lib/jvm/java-17-openjdk-amd64') ? '/usr/lib/jvm/java-17-openjdk-amd64' : null);
+      const env = { ...process.env, ANDROID_HOME: sdkRoot, ANDROID_SDK_ROOT: sdkRoot };
+      if (javaHome) env.JAVA_HOME = javaHome;
+      execSync(`yes | "${path.join(cmdlineDir, 'bin', 'sdkmanager')}" --sdk_root="${sdkRoot}" "platform-tools" "platforms;android-34" "build-tools;34.0.0"`, { stdio: 'inherit', env });
+      console.log('\nAndroid SDK installed at', sdkRoot);
+      appendToEnv('ANDROID_HOME', sdkRoot);
+      sdkPath = sdkRoot;
+    } catch (e) {
+      console.error('Failed to install SDK:', e.message);
+      console.log('\nManual install: https://developer.android.com/studio#command-line-tools-only\n');
+      process.exit(1);
+    }
+  }
+}
+
+// 4. Mobile setup (Capacitor deps + Android platform)
+const mobileDir = path.join(ROOT, 'mobile');
+if (fs.existsSync(path.join(ROOT, 'frontend', 'package.json')) && fs.existsSync(path.join(mobileDir, 'package.json'))) {
+  const capCliDir = path.join(mobileDir, 'node_modules', '@capacitor', 'cli');
+  if (!fs.existsSync(capCliDir)) {
+    console.log('Installing mobile dependencies...');
+    execSync('npm install', { cwd: mobileDir, stdio: 'inherit' });
+  }
+  const androidDir = path.join(mobileDir, 'android');
+  if (!fs.existsSync(androidDir)) {
+    console.log('Adding Android platform...');
+    execSync('npx cap add android', { cwd: mobileDir, stdio: 'inherit' });
+  }
+}
+
+// 5. Check for Android Studio (full IDE) - only if SDK still missing
 const androidStudioPaths = isWindows
   ? [path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Android', 'Android Studio')]
   : isMac
@@ -146,9 +250,16 @@ const androidStudioPaths = isWindows
       ];
 const hasAndroidStudio = androidStudioPaths.some((p) => fs.existsSync(p));
 
-if (hasAndroidStudio) {
-  console.log('Android Studio / SDK appears to be installed.');
+if (sdkPath) {
+  console.log('\n=== Setup complete ===');
   console.log('You can run: npm run build:mobile\n');
+  process.exit(0);
+}
+
+if (hasAndroidStudio) {
+  console.log('Android Studio is installed but SDK was not found.');
+  console.log('On Linux headless: run this script again; it will install the command-line SDK.');
+  console.log('Otherwise: run Android Studio once to download the SDK, or set ANDROID_HOME to your SDK path.\n');
   process.exit(0);
 }
 

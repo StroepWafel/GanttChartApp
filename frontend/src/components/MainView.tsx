@@ -628,17 +628,18 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       if (!result.ok) {
                         localStorage.setItem('gantt_mobile_build_status', JSON.stringify(status));
                         adminAlerts.addAlert('Mobile app', 'Build failed', status.message);
+                        modal.showAlert({ title: 'Build failed', message: 'See Settings → Status for details.' });
                       } else {
                         localStorage.removeItem('gantt_mobile_build_status');
                         api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); }).catch(() => {});
+                        modal.showAlert({ title: 'Build complete', message: status.message });
                       }
-                      modal.showAlert({ title: result.ok ? 'Build complete' : 'Build failed', message: status.message });
                     } catch (err) {
                       const msg = err instanceof Error ? err.message : 'Unknown error';
                       setMobileBuildStatus({ status: 'failed', message: msg });
                       localStorage.setItem('gantt_mobile_build_status', JSON.stringify({ status: 'failed', message: msg }));
                       adminAlerts.addAlert('Mobile app', 'Build failed', msg);
-                      modal.showAlert({ title: 'Build failed', message: msg });
+                      modal.showAlert({ title: 'Build failed', message: 'See Settings → Status for details.' });
                     } finally {
                       setMobileBuildInProgress(false);
                     }
