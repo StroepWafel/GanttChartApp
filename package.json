@@ -1,6 +1,6 @@
 {
   "name": "gantt-chart-app",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "Gantt chart web application with optional auth and read-only IoT API",
   "private": true,
   "scripts": {
