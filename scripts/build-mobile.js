@@ -228,6 +228,20 @@ console.log('Copied build to mobile/dist');
     }
   }
 
+  // Ensure mobile deps are installed (needed for cap CLI)
+  const capCliDir = path.join(mobileDir, 'node_modules', '@capacitor', 'cli');
+  if (!fs.existsSync(capCliDir)) {
+    console.log('Installing mobile dependencies...');
+    execSync('npm install', { cwd: mobileDir, stdio: 'inherit' });
+  }
+
+  // Add Android platform if missing (required before cap sync)
+  const androidDir = path.join(mobileDir, 'android');
+  if (!fs.existsSync(androidDir)) {
+    console.log('Adding Android platform...');
+    execSync('npx cap add android', { cwd: mobileDir, stdio: 'inherit' });
+  }
+
   try {
     execSync('npx cap sync', { cwd: mobileDir, stdio: 'inherit' });
     console.log('Capacitor sync complete');
@@ -236,7 +250,6 @@ console.log('Copied build to mobile/dist');
   }
 
   // Build APK and copy to mobile/releases/ for server download
-  const androidDir = path.join(mobileDir, 'android');
   const releasesDir = path.join(mobileDir, 'releases');
   const apkOutput = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
   const apkDest = path.join(releasesDir, 'app.apk');
