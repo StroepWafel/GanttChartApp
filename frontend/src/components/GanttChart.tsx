@@ -120,7 +120,8 @@ function buildHierarchicalRows(
   projects: Project[],
   categories: Category[],
   expanded: ExpandedState,
-  includeCompleted: boolean
+  includeCompleted: boolean,
+  showAllTasks = false
 ): GanttRow[] {
   const rows: GanttRow[] = [];
   const byParent = new Map<number, Task[]>();
@@ -129,6 +130,8 @@ function buildHierarchicalRows(
     if (!byParent.has(pid)) byParent.set(pid, []);
     byParent.get(pid)!.push(t);
   });
+  const expandedCheck = (type: 'category' | 'project' | 'task', id: number) =>
+    showAllTasks || isExpanded(expanded, type, id);
   const sortedCats = [...categories].sort((a, b) => a.display_order - b.display_order);
   for (const cat of sortedCats) {
     let catProjects = projects.filter((p) => p.category_id === cat.id);
@@ -137,7 +140,7 @@ function buildHierarchicalRows(
     }
     if (catProjects.length === 0) continue;
     rows.push({ type: 'category', id: `cat-${cat.id}`, category: cat });
-    if (!isExpanded(expanded, 'category', cat.id)) continue;
+    if (!expandedCheck('category', cat.id)) continue;
     for (const proj of catProjects) {
       const projTasks = tasks
         .filter((t) => t.project_id === proj.id)
@@ -149,14 +152,14 @@ function buildHierarchicalRows(
         });
       if (!includeCompleted && projTasks.length === 0) continue;
       rows.push({ type: 'project', id: `proj-${proj.id}`, project: proj });
-      if (!isExpanded(expanded, 'project', proj.id)) continue;
+      if (!expandedCheck('project', proj.id)) continue;
       const topLevel = projTasks.filter((t) => !t.parent_id);
       if (topLevel.length === 0 && projTasks.length === 0) continue;
       for (const task of topLevel) {
         const children = byParent.get(task.id) ?? [];
         if (children.length > 0) {
           rows.push({ type: 'task', task, indent: 2 });
-          if (isExpanded(expanded, 'task', task.id)) {
+          if (expandedCheck('task', task.id)) {
             for (const child of children) {
               rows.push({ type: 'task', task: child, indent: 3 });
             }
@@ -238,6 +241,14 @@ export default function GanttChart({
   const taskRows = useMemo(
     () => hierarchicalRows.filter((r): r is Extract<GanttRow, { type: 'task' }> => r.type === 'task'),
     [hierarchicalRows]
+  );
+  const hierarchicalRowsAllExpanded = useMemo(
+    () => buildHierarchicalRows(tasks, projects, categories, expanded, includeCompleted, true),
+    [tasks, projects, categories, expanded, includeCompleted]
+  );
+  const taskRowsAllExpanded = useMemo(
+    () => hierarchicalRowsAllExpanded.filter((r): r is Extract<GanttRow, { type: 'task' }> => r.type === 'task'),
+    [hierarchicalRowsAllExpanded]
   );
 
   const { projectBars, categoryBars, projectSpans, categorySpans } = useMemo(() => {
@@ -540,7 +551,7 @@ export default function GanttChart({
           </div>
         </div>
         <div className="gantt-task-list-cards">
-          {taskRows.map((row) => {
+          {taskRowsAllExpanded.map((row) => {
             const proj = projects.find((p) => p.id === row.task.project_id);
             const cat = proj ? categories.find((c) => c.id === proj.category_id) : undefined;
             const colors = priorityColors[row.task.base_priority ?? 5] ?? DEFAULT_PRIORITY_COLORS[row.task.base_priority ?? 5];
