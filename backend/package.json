@@ -1,6 +1,6 @@
 {
   "name": "gantt-chart-backend",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
