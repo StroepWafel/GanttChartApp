@@ -1,4 +1,5 @@
-const API = '/api';
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API = API_BASE ? `${API_BASE}/api` : '/api';
 
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('gantt_token');
@@ -180,6 +181,22 @@ export async function getVersion(): Promise<{ version: string; updating?: boolea
   const res = await fetch(`${API}/version?_t=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Version check failed: ${res.status}`);
   return res.json();
+}
+
+export async function getMobileAppStatus(): Promise<{ enabled: boolean }> {
+  const base = API_BASE || '';
+  const url = base ? `${base}/api/mobile-app/status` : '/api/mobile-app/status';
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get mobile app status');
+  return data;
+}
+
+export async function buildMobileApp(): Promise<{ ok: boolean; message: string; output?: string }> {
+  const res = await fetchApi('/admin/build-mobile', { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Build failed');
+  return data;
 }
 
 export async function getSettings() {

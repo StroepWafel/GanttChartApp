@@ -4,7 +4,12 @@ import AuthGate from './components/AuthGate';
 import ResetPassword from './components/ResetPassword';
 import ForceChangePassword from './components/ForceChangePassword';
 import MainView from './components/MainView';
+import InstallPrompt from './components/InstallPrompt';
 import { ModalProvider } from './context/ModalContext';
+
+function isMobileAppPath() {
+  return typeof window !== 'undefined' && window.location.pathname.startsWith('/mobile-app');
+}
 
 function getResetToken(): string | null {
   const params = new URLSearchParams(window.location.search);
@@ -161,10 +166,13 @@ export default function App() {
       </div>
     );
 
+  const installPrompt = isMobileAppPath() ? <InstallPrompt /> : null;
+
   if (authEnabled === null) {
     return (
       <>
         {updateOverlay}
+        {installPrompt}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           Loading...
         </div>
@@ -176,6 +184,7 @@ export default function App() {
     return (
       <>
         {updateOverlay}
+        {installPrompt}
         <ResetPassword token={resetToken} onSuccess={goToSignIn} />
       </>
     );
@@ -185,6 +194,7 @@ export default function App() {
     return (
       <>
         {updateOverlay}
+        {installPrompt}
         <AuthGate onLogin={handleLogin} />
       </>
     );
@@ -194,6 +204,7 @@ export default function App() {
     return (
       <>
         {updateOverlay}
+        {installPrompt}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           Loading...
         </div>
@@ -205,6 +216,7 @@ export default function App() {
     return (
       <>
         {updateOverlay}
+        {installPrompt}
         <ForceChangePassword onComplete={handleForceChangeComplete} />
       </>
     );
@@ -213,6 +225,7 @@ export default function App() {
   return (
     <>
       {updateOverlay}
+      {installPrompt}
       <ModalProvider>
         <MainView
           authEnabled={authEnabled}

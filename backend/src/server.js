@@ -22,6 +22,7 @@ import adminRouter from './routes/admin.js';
 import settingsRouter from './routes/settings.js';
 import updateRouter from './routes/update.js';
 import apiRouter from './routes/api.js';
+import mobileAppRouter from './routes/mobile-app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -44,6 +45,7 @@ const SERVER_BOOT_ID = crypto.randomUUID();
 
 // Frontend dist: when running from backend/, it's ../frontend/dist
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+const mobileDist = path.resolve(__dirname, '../../mobile/dist');
 
 const app = express();
 app.use(cors());
@@ -86,6 +88,9 @@ app.get('/api/version', (req, res) => {
 // Read-only IoT API (username + api_key required)
 app.use('/api/readonly', apiRouter);
 
+// Mobile app status (public, no auth)
+app.use('/api/mobile-app', mobileAppRouter);
+
 // Protected routes
 app.use('/api/categories', optionalAuth, categoriesRouter);
 app.use('/api/projects', optionalAuth, projectsRouter);
@@ -96,6 +101,33 @@ app.use('/api/backup', optionalAuth, backupRouter);
 
 // Serve frontend in production
 app.use(express.static(frontendDist));
+
+// Serve mobile app at /mobile-app when enabled and built (checked per-request so admin toggle works without restart)
+function isMobileAppEnabled() {
+  try {
+    const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('mobile_app_enabled');
+    const raw = row?.value;
+    if (raw == null || raw === '') return false;
+    try {
+      const v = JSON.parse(raw);
+      return v === true || v === 'true';
+    } catch {
+      return raw === 'true' || raw === true;
+    }
+  } catch {
+    return false;
+  }
+}
+
+app.use('/mobile-app', (req, res, next) => {
+  if (!existsSync(mobileDist) || !isMobileAppEnabled()) return next();
+  express.static(mobileDist)(req, res, next);
+});
+app.get(/^\/mobile-app(\/.*)?$/, (req, res, next) => {
+  if (!existsSync(mobileDist) || !isMobileAppEnabled()) return next();
+  res.sendFile(path.join(mobileDist, 'index.html'));
+});
+
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(frontendDist, 'index.html'));

@@ -1,0 +1,20 @@
+{
+  "name": "gantt-chart-mobile",
+  "private": true,
+  "version": "1.11.3",
+  "scripts": {
+    "build": "bash ../scripts/build-mobile.sh",
+    "cap:sync": "npx cap sync",
+    "cap:android": "npx cap add android",
+    "cap:ios": "npx cap add ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
+  },
+  "capacitor": {
+    "disabled": false
+  }
+}

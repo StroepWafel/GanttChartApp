@@ -1,7 +1,12 @@
 import express from 'express';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import { randomUUID, randomBytes } from 'crypto';
 import db, { runUserIdMigrations } from '../db.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { optionalAuth, requireAdmin } from '../auth.js';
 import {
   getEmailOnboardingConfig,
@@ -381,6 +386,46 @@ router.post('/full-restore', (req, res) => {
     }
 
     res.json({ ok: true, message: 'Full backup restored successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Manually trigger mobile app build (admin only) */
+router.post('/build-mobile', (req, res) => {
+  try {
+    const rootDir = path.resolve(__dirname, '../..');
+    const publicUrlRow = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('public_url');
+    let publicUrl = process.env.PUBLIC_URL || '';
+    if (publicUrlRow?.value) {
+      try {
+        const v = JSON.parse(publicUrlRow.value);
+        publicUrl = typeof v === 'string' ? v : '';
+      } catch {
+        publicUrl = String(publicUrlRow.value || '');
+      }
+    }
+    publicUrl = publicUrl.trim().replace(/\/$/, '');
+    const env = { ...process.env, MOBILE_APP_ENABLED: 'true', PUBLIC_URL: publicUrl || process.env.PUBLIC_URL || '' };
+    if (!env.PUBLIC_URL) {
+      return res.status(400).json({ error: 'Public URL is required. Set it in Settings > Admin > Mobile app, or in .env as PUBLIC_URL.' });
+    }
+    const buildScript = path.join(rootDir, 'scripts', 'build-mobile.js');
+    const proc = spawn('node', [buildScript], { cwd: rootDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout?.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr?.on('data', (d) => { stderr += d.toString(); });
+    proc.on('close', (code) => {
+      if (code === 0) {
+        res.json({ ok: true, message: 'Mobile app built successfully', output: stdout || stderr || 'Build complete.' });
+      } else {
+        res.status(500).json({ error: 'Build failed', output: (stdout + stderr).trim() || `Exit code ${code}` });
+      }
+    });
+    proc.on('error', (err) => {
+      res.status(500).json({ error: 'Failed to start build', output: err.message });
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -82,7 +82,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [githubTokenSet, setGithubTokenSet] = useState(false);
   const [githubTokenInput, setGithubTokenInput] = useState('');
   const [githubTokenSaving, setGithubTokenSaving] = useState(false);
-  type SettingsTab = 'personal' | 'admin' | 'emailOnboarding' | 'updates' | 'danger';
+  type SettingsTab = 'personal' | 'app' | 'admin' | 'emailOnboarding' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
   const settingsOpenToTabRef = useRef<SettingsTab | null>(null);
   const [emailOnboardingSettings, setEmailOnboardingSettings] = useState<api.EmailOnboardingSettings>({});
@@ -91,6 +91,10 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [testOnboardEmailTo, setTestOnboardEmailTo] = useState('');
   const [testOnboardEmailResponse, setTestOnboardEmailResponse] = useState<string | null>(null);
   const [templateValidationError, setTemplateValidationError] = useState<string | null>(null);
+  const [mobileAppEnabled, setMobileAppEnabled] = useState(false);
+  const [mobileAppEnabledSetting, setMobileAppEnabledSetting] = useState(false);
+  const [publicUrl, setPublicUrl] = useState('');
+  const [mobileBuildInProgress, setMobileBuildInProgress] = useState(false);
   const { isMobile } = useMediaQuery();
   const modal = useModal();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -136,6 +140,8 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         .then((s) => {
           setAutoUpdateEnabled(!!s.auto_update_enabled);
           setGithubTokenSet(!!s.github_token_set);
+          setMobileAppEnabledSetting(!!s.mobile_app_enabled);
+          setPublicUrl(typeof s.public_url === 'string' ? s.public_url : '');
           const eoKeys = [
             'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
             'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
@@ -154,6 +160,10 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
 
   useEffect(() => {
     api.getVersion().then((v) => setAppVersion(v.version)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api.getMobileAppStatus().then((s) => setMobileAppEnabled(s.enabled)).catch(() => setMobileAppEnabled(false));
   }, []);
 
   // One-time update check when admin loads (so we can show "Update available" in corner)
@@ -415,6 +425,18 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
             <CheckSquare size={16} />
             <span className="btn-sm-label">Completed</span>
           </button>
+          {mobileAppEnabled && (
+            <button
+              type="button"
+              className="btn-sm btn-sm-settings"
+              title="App installation & settings"
+              aria-label="App"
+              onClick={() => { settingsOpenToTabRef.current = 'app'; setShowSettings(true); }}
+            >
+              <Smartphone size={16} />
+              <span className="btn-sm-label">App</span>
+            </button>
+          )}
           <button
             className="btn-sm btn-sm-settings"
             onClick={() => setShowSettings(true)}
@@ -671,6 +693,17 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 >
                   Personal
                 </button>
+                {mobileAppEnabled && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === 'app'}
+                    className={`settings-tab ${settingsTab === 'app' ? 'active' : ''}`}
+                    onClick={() => setSettingsTab('app')}
+                  >
+                    App
+                  </button>
+                )}
                 {currentUser?.isAdmin && (
                   <button
                     type="button"
@@ -878,6 +911,101 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     </label>
                   </div>
                 </div>
+              </div>
+            )}
+            {settingsTab === 'app' && mobileAppEnabled && (
+              <div className="settings-tab-content" role="tabpanel">
+                <div className="settings-section">
+                  <h4>Mobile app</h4>
+                  <p className="settings-desc">
+                    Add the Gantt Chart app to your home screen for quick access, faster loading, and offline support.
+                  </p>
+                  <a
+                    href="/mobile-app/"
+                    className="btn-sm btn-sm-primary"
+                    style={{ display: 'inline-block', marginTop: '0.5rem' }}
+                  >
+                    Open app to install
+                  </a>
+                  <p className="settings-desc" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+                    On your phone, open the link above and use &quot;Add to Home Screen&quot; in your browser menu.
+                  </p>
+                </div>
+                {currentUser?.isAdmin && (
+                  <>
+                    <div className="settings-section">
+                      <h5>Admin: availability</h5>
+                      <div className="settings-checkbox-row" style={{ marginBottom: '0.75rem' }}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={!!mobileAppEnabledSetting}
+                            onChange={async (e) => {
+                              const v = e.target.checked;
+                              setMobileAppEnabledSetting(v);
+                              try {
+                                await api.patchSettings({ mobile_app_enabled: v });
+                                api.getMobileAppStatus().then((s) => setMobileAppEnabled(s.enabled)).catch(() => {});
+                              } catch (err) {
+                                setMobileAppEnabledSetting(!v);
+                                modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                              }
+                            }}
+                          />
+                          <span>Allow users to install the app</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div className="settings-section">
+                      <h5>Admin: build</h5>
+                      <p className="settings-desc">Public URL for the mobile build (set in .env or below). Required for build.</p>
+                      <input
+                        id="public-url-app"
+                        type="url"
+                        placeholder="https://gantt.example.com"
+                        value={publicUrl}
+                        onChange={(e) => setPublicUrl(e.target.value)}
+                        onBlur={async () => {
+                          const v = publicUrl.trim();
+                          try {
+                            await api.patchSettings({ public_url: v || null });
+                          } catch (err) {
+                            modal.showAlert({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to save' });
+                          }
+                        }}
+                        className="settings-input"
+                        style={{ width: '100%', maxWidth: '360px', marginTop: '0.25rem' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        disabled={mobileBuildInProgress || !publicUrl.trim()}
+                        style={{ marginTop: '0.75rem' }}
+                        onClick={async () => {
+                          setMobileBuildInProgress(true);
+                          try {
+                            const result = await api.buildMobileApp();
+                            modal.showAlert({
+                              title: result.ok ? 'Build complete' : 'Build failed',
+                              message: result.ok
+                                ? 'The mobile app was built successfully. Users can access it at /mobile-app/'
+                                : (result.output || result.message || 'Unknown error'),
+                            });
+                            if (result.ok) {
+                              api.getMobileAppStatus().then((s) => setMobileAppEnabled(s.enabled)).catch(() => {});
+                            }
+                          } catch (err) {
+                            modal.showAlert({ title: 'Build failed', message: err instanceof Error ? err.message : 'Unknown error' });
+                          } finally {
+                            setMobileBuildInProgress(false);
+                          }
+                        }}
+                      >
+                        {mobileBuildInProgress ? 'Building…' : 'Build app now'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
             {settingsTab === 'admin' && currentUser?.isAdmin && (

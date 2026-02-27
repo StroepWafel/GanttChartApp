@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 build/
+mobile/dist/
+mobile/android/
+mobile/ios/
 
 # Environment
 .env

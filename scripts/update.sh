@@ -69,6 +69,12 @@ log "Running npm run install:all && npm run build (NODE_ENV=development for devD
 NODE_ENV=development npm run install:all 2>&1 | tee -a "$LOG_FILE"
 NODE_ENV=development npm run build 2>&1 | tee -a "$LOG_FILE"
 
+# Build mobile app if enabled (requires .env: MOBILE_APP_ENABLED=true, PUBLIC_URL=...)
+if [ -f ".env" ] && grep -qE '^MOBILE_APP_ENABLED=true' .env 2>/dev/null; then
+  echo "=== Building mobile app ==="
+  npm run build:mobile 2>&1 | tee -a "$LOG_FILE" || log "build:mobile failed or skipped"
+fi
+
 echo "=== Restarting (PM2) ==="
 if command -v pm2 &>/dev/null; then
   pm2 restart gantt-api 2>/dev/null || true
