@@ -489,14 +489,24 @@ label.input-label,
 }
 
 .webhooks-table-wrap {
-  margin-top: 0.5rem;
+  margin-top: 12px;
+  margin-bottom: 4px;
 }
 
 .webhooks-table {
   width: 100%;
-  max-width: 560px;
-  border-collapse: collapse;
-  margin-bottom: 0.75rem;
+  max-width: 600px;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.webhooks-table thead {
+  background: var(--bg-panel);
 }
 
 .webhooks-table th {
@@ -504,22 +514,57 @@ label.input-label,
   font-size: 11px;
   color: var(--text-muted);
   font-weight: 600;
-  padding: 4px 8px 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.webhooks-table th:last-child,
+.webhooks-table td:last-child {
+  width: 44px;
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.webhooks-table td:last-child .btn-sm {
+  padding: 6px;
+  min-width: 32px;
+}
+
+.webhooks-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.webhooks-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+[data-theme='light'] .webhooks-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.webhooks-table tbody tr:not(:last-child) td {
   border-bottom: 1px solid var(--border);
 }
 
 .webhooks-table td {
-  padding: 6px 8px 6px 0;
+  padding: 10px 12px;
   vertical-align: middle;
 }
 
 .webhooks-table .settings-input {
   width: 100%;
   min-width: 200px;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .webhooks-table .settings-select {
   min-width: 120px;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .webhooks-events-th {
@@ -530,26 +575,73 @@ label.input-label,
   white-space: nowrap;
 }
 
+.webhook-events-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 .webhook-event-label {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  margin-right: 8px;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 11px;
+  font-weight: 600;
   color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .webhook-event-label:hover {
   color: var(--text);
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+.webhook-event-label:has(input:checked) {
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.35);
 }
 
 .webhook-event-label input {
   margin: 0;
+  width: 12px;
+  height: 12px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .webhook-event-label span {
   font-weight: 600;
+  line-height: 1;
+}
+
+.webhooks-add-btn-wrap {
+  margin-top: 4px;
+}
+
+.webhooks-add-btn-wrap .btn-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.webhooks-add-btn-wrap .btn-sm:hover:not(:disabled) {
+  color: var(--accent-hover);
+  background: rgba(99, 102, 241, 0.12);
+  border-color: var(--accent);
 }
 
 .settings-section h4 {

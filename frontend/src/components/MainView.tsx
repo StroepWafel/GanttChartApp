@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -666,6 +666,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                               </select>
                             </td>
                             <td className="webhooks-events-cell">
+                              <div className="webhook-events-group">
                               <label className="webhook-event-label" title="Send on task create">
                                 <input
                                   type="checkbox"
@@ -722,6 +723,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                                 />
                                 <span>✓</span>
                               </label>
+                              </div>
                             </td>
                             <td>
                               <button
@@ -745,16 +747,18 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         ))}
                       </tbody>
                     </table>
+                    <div className="webhooks-add-btn-wrap">
                     <button
                       type="button"
-                      className="btn-sm"
+                      className="btn-sm webhooks-add-btn"
                       onClick={() => {
                         const id = `wh_${Math.random().toString(36).slice(2)}`;
                         setWebhooks((prev) => [...prev, { id, url: '', type: 'generic' as const, events: { created: true, updated: true, deleted: true, completed: true } }]);
                       }}
                     >
-                      + Add webhook
+                      <Plus size={14} /> Add webhook
                     </button>
+                    </div>
                   </div>
                   </div>
                   )}

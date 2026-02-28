@@ -1,5 +1,5 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import db from '../db.js';
@@ -22,7 +22,8 @@ const requestLimit = rateLimit({
   keyGenerator: (req) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
     const email = (req.body?.email || '').toString().toLowerCase().trim();
-    return `${ip}:${email || 'empty'}`;
+    const ipKey = ip && ip !== 'unknown' ? ipKeyGenerator(ip) : ip;
+    return `${ipKey}:${email || 'empty'}`;
   },
 });
 

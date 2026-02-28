@@ -264,8 +264,11 @@ router.patch('/:id', (req, res) => {
         `).get(id);
     const task = taskFromRow(row);
     if (userId) {
-      sendWebhook(userId, 'task.updated', task);
-      if (completed === true && !wasCompleted) sendWebhook(userId, 'task.completed', task);
+      if (completed === true && !wasCompleted) {
+        sendWebhook(userId, 'task.completed', task);
+      } else {
+        sendWebhook(userId, 'task.updated', task);
+      }
     }
     res.json(task);
   } catch (err) {
