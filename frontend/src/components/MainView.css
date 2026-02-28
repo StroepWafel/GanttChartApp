@@ -1296,32 +1296,49 @@ label.input-label,
 
 .email-compose-vars {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  padding: 10px 16px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
   border-top: 1px solid var(--border);
   font-size: 12px;
 }
 
-.email-var-label {
+.email-var-section-label {
+  margin: 0;
+  font-weight: 600;
   color: var(--text-muted);
-  margin-right: 4px;
+}
+
+.email-compose-vars-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  align-items: center;
+  max-width: 400px;
+}
+
+.email-compose-vars-grid .input-label {
+  margin-bottom: 0;
 }
 
 .email-compose-vars .email-var-input {
-  padding: 4px 8px;
+  padding: 6px 10px;
   font-size: 12px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  min-width: 120px;
-  flex: 1;
-  max-width: 200px;
+  width: 100%;
+  min-width: 0;
 }
 
 .email-compose-vars .email-var-input::placeholder {
+  color: var(--text-muted);
+}
+
+.email-var-required-note {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -1343,6 +1360,10 @@ label.input-label,
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 16px;
+}
+
+.update-actions + p.settings-desc {
+  margin-top: 0.75rem;
 }
 
 .update-debug {
@@ -1404,6 +1425,12 @@ label.input-label,
   text-decoration: none;
 }
 
+a.btn-sm.btn-sm-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .btn-sm-primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
@@ -1413,12 +1440,13 @@ label.input-label,
 @media (max-width: 480px) {
   a.btn-sm-primary {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-height: 44px;
     padding: 12px 20px;
     font-size: 14px;
     font-weight: 500;
     width: 100%;
-    justify-content: center;
   }
 }
 

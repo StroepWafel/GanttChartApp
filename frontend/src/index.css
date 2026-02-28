@@ -144,6 +144,20 @@ input, select, textarea {
   gap: 4px;
 }
 
+.add-task-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 20px 16px;
+  overflow-y: auto;
+}
+
+.add-task-page .task-form-embedded {
+  flex: 1;
+  min-height: 0;
+}
+
 .split-modal .subtask-row {
   flex-direction: row;
   align-items: center;
@@ -190,13 +204,14 @@ input, select, textarea {
   overflow-y: auto;
   flex: 1;
   margin-bottom: 16px;
+  padding-right: 4px;
 }
 
 .completed-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 0 12px 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -211,7 +226,7 @@ input, select, textarea {
 
 .item-actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
 }
 
 .muted {

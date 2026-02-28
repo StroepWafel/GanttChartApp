@@ -213,8 +213,20 @@
   font-size: 11px;
 }
 
+.gantt-list-slim .gantt-list-row.gantt-row-sortable {
+  grid-template-columns: 28px 1fr 28px;
+  padding: 0 6px 0 6px;
+}
+
 .gantt-list-slim .gantt-list-row .gantt-list-date {
   display: none;
+}
+
+.gantt-list-slim .gantt-drag-handle {
+  align-self: center;
+  justify-self: end;
+  min-width: 28px;
+  min-height: 28px;
 }
 
 .gantt-list-slim .gantt-row-expand {

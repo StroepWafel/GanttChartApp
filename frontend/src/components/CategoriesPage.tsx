@@ -106,21 +106,19 @@ export default function CategoriesPage({
         </button>
       </div>
       {showForm && (
-        <div className="categories-form-section">
-          <CategoryProjectForm
-            categories={categories}
-            editingCategory={editCategory ?? undefined}
-            editingProject={editProject ?? undefined}
-            onAddCategory={onAddCategory}
-            onAddProject={onAddProject}
-            onUpdateCategory={onUpdateCategory}
-            onUpdateProject={onUpdateProject}
-            onRequestDeleteCategory={onRequestDeleteCategory}
-            onRequestDeleteProject={onRequestDeleteProject}
-            onClose={() => { onEditCategory(null); onEditProject(null); onShowAddForm(false); }}
-            embedded
-          />
-        </div>
+        <CategoryProjectForm
+          categories={categories}
+          editingCategory={editCategory ?? undefined}
+          editingProject={editProject ?? undefined}
+          onAddCategory={onAddCategory}
+          onAddProject={onAddProject}
+          onUpdateCategory={onUpdateCategory}
+          onUpdateProject={onUpdateProject}
+          onRequestDeleteCategory={onRequestDeleteCategory}
+          onRequestDeleteProject={onRequestDeleteProject}
+          onClose={() => { onEditCategory(null); onEditProject(null); onShowAddForm(false); }}
+          embedded={false}
+        />
       )}
     </div>
   );
