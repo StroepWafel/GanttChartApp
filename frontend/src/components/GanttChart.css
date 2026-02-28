@@ -443,6 +443,7 @@
   color: var(--text-muted);
   padding: 4px;
   border-radius: 3px;
+  touch-action: none;
 }
 
 .gantt-drag-handle:hover {

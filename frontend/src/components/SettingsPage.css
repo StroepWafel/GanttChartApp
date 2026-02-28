@@ -235,4 +235,6 @@
 
 .settings-page-body {
   max-width: 600px;
+  min-width: 0;
+  width: 100%;
 }
