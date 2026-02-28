@@ -7,7 +7,10 @@ interface Props {
 
 const SHORTCUTS = [
   { key: 'N', desc: 'New task' },
-  { key: 'S', desc: 'Focus search' },
+  { key: 'S or /', desc: 'Focus search' },
+  { key: 'C', desc: 'Completed tasks' },
+  { key: ',', desc: 'Settings' },
+  { key: 'G', desc: 'Categories / Projects' },
   { key: 'Esc', desc: 'Close modals' },
   { key: '?', desc: 'Show this help' },
 ];

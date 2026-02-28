@@ -32,7 +32,7 @@ router.patch('/', (req, res) => {
     if (!key) {
       return res.status(400).json({ error: 'key required' });
     }
-    const valStr = typeof value === 'string' ? value : JSON.stringify(value);
+    const valStr = JSON.stringify(value);
     db.prepare(`
       INSERT INTO user_preferences (user_id, key, value)
       VALUES (?, ?, ?)

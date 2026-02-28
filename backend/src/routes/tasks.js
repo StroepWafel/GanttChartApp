@@ -8,7 +8,7 @@ const router = express.Router();
 
 function taskFromRow(row) {
   if (!row) return null;
-  return {
+  const task = {
     id: row.id,
     project_id: row.project_id,
     parent_id: row.parent_id,
@@ -25,6 +25,9 @@ function taskFromRow(row) {
     updated_at: row.updated_at,
     urgency: computeUrgency(row),
   };
+  if (row.project_name != null) task.project_name = row.project_name;
+  if (row.category_name != null) task.category_name = row.category_name;
+  return task;
 }
 
 router.get('/', (req, res) => {
@@ -231,6 +234,12 @@ router.patch('/:id', (req, res) => {
       params.push(completed ? 1 : 0, completed ? 1 : 0);
     }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
+    const wasCompleted = completed !== undefined
+      ? (userId
+          ? db.prepare('SELECT completed FROM tasks WHERE id = ? AND user_id = ?').get(id, userId)
+          : db.prepare('SELECT completed FROM tasks WHERE id = ?').get(id)
+        )?.completed === 1
+      : false;
     if (userId) {
       params.push(id, userId);
       db.prepare(`UPDATE tasks SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ? AND user_id = ?`).run(...params);
@@ -254,7 +263,10 @@ router.patch('/:id', (req, res) => {
           WHERE t.id = ?
         `).get(id);
     const task = taskFromRow(row);
-    if (userId) sendWebhook(userId, 'task.updated', task);
+    if (userId) {
+      sendWebhook(userId, 'task.updated', task);
+      if (completed === true && !wasCompleted) sendWebhook(userId, 'task.completed', task);
+    }
     res.json(task);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -266,13 +278,21 @@ router.delete('/:id', (req, res) => {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
     const { cascade } = req.query;
-    const task = db.prepare('SELECT id FROM tasks WHERE id = ? AND user_id = ?').get(req.params.id, userId);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const taskRow = db.prepare(`
+      SELECT t.*, p.name as project_name, c.name as category_name
+      FROM tasks t
+      JOIN projects p ON t.project_id = p.id
+      JOIN categories c ON p.category_id = c.id
+      WHERE t.id = ? AND t.user_id = ?
+    `).get(req.params.id, userId);
+    if (!taskRow) return res.status(404).json({ error: 'Task not found' });
     const children = db.prepare('SELECT id FROM tasks WHERE parent_id = ? AND user_id = ?').all(req.params.id, userId);
     if (children.length > 0 && cascade !== 'true') {
       return res.status(400).json({ error: 'Task has children. Use ?cascade=true to delete with children.' });
     }
+    const task = taskFromRow(taskRow);
     db.prepare('DELETE FROM tasks WHERE (id = ? OR parent_id = ?) AND user_id = ?').run(req.params.id, req.params.id, userId);
+    sendWebhook(userId, 'task.deleted', task);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

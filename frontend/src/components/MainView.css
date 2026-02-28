@@ -488,6 +488,70 @@ label.input-label,
   margin-bottom: 24px;
 }
 
+.webhooks-table-wrap {
+  margin-top: 0.5rem;
+}
+
+.webhooks-table {
+  width: 100%;
+  max-width: 560px;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+}
+
+.webhooks-table th {
+  text-align: left;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 4px 8px 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.webhooks-table td {
+  padding: 6px 8px 6px 0;
+  vertical-align: middle;
+}
+
+.webhooks-table .settings-input {
+  width: 100%;
+  min-width: 200px;
+}
+
+.webhooks-table .settings-select {
+  min-width: 120px;
+}
+
+.webhooks-events-th {
+  white-space: nowrap;
+}
+
+.webhooks-events-cell {
+  white-space: nowrap;
+}
+
+.webhook-event-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.webhook-event-label:hover {
+  color: var(--text);
+}
+
+.webhook-event-label input {
+  margin: 0;
+}
+
+.webhook-event-label span {
+  font-weight: 600;
+}
+
 .settings-section h4 {
   margin: 0 0 8px;
   font-size: 12px;

@@ -61,6 +61,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [restoreConfirmData, setRestoreConfirmData] = useState<Record<string, unknown> | null>(null);
   const [priorityColors, setPriorityColors] = useState<PriorityColors>(() => loadPriorityColors());
   const [showPriorityColors, setShowPriorityColors] = useState(false);
+  const [showWebhooks, setShowWebhooks] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean; apiKey: string | null } | null>(null);
   const [users, setUsers] = useState<{ id: number; username: string; isAdmin: boolean; isActive: boolean; apiKey: string | null; email?: string | null }[]>([]);
   const [showUserManagement, setShowUserManagement] = useState(false);
@@ -128,7 +129,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [mobileAppUpdateAvailable, setMobileAppUpdateAvailable] = useState(false);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
-  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhooks, setWebhooks] = useState<{ id: string; url: string; type: 'generic' | 'discord'; events: { created: boolean; updated: boolean; deleted: boolean; completed: boolean } }[]>([]);
   const [searchInputValue, setSearchInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -157,6 +158,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     onFocusSearch: () => searchInputRef.current?.focus(),
     onEscape: handleEscape,
     onShowShortcuts: () => setShowShortcutsHelp(true),
+    onShowCompleted: () => setShowCompleted(true),
+    onShowSettings: () => setShowSettings(true),
+    onShowCategories: () => { setEditCategory(null); setEditProject(null); setShowCatProj(true); },
     enabled: !isMobile,
   });
 
@@ -322,8 +326,27 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
             applyTheme(t);
             setThemeState(t);
           }
-          const wu = prefs.webhook_url;
-          setWebhookUrl(typeof wu === 'string' ? wu : '');
+          const wh = prefs.webhooks;
+          if (Array.isArray(wh)) {
+            setWebhooks(wh.filter((w) => w?.url && typeof w.url === 'string').map((w) => ({
+              id: w.id || `wh_${Math.random().toString(36).slice(2)}`,
+              url: String(w.url).trim(),
+              type: w.type === 'discord' ? 'discord' : 'generic',
+              events: {
+                created: (w.events as { created?: boolean })?.created !== false,
+                updated: (w.events as { updated?: boolean })?.updated !== false,
+                deleted: (w.events as { deleted?: boolean })?.deleted !== false,
+                completed: (w.events as { completed?: boolean })?.completed !== false,
+              },
+            })));
+          } else {
+            const legacy = prefs.webhook_url;
+            if (typeof legacy === 'string' && legacy.trim()) {
+              setWebhooks([{ id: `wh_${Math.random().toString(36).slice(2)}`, url: legacy.trim(), type: 'generic', events: { created: true, updated: true, deleted: true, completed: true } }]);
+            } else {
+              setWebhooks([]);
+            }
+          }
         })
         .catch(() => {});
     }
@@ -580,22 +603,161 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     </div>
                   ) : <p className="muted">No API key</p>}
                 </div>
-                <div className="settings-section">
-                  <h5>Webhook</h5>
-                  <p className="settings-desc">Optional: POST task events (create, update) to a URL. Used for integrations.</p>
-                  <input
-                    type="url"
-                    placeholder="https://example.com/webhook"
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
-                    onBlur={async () => {
-                      try {
-                        await api.patchUserPreferences('webhook_url', webhookUrl.trim() || null);
-                      } catch { /* ignore */ }
-                    }}
-                    className="settings-input"
-                    style={{ width: '100%', maxWidth: '400px' }}
-                  />
+                <div className="settings-section settings-dropdown">
+                  <button
+                    type="button"
+                    className={`settings-dropdown-trigger ${showWebhooks ? 'expanded' : ''}`}
+                    onClick={() => setShowWebhooks((v) => !v)}
+                    aria-expanded={showWebhooks}
+                  >
+                    <span>Webhooks</span>
+                    <ChevronDown size={16} className={showWebhooks ? 'rotated' : ''} />
+                  </button>
+                  {showWebhooks && (
+                  <div className="settings-dropdown-content">
+                  <p className="settings-desc">POST task events (create, update, delete, complete) to URLs. Toggle C/U/D/✓ per webhook. Choose type for Discord or generic format.</p>
+                  <div className="webhooks-table-wrap">
+                    <table className="webhooks-table">
+                      <thead>
+                        <tr>
+                          <th>URL</th>
+                          <th>Type</th>
+                          <th className="webhooks-events-th">Events</th>
+                          <th aria-label="Actions" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {webhooks.map((w) => (
+                          <tr key={w.id}>
+                            <td>
+                              <input
+                                type="url"
+                                placeholder="https://example.com/webhook"
+                                value={w.url}
+                                onChange={(e) => setWebhooks((prev) => prev.map((x) => (x.id === w.id ? { ...x, url: e.target.value } : x)))}
+                                onBlur={async (e) => {
+                                  const newUrl = e.target.value.trim();
+                                  const next = webhooks.map((x) => (x.id === w.id ? { ...x, url: newUrl } : x));
+                                  const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                  setWebhooks(newUrl ? next : next.filter((x) => x.id !== w.id));
+                                  try {
+                                    await api.patchUserPreferences('webhooks', toSave);
+                                  } catch { /* ignore */ }
+                                }}
+                                className="settings-input"
+                              />
+                            </td>
+                            <td>
+                              <select
+                                value={w.type}
+                                onChange={async (e) => {
+                                  const type = e.target.value as 'generic' | 'discord';
+                                  const next = webhooks.map((x) => (x.id === w.id ? { ...x, type } : x));
+                                  setWebhooks(next);
+                                  const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                  try {
+                                    await api.patchUserPreferences('webhooks', toSave);
+                                  } catch { /* ignore */ }
+                                }}
+                                className="settings-select"
+                              >
+                                <option value="generic">Generic JSON</option>
+                                <option value="discord">Discord</option>
+                              </select>
+                            </td>
+                            <td className="webhooks-events-cell">
+                              <label className="webhook-event-label" title="Send on task create">
+                                <input
+                                  type="checkbox"
+                                  checked={w.events.created}
+                                  onChange={async () => {
+                                    const nextEv = { ...w.events, created: !w.events.created };
+                                    const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
+                                    setWebhooks(next);
+                                    const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                    try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
+                                  }}
+                                />
+                                <span>C</span>
+                              </label>
+                              <label className="webhook-event-label" title="Send on task update">
+                                <input
+                                  type="checkbox"
+                                  checked={w.events.updated}
+                                  onChange={async () => {
+                                    const nextEv = { ...w.events, updated: !w.events.updated };
+                                    const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
+                                    setWebhooks(next);
+                                    const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                    try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
+                                  }}
+                                />
+                                <span>U</span>
+                              </label>
+                              <label className="webhook-event-label" title="Send on task delete">
+                                <input
+                                  type="checkbox"
+                                  checked={w.events.deleted}
+                                  onChange={async () => {
+                                    const nextEv = { ...w.events, deleted: !w.events.deleted };
+                                    const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
+                                    setWebhooks(next);
+                                    const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                    try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
+                                  }}
+                                />
+                                <span>D</span>
+                              </label>
+                              <label className="webhook-event-label" title="Send on task complete">
+                                <input
+                                  type="checkbox"
+                                  checked={w.events.completed}
+                                  onChange={async () => {
+                                    const nextEv = { ...w.events, completed: !w.events.completed };
+                                    const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
+                                    setWebhooks(next);
+                                    const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                    try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
+                                  }}
+                                />
+                                <span>✓</span>
+                              </label>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn-sm btn-sm-danger-outline"
+                                title="Remove webhook"
+                                aria-label="Remove webhook"
+                                onClick={async () => {
+                                  const next = webhooks.filter((x) => x.id !== w.id);
+                                  setWebhooks(next);
+                                  const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                  try {
+                                    await api.patchUserPreferences('webhooks', toSave);
+                                  } catch { /* ignore */ }
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      onClick={() => {
+                        const id = `wh_${Math.random().toString(36).slice(2)}`;
+                        setWebhooks((prev) => [...prev, { id, url: '', type: 'generic' as const, events: { created: true, updated: true, deleted: true, completed: true } }]);
+                      }}
+                    >
+                      + Add webhook
+                    </button>
+                  </div>
+                  </div>
+                  )}
                 </div>
               </div>
             )}
