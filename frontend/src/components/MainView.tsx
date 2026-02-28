@@ -110,11 +110,11 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [mobileAppEnabledSetting, setMobileAppEnabledSetting] = useState(false);
   const [publicUrl, setPublicUrl] = useState('');
   const [mobileBuildInProgress, setMobileBuildInProgress] = useState(false);
-  const [mobileBuildStatus, setMobileBuildStatus] = useState<{ status: 'idle' | 'success' | 'failed'; message?: string }>(() => {
+  const [mobileBuildStatus, setMobileBuildStatus] = useState<{ status: 'idle' | 'building' | 'success' | 'failed'; message?: string }>(() => {
     try {
       const s = localStorage.getItem('gantt_mobile_build_status');
       if (s) {
-        const parsed = JSON.parse(s) as { status: 'idle' | 'success' | 'failed'; message?: string };
+        const parsed = JSON.parse(s) as { status: 'idle' | 'building' | 'success' | 'failed'; message?: string };
         if (parsed.status === 'failed' && parsed.message) return parsed;
       }
     } catch {}
