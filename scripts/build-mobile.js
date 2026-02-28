@@ -198,9 +198,8 @@ console.log('Copied build to mobile/dist');
       const sharps = ico.sharpsFromIco(faviconPath);
       if (sharps.length > 0) {
         const best = sharps[sharps.length - 1];
-        // Maskable safe zone: center 58% of icon – Android/iOS apply circle/squircle masks that crop edges.
-        // Use 58% (not 66%) to avoid text/graphics being cut off on some devices.
-        const safeZoneScale = 0.58;
+        // Maskable safe zone: center 50% of icon – Android/iOS apply circle/squircle masks that crop edges.
+        const safeZoneScale = 0.5;
 
         const makeMaskableIcon = async (size) => {
           const inner = Math.round(size * safeZoneScale);

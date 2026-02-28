@@ -12,6 +12,17 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
+      manifest: {
+        name: 'Gantt Chart',
+        short_name: 'Gantt',
+        theme_color: '#333333',
+        background_color: '#333333',
+      },
+      pwaAssets: {
+        image: 'public/icon-source.png',
+        preset: 'minimal-2023',
+        overrideManifestIcons: true,
+      },
     }),
   ],
   server: {
