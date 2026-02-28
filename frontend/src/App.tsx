@@ -14,9 +14,9 @@ function useOnline() {
   }, []);
   return online;
 }
-import { getAuthStatus, getMe, getVersion } from './api';
+import { getAuthStatus, getMe, getVersion, login } from './api';
 import { applyTheme, getStoredTheme } from './theme';
-import { clearCredentials } from './credentialStorage';
+import { clearCredentials, getCredentials, isMobileNative } from './credentialStorage';
 import AuthGate from './components/AuthGate';
 import ResetPassword from './components/ResetPassword';
 import ForceChangePassword from './components/ForceChangePassword';
@@ -43,6 +43,7 @@ export default function App() {
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('gantt_token'));
   const [mustChangePassword, setMustChangePassword] = useState<boolean | null>(null);
+  const [restoringFromCredentials, setRestoringFromCredentials] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(() => getResetToken());
   const [updatePhase, setUpdatePhase] = useState<null | 'waiting' | 'reloading'>(null);
   const [updateReloadTimedOut, setUpdateReloadTimedOut] = useState(false);
@@ -120,6 +121,34 @@ export default function App() {
       .then((d) => setAuthEnabled(d.enabled))
       .catch(() => setAuthEnabled(false));
   }, []);
+
+  // On native mobile: when localStorage token is gone (e.g. after app update) but we have
+  // stored credentials, restore the session so the user stays logged in.
+  useEffect(() => {
+    if (authEnabled !== true || token !== null || !isMobileNative()) return;
+    let cancelled = false;
+    setRestoringFromCredentials(true);
+    getCredentials()
+      .then(async (creds) => {
+        if (cancelled || !creds) return null;
+        const data = await login(creds.username, creds.password);
+        return data.token ?? null;
+      })
+      .then((newToken) => {
+        if (cancelled) return;
+        if (newToken) {
+          localStorage.setItem('gantt_token', newToken);
+          setToken(newToken);
+        }
+      })
+      .catch(() => {
+        /* e.g. network error; keep credentials for retry next launch */
+      })
+      .finally(() => {
+        if (!cancelled) setRestoringFromCredentials(false);
+      });
+    return () => { cancelled = true; };
+  }, [authEnabled, token]);
 
   // When we have a token (e.g. from localStorage), fetch /me to know if user must change password
   useEffect(() => {
@@ -215,6 +244,17 @@ export default function App() {
   }
 
   if (authEnabled && !token) {
+    if (restoringFromCredentials) {
+      return (
+        <>
+          {offlineBanner}
+          {updateOverlay}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+            Restoring session…
+          </div>
+        </>
+      );
+    }
     return (
       <>
         {offlineBanner}
