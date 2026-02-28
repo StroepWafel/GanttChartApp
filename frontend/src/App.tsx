@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getAuthStatus, getMe, getVersion } from './api';
+import { clearCredentials } from './credentialStorage';
 import AuthGate from './components/AuthGate';
 import ResetPassword from './components/ResetPassword';
 import ForceChangePassword from './components/ForceChangePassword';
@@ -219,6 +220,7 @@ export default function App() {
           <MainView
           authEnabled={authEnabled}
           onLogout={() => {
+            clearCredentials();
             localStorage.removeItem('gantt_token');
             localStorage.removeItem('gantt_token_admin');
             setToken(null);

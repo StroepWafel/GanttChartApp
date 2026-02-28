@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getLoginHash, login, requestPasswordReset } from '../api';
+import { isMobileNative, saveCredentials } from '../credentialStorage';
 import './AuthGate.css';
 
 interface Props {
@@ -25,6 +26,9 @@ export default function AuthGate({ onLogin }: Props) {
       await getLoginHash(username);
       const data = await login(username, password);
       if (data.token) {
+        if (isMobileNative()) {
+          await saveCredentials(username, password);
+        }
         onLogin({ token: data.token, mustChangePassword: data.mustChangePassword ?? false });
       } else {
         setError(data.error || 'Invalid credentials');

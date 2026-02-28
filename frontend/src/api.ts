@@ -1,3 +1,5 @@
+import { clearCredentials, getCredentials, isMobileNative } from './credentialStorage';
+
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const API = API_BASE ? `${API_BASE}/api` : '/api';
 
@@ -27,11 +29,35 @@ function getAuthHeaders(): HeadersInit {
 }
 
 export async function fetchApi(path: string, opts: RequestInit = {}) {
-  const res = await fetch(`${API}${path}`, {
+  let res = await fetch(`${API}${path}`, {
     ...opts,
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders(), ...opts.headers },
   });
-  if (res.status === 401) {
+  if (res.status === 401 && isMobileNative()) {
+    const creds = await getCredentials();
+    if (creds) {
+      try {
+        const data = await login(creds.username, creds.password);
+        if (data.token) {
+          res = await fetch(`${API}${path}`, {
+            ...opts,
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders(), ...opts.headers },
+          });
+          if (res.status === 401) {
+            await clearCredentials();
+            localStorage.removeItem('gantt_token');
+            window.location.reload();
+          }
+          return res;
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+    await clearCredentials();
+    localStorage.removeItem('gantt_token');
+    window.location.reload();
+  } else if (res.status === 401) {
     localStorage.removeItem('gantt_token');
     window.location.reload();
   }
