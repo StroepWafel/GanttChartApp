@@ -916,7 +916,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       const poll = async (): Promise<void> => {
                         const s = await api.getMobileBuildStatus();
                         setMobileBuildStatus({ status: s.status, message: s.output || s.error || undefined });
-                        if (s.status === 'building') {
+                        if (s.status === 'building' || s.status === 'idle') {
                           setTimeout(poll, 2500);
                           return;
                         }
@@ -926,7 +926,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                           localStorage.setItem('gantt_mobile_build_status', JSON.stringify({ status: 'failed', message: msg }));
                           adminAlerts.addAlert('Mobile app', 'Build failed', msg);
                           modal.showAlert({ title: 'Build failed', message: 'See Settings → Status for details.' });
-                        } else {
+                        } else if (s.status === 'success') {
                           localStorage.removeItem('gantt_mobile_build_status');
                           api.getMobileAppStatus().then((app) => { setMobileAppEnabled(app.enabled); setMobileApkAvailable(!!app.apkAvailable); }).catch(() => {});
                           modal.showAlert({ title: 'Build complete', message: s.output || 'Build complete.' });
