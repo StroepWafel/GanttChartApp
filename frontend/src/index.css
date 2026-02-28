@@ -21,6 +21,15 @@
   --radius-lg: 14px;
 }
 
+[data-theme='light'] {
+  --bg: #f4f4f5;
+  --bg-panel: #ffffff;
+  --bg-elevated: #e4e4e7;
+  --border: #d4d4d8;
+  --text: #18181b;
+  --text-muted: #71717a;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
@@ -240,4 +249,17 @@ input, select, textarea {
 
 .confirm-modal-message strong {
   color: var(--text);
+}
+
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: var(--danger, #f43f5e);
+  color: white;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 13px;
 }

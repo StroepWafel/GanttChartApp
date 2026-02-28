@@ -1,5 +1,6 @@
 import express from 'express';
 import db from '../db.js';
+import { validateName } from '../validation.js';
 
 const router = express.Router();
 
@@ -26,10 +27,13 @@ router.post('/', (req, res) => {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
     const { name, display_order = 0 } = req.body;
+    const finalName = name || 'Uncategorized';
+    const nameVal = validateName(finalName);
+    if (!nameVal.ok) return res.status(400).json({ error: nameVal.error });
     const result = db.prepare(`
       INSERT INTO categories (user_id, name, display_order) VALUES (?, ?, ?)
-    `).run(userId, name || 'Uncategorized', display_order);
-    res.status(201).json({ id: result.lastInsertRowid, name: name || 'Uncategorized', display_order });
+    `).run(userId, nameVal.value, display_order);
+    res.status(201).json({ id: result.lastInsertRowid, name: nameVal.value, display_order });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -42,7 +46,12 @@ router.patch('/:id', (req, res) => {
     const { name, display_order } = req.body;
     const updates = [];
     const params = [];
-    if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+    if (name !== undefined) {
+      const nameVal = validateName(name);
+      if (!nameVal.ok) return res.status(400).json({ error: nameVal.error });
+      updates.push('name = ?');
+      params.push(nameVal.value);
+    }
     if (display_order !== undefined) { updates.push('display_order = ?'); params.push(display_order); }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
     if (userId) {

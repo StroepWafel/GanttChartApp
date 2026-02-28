@@ -13,7 +13,9 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
-    "@capacitor/preferences": "^6.0.0"
+    "@capacitor/local-notifications": "^6.1.3",
+    "@capacitor/preferences": "^6.0.0",
+    "capacitor-secure-storage-plugin": "0.10.0"
   },
   "capacitor": {
     "disabled": false

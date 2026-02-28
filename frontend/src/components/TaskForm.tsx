@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { Category, Project, Task } from '../types';
 import { useModal } from '../context/ModalContext';
 import type { updateTask } from '../api';
+import { scheduleReminder, cancelReminder, getStoredReminder, isMobileNative, type ReminderOffset } from '../reminders';
 
 interface Props {
   categories: Category[];
@@ -17,7 +18,7 @@ interface Props {
     end_date: string;
     due_date?: string;
     base_priority?: number;
-  }) => void;
+  }) => void | Promise<{ id: number } | undefined>;
   onUpdate?: (id: number, data: Parameters<typeof updateTask>[1]) => void;
 }
 
@@ -34,6 +35,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
   const [dueDate, setDueDate] = useState('');
   const [basePriority, setBasePriority] = useState(5);
   const [progress, setProgress] = useState(0);
+  const [reminderOption, setReminderOption] = useState<ReminderOffset>('off');
 
   useEffect(() => {
     if (task) {
@@ -46,6 +48,9 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
       setDueDate(task.due_date?.slice(0, 10) ?? '');
       setBasePriority(task.base_priority ?? 5);
       setProgress(task.progress ?? 0);
+      setReminderOption(getStoredReminder(task.id));
+    } else {
+      setReminderOption('off');
     }
   }, [task, projects]);
 
@@ -55,7 +60,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
     }
   }, [categoryId, projectsInCategory, projectId]);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!projectId || !name || !startDate || !endDate) return;
     if (endDate < startDate) {
@@ -67,6 +72,9 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
       return;
     }
     if (isEdit && task && onUpdate) {
+      if (!dueDate || reminderOption === 'off') {
+        cancelReminder(task.id);
+      }
       onUpdate(task.id, {
         project_id: projectId,
         name,
@@ -76,8 +84,11 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
         base_priority: basePriority,
         progress,
       });
+      if (dueDate && reminderOption !== 'off') {
+        scheduleReminder(task.id, name, dueDate, reminderOption);
+      }
     } else {
-      onCreate({
+      const result = await onCreate({
         project_id: projectId,
         name,
         start_date: startDate,
@@ -85,6 +96,10 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
         due_date: dueDate || undefined,
         base_priority: basePriority,
       });
+      const created = result && typeof result === 'object' && 'id' in result ? result as { id: number } : null;
+      if (created && dueDate && reminderOption !== 'off') {
+        scheduleReminder(created.id, name, dueDate, reminderOption);
+      }
     }
     onClose();
   }
@@ -163,6 +178,20 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
               min={startDate}
             />
           </div>
+          {dueDate && isMobileNative() && (
+            <div className="form-row">
+              <label>Remind me</label>
+              <select
+                value={reminderOption}
+                onChange={(e) => setReminderOption(e.target.value as ReminderOffset)}
+              >
+                <option value="off">Off</option>
+                <option value="1d">1 day before</option>
+                <option value="day">Day of</option>
+                <option value="1h">1 hour before</option>
+              </select>
+            </div>
+          )}
           <div className="form-row">
             <label>Priority (10 = highest, 1 = lowest)</label>
             <div className="priority-input">

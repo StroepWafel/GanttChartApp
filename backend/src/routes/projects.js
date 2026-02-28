@@ -1,5 +1,6 @@
 import express from 'express';
 import db from '../db.js';
+import { validateName, validateDateRange } from '../validation.js';
 
 const router = express.Router();
 
@@ -47,6 +48,14 @@ router.post('/', (req, res) => {
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
     const { name, category_id, due_date, start_date } = req.body;
     if (!category_id) return res.status(400).json({ error: 'category_id required' });
+    if (name !== undefined && name !== null) {
+      const nameVal = validateName(name);
+      if (!nameVal.ok) return res.status(400).json({ error: nameVal.error });
+    }
+    if (start_date && due_date) {
+      const dateVal = validateDateRange(start_date, due_date);
+      if (!dateVal.ok) return res.status(400).json({ error: dateVal.error });
+    }
     const cat = db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?').get(category_id, userId);
     if (!cat) return res.status(400).json({ error: 'Category not found' });
     const result = db.prepare(`
@@ -66,10 +75,19 @@ router.patch('/:id', (req, res) => {
     const { name, category_id, due_date, start_date } = req.body;
     const updates = [];
     const params = [];
-    if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+    if (name !== undefined) {
+      const nameVal = validateName(name);
+      if (!nameVal.ok) return res.status(400).json({ error: nameVal.error });
+      updates.push('name = ?');
+      params.push(nameVal.value);
+    }
     if (category_id !== undefined) { updates.push('category_id = ?'); params.push(category_id); }
     if (due_date !== undefined) { updates.push('due_date = ?'); params.push(due_date || null); }
     if (start_date !== undefined) { updates.push('start_date = ?'); params.push(start_date || null); }
+    if (start_date !== undefined && due_date !== undefined) {
+      const dateVal = validateDateRange(start_date, due_date);
+      if (!dateVal.ok) return res.status(400).json({ error: dateVal.error });
+    }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
     if (userId) {
       params.push(id, userId);

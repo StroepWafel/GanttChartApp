@@ -456,12 +456,23 @@ export async function updateTask(id: number, data: Partial<{
   progress: number;
   completed: boolean;
   base_priority: number;
+  display_order: number;
 }>) {
   const res = await fetchApi(`/tasks/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
   return res.json();
+}
+
+export async function reorderTasks(updates: { id: number; display_order: number }[]) {
+  const res = await fetchApi('/tasks/reorder', {
+    method: 'PATCH',
+    body: JSON.stringify({ updates }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data as { error?: string }).error || 'Failed to reorder tasks');
+  return data;
 }
 
 export async function splitTask(id: number, subtasks: { name: string; start_date: string; end_date: string }[]) {

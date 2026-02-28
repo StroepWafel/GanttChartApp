@@ -5,7 +5,12 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "build": "node -e \"console.log('Backend: no build step')\""
+    "build": "node -e \"console.log('Backend: no build step')\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

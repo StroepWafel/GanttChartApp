@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
@@ -13,7 +13,12 @@ import ConfirmModal from './ConfirmModal';
 import BottomNav from './BottomNav';
 import CategoriesPage from './CategoriesPage';
 import SettingsPage from './SettingsPage';
+import UpdatesSection from './settings/UpdatesSection';
+import UserManagementSection from './settings/UserManagementSection';
+import ShortcutsHelpModal from './ShortcutsHelpModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useMainData } from '../hooks/useMainData';
 import type { MobilePage } from './BottomNav';
 import { useModal } from '../context/ModalContext';
 import { useAdminAlerts } from '../context/AdminAlertsContext';
@@ -24,6 +29,9 @@ import {
   type PriorityColors,
 } from '../priorityColors';
 import { getSettingsForBackup, applySettingsFromBackup, type BackupSettings } from '../settingsBackup';
+import { exportTasksToCsv, downloadCsv } from '../utils/exportCsv';
+import { cancelReminder } from '../reminders';
+import { applyTheme, getStoredTheme, setStoredTheme, type Theme } from '../theme';
 import './MainView.css';
 
 interface Props {
@@ -33,9 +41,6 @@ interface Props {
 }
 
 export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded }: Props) {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -47,6 +52,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
+  const { categories, projects, tasks, load, setCategories, setProjects } = useMainData(includeCompleted);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [showClearEveryoneConfirm, setShowClearEveryoneConfirm] = useState(false);
   const [clearEveryoneError, setClearEveryoneError] = useState<string | null>(null);
@@ -120,8 +126,50 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     return localStorage.getItem('gantt_mobile_app_prompt_dismissed') === '1';
   });
   const [mobileAppUpdateAvailable, setMobileAppUpdateAvailable] = useState(false);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [searchInputValue, setSearchInputValue] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const id = setTimeout(() => setSearchQuery(searchInputValue.trim().toLowerCase()), 300);
+    return () => clearTimeout(id);
+  }, [searchInputValue]);
   const modal = useModal();
   const adminAlerts = useAdminAlerts();
+
+  const handleEscape = useCallback(() => {
+    if (showShortcutsHelp) setShowShortcutsHelp(false);
+    else if (showSettings && !isMobile) setShowSettings(false);
+    else if (showAddTask || editTask) {
+      setShowAddTask(false);
+      setEditTask(null);
+    } else if (splitTask) setSplitTask(null);
+    else if (editCategory) setEditCategory(null);
+    else if (editProject) setEditProject(null);
+    else if (showCompleted) setShowCompleted(false);
+    else if (showCatProj) setShowCatProj(false);
+  }, [showShortcutsHelp, showSettings, showAddTask, editTask, splitTask, editCategory, editProject, showCompleted, showCatProj, isMobile]);
+
+  useKeyboardShortcuts({
+    onNewTask: () => setShowAddTask(true),
+    onFocusSearch: () => searchInputRef.current?.focus(),
+    onEscape: handleEscape,
+    onShowShortcuts: () => setShowShortcutsHelp(true),
+    enabled: !isMobile,
+  });
+
+  const filteredTasks = useMemo(() => {
+    if (!searchQuery) return tasks;
+    return tasks.filter(
+      (t) =>
+        t.name.toLowerCase().includes(searchQuery) ||
+        (t.project_name?.toLowerCase().includes(searchQuery)) ||
+        (t.category_name?.toLowerCase().includes(searchQuery))
+    );
+  }, [tasks, searchQuery]);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
   );
@@ -140,21 +188,6 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showHeaderMenu]);
-
-  const load = useCallback(async () => {
-    const [cats, projs, t] = await Promise.all([
-      api.getCategories(),
-      api.getProjects(),
-      api.getTasks(includeCompleted),
-    ]);
-    setCategories(cats);
-    setProjects(projs);
-    setTasks(t);
-  }, [includeCompleted]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   useEffect(() => {
     if (authEnabled) {
@@ -284,6 +317,13 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
               setPriorityColors((prev) => ({ ...DEFAULT_PRIORITY_COLORS, ...prev, ...valid }));
             }
           }
+          const t = prefs.theme as Theme | undefined;
+          if (t === 'light' || t === 'dark') {
+            applyTheme(t);
+            setThemeState(t);
+          }
+          const wu = prefs.webhook_url;
+          setWebhookUrl(typeof wu === 'string' ? wu : '');
         })
         .catch(() => {});
     }
@@ -337,17 +377,20 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   }
 
   async function handleCreateTask(data: Parameters<typeof api.createTask>[0]) {
-    await api.createTask(data);
+    const task = await api.createTask(data);
     await load();
     setShowAddTask(false);
+    return { id: task.id };
   }
 
   async function handleUpdateTask(id: number, data: Parameters<typeof api.updateTask>[1]) {
+    if (data.completed) cancelReminder(id);
     await api.updateTask(id, data);
     await load();
   }
 
   async function handleDeleteTask(id: number, cascade: boolean) {
+    cancelReminder(id);
     await api.deleteTask(id, cascade);
     await load();
   }
@@ -470,6 +513,26 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       <>
         {settingsTab === 'personal' && (
           <div className="settings-tab-content" role="tabpanel">
+            <div className="settings-section">
+              <h4>Appearance</h4>
+              <div className="settings-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={theme === 'light'}
+                  onChange={async (e) => {
+                    const next: Theme = e.target.checked ? 'light' : 'dark';
+                    setStoredTheme(next);
+                    setThemeState(next);
+                    if (authEnabled) {
+                      try {
+                        await api.patchUserPreferences('theme', next);
+                      } catch { /* ignore */ }
+                    }
+                  }}
+                />
+                <span>Light theme</span>
+              </div>
+            </div>
             {authEnabled && currentUser && (
               <div className="settings-section">
                 <h4>Account</h4>
@@ -516,6 +579,23 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       <button type="button" className="btn-sm" title="Copy API key" aria-label="Copy API key" onClick={() => navigator.clipboard.writeText(currentUser.apiKey!)}><Copy size={16} /></button>
                     </div>
                   ) : <p className="muted">No API key</p>}
+                </div>
+                <div className="settings-section">
+                  <h5>Webhook</h5>
+                  <p className="settings-desc">Optional: POST task events (create, update) to a URL. Used for integrations.</p>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/webhook"
+                    value={webhookUrl}
+                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    onBlur={async () => {
+                      try {
+                        await api.patchUserPreferences('webhook_url', webhookUrl.trim() || null);
+                      } catch { /* ignore */ }
+                    }}
+                    className="settings-input"
+                    style={{ width: '100%', maxWidth: '400px' }}
+                  />
                 </div>
               </div>
             )}
@@ -565,6 +645,20 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 <button className="btn-sm" onClick={handleDownloadBackup}>Download backup</button>
                 <label className="btn-sm btn-sm-restore">Restore backup<input type="file" accept=".json,application/json" onChange={handleRestoreFileSelect} style={{ display: 'none' }} /></label>
               </div>
+            </div>
+            <div className="settings-section">
+              <h4>Export</h4>
+              <p className="settings-desc">Export tasks to CSV for use in spreadsheets.</p>
+              <button className="btn-sm" onClick={async () => {
+                try {
+                  const allTasks = await api.getTasks(true);
+                  const csv = exportTasksToCsv(allTasks);
+                  downloadCsv(csv, `gantt-tasks-${new Date().toISOString().slice(0, 10)}.csv`);
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Export failed';
+                  modal.showAlert({ title: 'Export failed', message: msg });
+                }
+              }}>Export to CSV</button>
             </div>
             {authEnabled && onLogout && (
               <div className="settings-section">
@@ -693,375 +787,34 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         )}
         {settingsTab === 'admin' && currentUser?.isAdmin && (
           <div className="settings-tab-content" role="tabpanel">
-            <div className="settings-section settings-dropdown">
-              <button
-                type="button"
-                className={`settings-dropdown-trigger ${showUserManagement ? 'expanded' : ''}`}
-                onClick={() => setShowUserManagement((v) => !v)}
-                aria-expanded={showUserManagement}
-              >
-                <span>User management</span>
-                <ChevronDown size={16} className={showUserManagement ? 'rotated' : ''} />
-              </button>
-              {showUserManagement && (
-                <div className="settings-dropdown-content">
-                  <div className="user-list">
-                    {users.map((u) => (
-                      <div key={u.id} className="user-row user-row-admin">
-                        <span className="user-row-name">
-                          {u.username}
-                          {u.isAdmin && <span className="admin-badge">Admin</span>}
-                          {!u.isActive && <span className="inactive-badge">Disabled</span>}
-                        </span>
-                        {editUserEmailId === u.id ? (
-                          <div className="user-email-edit" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
-                            <input
-                              type="email"
-                              placeholder="Email"
-                              value={editUserEmailValue}
-                              onChange={(e) => setEditUserEmailValue(e.target.value)}
-                              className="settings-input"
-                              style={{ minWidth: '180px' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn-sm"
-                              onClick={async () => {
-                                setUserMgmtError('');
-                                try {
-                                  await api.updateUser(u.id, { email: editUserEmailValue.trim() || null });
-                                  setEditUserEmailId(null);
-                                  setEditUserEmailValue('');
-                                  api.getUsers().then(setUsers);
-                                } catch (err) {
-                                  const msg = err instanceof Error ? err.message : 'Failed to update email';
-                                  adminAlerts.addAlert('User management', 'Error', msg);
-                                  setUserMgmtError(msg);
-                                }
-                              }}
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-sm btn-sm-danger-outline"
-                              onClick={() => {
-                                setEditUserEmailId(null);
-                                setEditUserEmailValue('');
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="user-email-display" style={{ marginLeft: '0.5rem', color: 'var(--muted)' }}>
-                            {u.email ? u.email : '—'}
-                            <button
-                              type="button"
-                              className="btn-sm btn-sm-danger-outline"
-                              style={{ marginLeft: '0.5rem', padding: '0.15rem 0.4rem', fontSize: '0.75rem' }}
-                              title="Edit email"
-                              onClick={() => {
-                                setEditUserEmailId(u.id);
-                                setEditUserEmailValue(u.email || '');
-                              }}
-                            >
-                              <Pencil size={12} />
-                            </button>
-                          </span>
-                        )}
-                        {u.id !== currentUser?.id && (
-                          <div className="user-row-actions">
-                            <button
-                              type="button"
-                              className="btn-sm btn-sm-danger-outline"
-                              title={u.isActive ? 'Revoke account access' : 'Restore account access'}
-                              onClick={async () => {
-                                try {
-                                  await api.updateUser(u.id, { isActive: !u.isActive });
-                                  api.getUsers().then(setUsers);
-                                } catch (err) {
-                                  const msg = err instanceof Error ? err.message : 'Failed to update user';
-                                  adminAlerts.addAlert('User management', 'Error', msg);
-                                  modal.showAlert({ title: 'Error', message: msg });
-                                }
-                              }}
-                            >
-                              {u.isActive ? 'Revoke account' : 'Restore account'}
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-sm btn-sm-danger-outline"
-                              title="Revoke API key"
-                              disabled={!u.apiKey}
-                              onClick={async () => {
-                                if (!u.apiKey) return;
-                                const ok = await modal.showConfirm({
-                                  title: 'Revoke API key',
-                                  message: `Revoke API key for ${u.username}? They will need a new key to use the IoT API.`,
-                                  confirmLabel: 'Revoke',
-                                  variant: 'danger',
-                                });
-                                if (!ok) return;
-                                try {
-                                  await api.updateUser(u.id, { revokeApiKey: true });
-                                  api.getUsers().then(setUsers);
-                                } catch (err) {
-                                  const msg = err instanceof Error ? err.message : 'Failed to revoke API key';
-                                  adminAlerts.addAlert('User management', 'Error', msg);
-                                  modal.showAlert({ title: 'Error', message: msg });
-                                }
-                              }}
-                            >
-                              Revoke API key
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-sm"
-                              title="Generate new API key"
-                              onClick={async () => {
-                                try {
-                                  await api.updateUser(u.id, { regenerateApiKey: true });
-                                  api.getUsers().then(setUsers);
-                                } catch (err) {
-                                  const msg = err instanceof Error ? err.message : 'Failed to regenerate API key';
-                                  adminAlerts.addAlert('User management', 'Error', msg);
-                                  modal.showAlert({ title: 'Error', message: msg });
-                                }
-                              }}
-                            >
-                              New API key
-                            </button>
-                            {!u.isActive && (
-                              <button
-                                type="button"
-                                className="btn-sm btn-sm-danger"
-                                title="Permanently delete this user"
-                                onClick={async () => {
-                                  const ok = await modal.showConfirm({
-                                    title: 'Delete user permanently',
-                                    message: `Permanently delete user "${u.username}"? This cannot be undone. Their categories, projects, and tasks will also be removed.`,
-                                    confirmLabel: 'Delete',
-                                    variant: 'danger',
-                                  });
-                                  if (!ok) return;
-                                  try {
-                                    await api.deleteUser(u.id);
-                                    api.getUsers().then(setUsers);
-                                  } catch (err) {
-                                    const msg = err instanceof Error ? err.message : 'Failed to delete user';
-                                    adminAlerts.addAlert('User management', 'Error', msg);
-                                    modal.showAlert({ title: 'Error', message: msg });
-                                  }
-                                }}
-                              >
-                                Delete permanently
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="create-user-form">
-                    {(emailOnboardingSettings.email_onboarding_enabled &&
-                      emailOnboardingSettings.email_onboarding_api_key &&
-                      emailOnboardingSettings.email_onboarding_domain) ? (
-                      <>
-                        <input
-                          type="text"
-                          placeholder="Username"
-                          value={newUsername}
-                          onChange={(e) => { setNewUsername(e.target.value); setUserMgmtError(''); }}
-                          className="settings-input"
-                        />
-                        <input
-                          type="email"
-                          placeholder="Email"
-                          value={newOnboardEmail}
-                          onChange={(e) => { setNewOnboardEmail(e.target.value); setUserMgmtError(''); }}
-                          className="settings-input"
-                        />
-                        <button
-                          type="button"
-                          className="btn-sm"
-                          disabled={!newOnboardEmail.trim() || !newUsername.trim() || onboardSending}
-                          onClick={async () => {
-                            const email = newOnboardEmail.trim();
-                            const username = newUsername.trim();
-                            if (!email || !username) return;
-                            setUserMgmtError('');
-                            try {
-                              const preview = await api.previewOnboardEmail(username);
-                              setOnboardPreviewData({ email, username, subject: preview.subject, body: preview.body });
-                              setOnboardResult(null);
-                            } catch (err) {
-                              const msg = err instanceof Error ? err.message : 'Failed to preview';
-                              adminAlerts.addAlert('User management', 'Error', msg);
-                              setUserMgmtError(msg);
-                            }
-                          }}
-                        >
-                          Onboard
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-sm btn-sm-danger-outline"
-                          onClick={() => setShowCreateManually((v) => !v)}
-                        >
-                          {showCreateManually ? 'Hide' : 'Create manually'}
-                        </button>
-                        {showCreateManually && (
-                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
-                            <input
-                              type="email"
-                              placeholder="Email (optional)"
-                              value={newManualEmail}
-                              onChange={(e) => setNewManualEmail(e.target.value)}
-                              className="settings-input"
-                            />
-                            <input
-                              type="password"
-                              placeholder="Temporary password"
-                              value={newTempPassword}
-                              onChange={(e) => setNewTempPassword(e.target.value)}
-                              className="settings-input"
-                            />
-                            <button
-                              type="button"
-                              className="btn-sm"
-                              onClick={async () => {
-                                if (!newUsername || !newTempPassword) return;
-                                setUserMgmtError('');
-                                try {
-                                  await api.createUser(newUsername, newTempPassword, newManualEmail.trim() || undefined);
-                                  setNewUsername('');
-                                  setNewTempPassword('');
-                                  setNewManualEmail('');
-                                  api.getUsers().then(setUsers);
-                                } catch (err) {
-                                  const msg = err instanceof Error ? err.message : 'Failed to create user';
-                                  adminAlerts.addAlert('User management', 'Error', msg);
-                                  setUserMgmtError(msg);
-                                }
-                              }}
-                            >
-                              Create user
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          placeholder="Username"
-                          value={newUsername}
-                          onChange={(e) => setNewUsername(e.target.value)}
-                          className="settings-input"
-                        />
-                        <input
-                          type="email"
-                          placeholder="Email (optional)"
-                          value={newManualEmail}
-                          onChange={(e) => setNewManualEmail(e.target.value)}
-                          className="settings-input"
-                        />
-                        <input
-                          type="password"
-                          placeholder="Temporary password"
-                          value={newTempPassword}
-                          onChange={(e) => setNewTempPassword(e.target.value)}
-                          className="settings-input"
-                        />
-                        <button
-                          type="button"
-                          className="btn-sm"
-                          onClick={async () => {
-                            if (!newUsername || !newTempPassword) return;
-                            setUserMgmtError('');
-                            try {
-                              await api.createUser(newUsername, newTempPassword, newManualEmail.trim() || undefined);
-                              setNewUsername('');
-                              setNewTempPassword('');
-                              setNewManualEmail('');
-                              api.getUsers().then(setUsers);
-                            } catch (err) {
-                              const msg = err instanceof Error ? err.message : 'Failed to create user';
-                              adminAlerts.addAlert('User management', 'Error', msg);
-                              setUserMgmtError(msg);
-                            }
-                          }}
-                        >
-                          Create user
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  {userMgmtError && <p className="auth-error">{userMgmtError}</p>}
-                </div>
-              )}
-            </div>
-            <div className="settings-section">
-              <h5>Masquerade</h5>
-              <p className="settings-desc">Act as another user.</p>
-              <div className="masquerade-row">
-                <select
-                  value={masqueradeUserId}
-                  onChange={(e) => setMasqueradeUserId(e.target.value)}
-                  className="settings-select"
-                >
-                  <option value="">Select user...</option>
-                  {users.filter((u) => u.id !== currentUser?.id).map((u) => (
-                    <option key={u.id} value={String(u.id)}>{u.username}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="btn-sm"
-                  disabled={!masqueradeUserId}
-                  onClick={async () => {
-                    if (!masqueradeUserId) return;
-                    try {
-                      await api.masquerade(parseInt(masqueradeUserId, 10));
-                      setMasqueradeUserId('');
-                      window.location.reload();
-                    } catch (err) {
-                      const msg = err instanceof Error ? err.message : 'Masquerade failed';
-                      adminAlerts.addAlert('User management', 'Error', msg);
-                      modal.showAlert({ title: 'Error', message: msg });
-                    }
-                  }}
-                >
-                  Masquerade
-                </button>
-              </div>
-            </div>
-            <div className="settings-section">
-              <h5>Full backup</h5>
-              <p className="settings-desc">Download backup of all users and data (admin only).</p>
-              <button
-                type="button"
-                className="btn-sm"
-                onClick={async () => {
-                  try {
-                    const blob = await api.getAdminFullBackup();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `gantt-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  } catch (err) {
-                    const msg = err instanceof Error ? err.message : 'Failed to download full backup';
-                    adminAlerts.addAlert('Backup', 'Error', msg);
-                    modal.showAlert({ title: 'Error', message: msg });
-                  }
-                }}
-              >
-                Download full backup
-              </button>
-            </div>
+            <UserManagementSection
+              users={users}
+              setUsers={setUsers}
+              currentUser={currentUser}
+              showUserManagement={showUserManagement}
+              setShowUserManagement={setShowUserManagement}
+              emailOnboardingSettings={emailOnboardingSettings}
+              newUsername={newUsername}
+              setNewUsername={setNewUsername}
+              newOnboardEmail={newOnboardEmail}
+              setNewOnboardEmail={setNewOnboardEmail}
+              newManualEmail={newManualEmail}
+              setNewManualEmail={setNewManualEmail}
+              newTempPassword={newTempPassword}
+              setNewTempPassword={setNewTempPassword}
+              showCreateManually={showCreateManually}
+              setShowCreateManually={setShowCreateManually}
+              onboardSending={onboardSending}
+              setOnboardPreviewData={setOnboardPreviewData}
+              editUserEmailId={editUserEmailId}
+              setEditUserEmailId={setEditUserEmailId}
+              editUserEmailValue={editUserEmailValue}
+              setEditUserEmailValue={setEditUserEmailValue}
+              masqueradeUserId={masqueradeUserId}
+              setMasqueradeUserId={setMasqueradeUserId}
+              userMgmtError={userMgmtError}
+              setUserMgmtError={setUserMgmtError}
+            />
           </div>
         )}
         {settingsTab === 'emailOnboarding' && currentUser?.isAdmin && (
@@ -1385,194 +1138,25 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         )}
         {settingsTab === 'updates' && currentUser?.isAdmin && (
           <div className="settings-tab-content" role="tabpanel">
-            <div className="settings-section">
-              <h5>Updates</h5>
-              <p className="settings-desc settings-version">
-                Version v{appVersion ?? '…'}
-              </p>
-              <p className="settings-desc">
-                Automatic restarts after update only work when deployed with PM2.
-                Update scripts log to <code>data/backups/update.log</code>.
-              </p>
-              <div className="settings-checkbox-row">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={autoUpdateEnabled}
-                    onChange={async (e) => {
-                      const v = e.target.checked;
-                      setAutoUpdateEnabled(v);
-                      try {
-                        await api.patchSettings({ auto_update_enabled: v });
-                      } catch (err) {
-                        setAutoUpdateEnabled(!v);
-                        const msg = err instanceof Error ? err.message : 'Failed to save';
-                        adminAlerts.addAlert('Updates', 'Error', msg);
-                        modal.showAlert({ title: 'Error', message: msg });
-                      }
-                    }}
-                  />
-                  Enable automatic update checks
-                </label>
-              </div>
-              <div className="settings-field-row">
-                <label className="input-label">GitHub token (optional)</label>
-                <p className="settings-desc" style={{ marginTop: 0 }}>
-                  Add a personal access token to raise the API rate limit from 60 to 5,000 requests/hour.
-                  Leave blank to use the default limit.
-                </p>
-                <p className="settings-desc">
-                  To generate a token, go to{' '}
-                  <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
-                    GitHub settings
-                  </a>{' '}
-                  and create a new classic token. Set the expiration date to never and give it the{' '}
-                  <code>public_repo</code> scope.
-                </p>
-                <div className="settings-field-controls">
-                  <input
-                    type="password"
-                    className="settings-input"
-                    placeholder={githubTokenSet ? 'Token configured — enter new token to replace' : 'ghp_… (optional)'}
-                    value={githubTokenInput}
-                    onChange={(e) => setGithubTokenInput(e.target.value)}
-                    autoComplete="off"
-                    style={{ minWidth: '200px', maxWidth: 560 }}
-                  />
-                  <button
-                    type="button"
-                    className="btn-sm"
-                    disabled={githubTokenSaving}
-                    onClick={async () => {
-                      const isClear = !githubTokenInput.trim();
-                      if (isClear) {
-                        const ok = await modal.showConfirm({
-                          title: 'Clear GitHub token',
-                          message: 'Remove the saved token? Update checks will use the default rate limit (60 requests/hour).',
-                          confirmLabel: 'Clear token',
-                          variant: 'danger',
-                        });
-                        if (!ok) return;
-                      }
-                      setGithubTokenSaving(true);
-                      try {
-                        const hadToken = !!githubTokenInput.trim();
-                        await api.patchSettings({ github_token: githubTokenInput.trim() || '' });
-                        setGithubTokenSet(!isClear);
-                        setGithubTokenInput('');
-                        modal.showAlert({ message: hadToken ? 'Token saved.' : 'Token cleared.' });
-                      } catch (err) {
-                        const msg = err instanceof Error ? err.message : 'Failed to save';
-                        adminAlerts.addAlert('Updates', 'Error', msg);
-                        modal.showAlert({ title: 'Error', message: msg });
-                      } finally {
-                        setGithubTokenSaving(false);
-                      }
-                    }}
-                  >
-                    {githubTokenSaving ? 'Saving…' : (githubTokenInput.trim() ? 'Save token' : 'Clear token')}
-                  </button>
-                </div>
-              </div>
-              <div className="update-actions">
-                <button
-                  type="button"
-                  className="btn-sm"
-                  onClick={async () => {
-                    setUpdateCheck(null);
-                    try {
-                      const data = await api.checkUpdate(false);
-                      setUpdateCheck(normalizeUpdateCheck(data));
-                    } catch (err) {
-                      const msg = err instanceof Error ? err.message : 'Check failed';
-                      setUpdateCheck({ updateAvailable: false, error: msg });
-                    }
-                  }}
-                >
-                  Check for updates
-                </button>
-                <button
-                  type="button"
-                  className="btn-sm"
-                  title="Include debug info (paths, version source) for troubleshooting"
-                  onClick={async () => {
-                    setUpdateCheck(null);
-                    try {
-                      const data = await api.checkUpdate(true);
-                      setUpdateCheck(normalizeUpdateCheck(data));
-                      setShowUpdateDebug(true);
-                    } catch (err) {
-                      const msg = err instanceof Error ? err.message : 'Check failed';
-                      setUpdateCheck({ updateAvailable: false, error: msg });
-                    }
-                  }}
-                >
-                  Check with debug
-                </button>
-                {updateCheck?.updateAvailable && (
-                  <button
-                    type="button"
-                    className="btn-sm"
-                    disabled={applyingUpdate}
-                    onClick={async () => {
-                      const ok = await modal.showConfirm({
-                        title: 'Apply update',
-                        message: `Update to v${updateCheck.latestVersion}? A full backup will be created first. The server will restart and all users will see an update message; this page will reload automatically once it is back.`,
-                        confirmLabel: 'Update',
-                      });
-                      if (!ok) return;
-                      setApplyingUpdate(true);
-                      try {
-                        await api.applyUpdate();
-                        onUpdateApplySucceeded?.();
-                      } catch (err) {
-                        setApplyingUpdate(false);
-                        const msg = err instanceof Error ? err.message : 'Failed to apply update';
-                        adminAlerts.addAlert('Updates', 'Error', msg);
-                        modal.showAlert({ title: 'Error', message: msg });
-                      }
-                    }}
-                  >
-                    {applyingUpdate ? 'Applying…' : `Apply update (v${updateCheck.latestVersion})`}
-                  </button>
-                )}
-              </div>
-              {updateCheck && (
-                <>
-                  <p className="settings-desc">
-                    {updateCheck.updateAvailable ? (
-                      <>
-                        Update available: v{updateCheck.latestVersion}
-                        {updateCheck.releaseName && (
-                          <span className="update-release-name"> — {updateCheck.releaseName}</span>
-                        )}
-                        {' '}(current: v{updateCheck.currentVersion})
-                      </>
-                    ) : updateCheck.error ? (
-                      <span className="auth-error">{updateCheck.error}</span>
-                    ) : (
-                      <>Up to date (v{updateCheck.currentVersion})</>
-                    )}
-                  </p>
-                  {updateCheck._debug && (
-                    <div className="update-debug">
-                      <button
-                        type="button"
-                        className="btn-sm"
-                        onClick={() => setShowUpdateDebug((v) => !v)}
-                      >
-                        {showUpdateDebug ? 'Hide' : 'Show'} debug info
-                      </button>
-                      {showUpdateDebug && (
-                        <pre className="update-debug-content" title="Copy this to share when reporting issues">
-                          {JSON.stringify(updateCheck._debug, null, 2)}
-                        </pre>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            <UpdatesSection
+              appVersion={appVersion}
+              autoUpdateEnabled={autoUpdateEnabled}
+              setAutoUpdateEnabled={setAutoUpdateEnabled}
+              updateCheck={updateCheck}
+              setUpdateCheck={setUpdateCheck}
+              setShowUpdateDebug={setShowUpdateDebug}
+              showUpdateDebug={showUpdateDebug}
+              normalizeUpdateCheck={normalizeUpdateCheck}
+              githubTokenSet={githubTokenSet}
+              githubTokenInput={githubTokenInput}
+              setGithubTokenInput={setGithubTokenInput}
+              githubTokenSaving={githubTokenSaving}
+              setGithubTokenSaving={setGithubTokenSaving}
+              setGithubTokenSet={setGithubTokenSet}
+              applyingUpdate={applyingUpdate}
+              setApplyingUpdate={setApplyingUpdate}
+              onUpdateApplySucceeded={onUpdateApplySucceeded}
+            />
           </div>
         )}
         {settingsTab === 'danger' && (
@@ -1617,6 +1201,17 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           </button>
         )}
         <h1>Gantt Chart</h1>
+        {!isMobile && (
+          <input
+            ref={searchInputRef}
+            type="search"
+            placeholder="Search tasks..."
+            value={searchInputValue}
+            onChange={(e) => setSearchInputValue(e.target.value)}
+            className="header-search-input"
+            aria-label="Search tasks"
+          />
+        )}
         <div className={`header-actions ${isMobile ? 'header-actions-mobile' : ''}`}>
           {isMobile ? (
             <button
@@ -1712,7 +1307,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
             {mobilePage === 'chart' && (
               <main className="gantt-area">
                 <GanttChart
-                  tasks={tasks}
+                  tasks={filteredTasks}
                   projects={projects}
                   categories={categories}
                   priorityColors={priorityColors}
@@ -1721,17 +1316,18 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                   onTaskChange={handleUpdateTask}
                   onTaskComplete={(id) => handleUpdateTask(id, { completed: true })}
                   onTaskUncomplete={(id) => handleUpdateTask(id, { completed: false })}
-                  onTaskDelete={handleDeleteTask}
-                  onTaskSplit={setSplitTask}
-                  onTaskEdit={(t) => { setEditTask(t); setMobilePage('add-task'); }}
-                  forceViewMode="chart"
+onTaskDelete={handleDeleteTask}
+                onTaskSplit={setSplitTask}
+                onTaskEdit={(t) => { setEditTask(t); setMobilePage('add-task'); }}
+                onTaskReorder={async (updates) => { await api.reorderTasks(updates); load(); }}
+                forceViewMode="chart"
                 />
               </main>
             )}
             {mobilePage === 'list' && (
               <main className="gantt-area">
                 <GanttChart
-                  tasks={tasks}
+                  tasks={filteredTasks}
                   projects={projects}
                   categories={categories}
                   priorityColors={priorityColors}
@@ -1743,6 +1339,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                   onTaskDelete={handleDeleteTask}
                   onTaskSplit={setSplitTask}
                   onTaskEdit={(t) => { setEditTask(t); setMobilePage('add-task'); }}
+                  onTaskReorder={async (updates) => { await api.reorderTasks(updates); load(); }}
                   forceViewMode="list"
                 />
               </main>
@@ -1879,7 +1476,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
 
             <main className="gantt-area">
               <GanttChart
-                tasks={tasks}
+                tasks={filteredTasks}
                 projects={projects}
                 categories={categories}
                 priorityColors={priorityColors}
@@ -1891,6 +1488,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 onTaskDelete={handleDeleteTask}
                 onTaskSplit={setSplitTask}
                 onTaskEdit={setEditTask}
+                onTaskReorder={async (updates) => { await api.reorderTasks(updates); load(); }}
               />
             </main>
           </>
@@ -2018,6 +1616,10 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           onRequestDeleteProject={(p) => setDeleteProjectConfirm(p)}
           onClose={() => { setShowCatProj(false); setEditCategory(null); setEditProject(null); }}
         />
+      )}
+
+      {showShortcutsHelp && (
+        <ShortcutsHelpModal onClose={() => setShowShortcutsHelp(false)} />
       )}
 
       {showSettings && !isMobile && (

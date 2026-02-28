@@ -1,10 +1,27 @@
 import crypto from 'node:crypto';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import { login, isAuthEnabled, masqueradeToken, optionalAuth, requireAdmin } from '../auth.js';
 import db from '../db.js';
 
 const router = express.Router();
+
+const loginLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const changePasswordLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 router.get('/status', (req, res) => {
   res.json({ enabled: isAuthEnabled() });
@@ -32,7 +49,7 @@ router.get('/login-hash', (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimit, async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -48,7 +65,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-router.post('/change-password', optionalAuth, async (req, res) => {
+router.post('/change-password', changePasswordLimit, optionalAuth, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });

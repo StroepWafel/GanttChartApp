@@ -27,6 +27,7 @@ export interface Task {
   completed: boolean;
   completed_at?: string | null;
   base_priority: number;
+  display_order?: number;
   urgency?: number;
   project_name?: string;
   category_name?: string;

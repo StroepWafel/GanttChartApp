@@ -2,7 +2,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import db from './db.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'gantt-chart-secret-change-in-production';
+const DEFAULT_JWT_SECRET = 'gantt-chart-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
 const AUTH_ENABLED = process.env.AUTH_ENABLED === 'true';
 
 function hasUsers() {
@@ -112,4 +113,10 @@ export function masqueradeToken(userId) {
     JWT_SECRET,
     { expiresIn: '24h' }
   );
+}
+
+// Fail startup if auth is enabled but JWT_SECRET is weak
+if (isAuthEnabled() && (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_JWT_SECRET)) {
+  console.error('[auth] FATAL: Auth is enabled but JWT_SECRET is missing or unchanged. Set a strong JWT_SECRET in .env for production.');
+  process.exit(1);
 }

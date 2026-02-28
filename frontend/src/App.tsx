@@ -1,5 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
+
+function useOnline() {
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+  return online;
+}
 import { getAuthStatus, getMe, getVersion } from './api';
+import { applyTheme, getStoredTheme } from './theme';
 import { clearCredentials } from './credentialStorage';
 import AuthGate from './components/AuthGate';
 import ResetPassword from './components/ResetPassword';
@@ -23,6 +39,7 @@ const RELOAD_DELAY_MS = 2500;
 const WAIT_TIMEOUT_MS = 120000;
 
 export default function App() {
+  const online = useOnline();
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('gantt_token'));
   const [mustChangePassword, setMustChangePassword] = useState<boolean | null>(null);
@@ -31,7 +48,9 @@ export default function App() {
   const [updateReloadTimedOut, setUpdateReloadTimedOut] = useState(false);
   const updatePollRef = useRef<{ intervalId: ReturnType<typeof setInterval>; timeoutId: ReturnType<typeof setTimeout>; hasSeenFailure: boolean } | null>(null);
 
-  // Slow poll: all clients check periodically if server is about to restart
+  // Slow poll: all clients check periodically if server is about to restart.
+  // Only trust data.updating from server—connection errors (e.g. app sleep, network blip)
+  // should NOT trigger the overlay, as they are often transient.
   useEffect(() => {
     if (updatePhase !== null) return;
     const id = setInterval(async () => {
@@ -39,8 +58,7 @@ export default function App() {
         const data = await getVersion();
         if (data.updating) setUpdatePhase('waiting');
       } catch {
-        // Connection error might mean server is restarting
-        setUpdatePhase('waiting');
+        // Connection error—do not treat as server restart; ignore
       }
     }, SLOW_POLL_MS);
     return () => clearInterval(id);
@@ -94,6 +112,10 @@ export default function App() {
   }, [updatePhase]);
 
   useEffect(() => {
+    applyTheme(getStoredTheme());
+  }, []);
+
+  useEffect(() => {
     getAuthStatus()
       .then((d) => setAuthEnabled(d.enabled))
       .catch(() => setAuthEnabled(false));
@@ -135,6 +157,13 @@ export default function App() {
     return () => window.removeEventListener('popstate', handler);
   }, []);
 
+  const offlineBanner =
+    !online && (
+      <div className="offline-banner" role="status" aria-live="polite">
+        You are offline. Some features may be unavailable.
+      </div>
+    );
+
   const updateOverlay =
     updatePhase && (
       <div className="update-reload-overlay" role="alert" aria-live="polite">
@@ -166,6 +195,7 @@ export default function App() {
   if (authEnabled === null) {
     return (
       <>
+        {offlineBanner}
         {updateOverlay}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           Loading...
@@ -177,6 +207,7 @@ export default function App() {
   if (resetToken && authEnabled) {
     return (
       <>
+        {offlineBanner}
         {updateOverlay}
         <ResetPassword token={resetToken} onSuccess={goToSignIn} />
       </>
@@ -186,6 +217,7 @@ export default function App() {
   if (authEnabled && !token) {
     return (
       <>
+        {offlineBanner}
         {updateOverlay}
         <AuthGate onLogin={handleLogin} />
       </>
@@ -195,6 +227,7 @@ export default function App() {
   if (authEnabled && token && mustChangePassword === null) {
     return (
       <>
+        {offlineBanner}
         {updateOverlay}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           Loading...
@@ -206,6 +239,7 @@ export default function App() {
   if (authEnabled && token && mustChangePassword === true) {
     return (
       <>
+        {offlineBanner}
         {updateOverlay}
         <ForceChangePassword onComplete={handleForceChangeComplete} />
       </>
@@ -214,6 +248,7 @@ export default function App() {
 
   return (
     <>
+      {offlineBanner}
       {updateOverlay}
       <AdminAlertsProvider>
         <ModalProvider>

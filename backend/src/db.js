@@ -163,6 +163,11 @@ try {
     db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0');
   }
 
+  const taskCols = db.prepare("PRAGMA table_info(tasks)").all();
+  if (!taskCols.some((c) => c.name === 'display_order')) {
+    db.exec('ALTER TABLE tasks ADD COLUMN display_order INTEGER DEFAULT 0');
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

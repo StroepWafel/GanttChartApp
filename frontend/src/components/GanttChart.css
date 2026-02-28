@@ -297,7 +297,15 @@
   box-sizing: border-box;
 }
 
+.gantt-row-sortable {
+  grid-template-columns: 36px minmax(180px, 1fr) 70px 70px 24px;
+}
+
 @media (max-width: 768px) {
+  .gantt-row-sortable {
+    grid-template-columns: 32px minmax(80px, 1fr) 48px 48px 24px;
+  }
+
   .gantt-list-row {
     grid-template-columns: 32px minmax(80px, 1fr) 48px 48px;
     gap: 4px;
@@ -309,6 +317,10 @@
 }
 
 @media (max-width: 480px) {
+  .gantt-row-sortable {
+    grid-template-columns: 28px minmax(60px, 1fr) 44px 44px 20px;
+  }
+
   .gantt-list-row {
     grid-template-columns: 28px minmax(60px, 1fr) 44px 44px;
     gap: 4px;
@@ -409,6 +421,30 @@
 
 .gantt-list-row.completed {
   opacity: 0.7;
+}
+
+.gantt-drag-handle {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  padding: 4px;
+  border-radius: 3px;
+}
+
+.gantt-drag-handle:hover {
+  color: var(--text);
+  background: var(--bg-elevated);
+}
+
+.gantt-drag-handle:active {
+  cursor: grabbing;
+}
+
+.gantt-list-row.gantt-dragging {
+  opacity: 0.5;
+  z-index: 1;
 }
 
 .gantt-list-name {

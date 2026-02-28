@@ -1,0 +1,48 @@
+.shortcuts-help-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shortcuts-help-modal {
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  max-width: 360px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.shortcuts-help-modal h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+
+.shortcuts-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.shortcuts-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+}
+
+.shortcuts-list kbd {
+  display: inline-block;
+  min-width: 2rem;
+  padding: 0.15rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.shortcuts-list span {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}

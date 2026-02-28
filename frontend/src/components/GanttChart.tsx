@@ -1,5 +1,16 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Pencil, Split, Trash2, RotateCcw, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Split, Trash2, RotateCcw, Check, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import ConfirmModal from './ConfirmModal';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
@@ -24,6 +35,7 @@ interface Props {
   onTaskDelete: (id: number, cascade: boolean) => void;
   onTaskSplit: (task: Task) => void;
   onTaskEdit: (task: Task) => void;
+  onTaskReorder?: (updates: { id: number; display_order: number }[]) => void;
   /** When set (e.g. by mobile page), forces chart or list view - no internal toggle */
   forceViewMode?: 'chart' | 'list';
 }
@@ -38,6 +50,24 @@ function isExpanded(state: ExpandedState, type: keyof ExpandedState, id: number)
   const val = state[type][id];
   return val === undefined ? true : val;
 }
+
+function TaskListRowSortable({
+  taskId,
+  isTopLevel,
+  children,
+}: {
+  taskId: number;
+  isTopLevel: boolean;
+  children: (handlers: { setNodeRef: (el: HTMLElement | null) => void; style?: React.CSSProperties; attributes: object; listeners: object | undefined; isDragging: boolean }) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: taskId,
+    disabled: !isTopLevel,
+  });
+  const style = transform ? { transform: CSS.Transform.toString(transform), transition } : undefined;
+  return <>{children({ setNodeRef, style, attributes, listeners, isDragging })}</>;
+}
+
 
 function toStartOfDay(d: Date): Date {
   const x = new Date(d);
@@ -145,6 +175,9 @@ function buildHierarchicalRows(
       const projTasks = tasks
         .filter((t) => t.project_id === proj.id)
         .sort((a, b) => {
+          const orderA = a.display_order ?? 0;
+          const orderB = b.display_order ?? 0;
+          if (orderA !== orderB) return orderA - orderB;
           const uA = (a as Task & { urgency?: number }).urgency ?? 0;
           const uB = (b as Task & { urgency?: number }).urgency ?? 0;
           if (uB !== uA) return uB - uA;
@@ -186,6 +219,7 @@ export default function GanttChart({
   onTaskDelete,
   onTaskSplit,
   onTaskEdit,
+  onTaskReorder,
   forceViewMode,
 }: Props) {
   const { isMobile, isSmallMobile } = useMediaQuery();
@@ -237,6 +271,38 @@ export default function GanttChart({
   const hierarchicalRows = useMemo(
     () => buildHierarchicalRows(tasks, projects, categories, expanded, includeCompleted),
     [tasks, projects, categories, expanded, includeCompleted]
+  );
+
+  const topLevelTaskIds = useMemo(
+    () => tasks.filter((t) => !t.parent_id).map((t) => t.id),
+    [tasks]
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id || !onTaskReorder) return;
+      const activeId = active.id as number;
+      const overId = over.id as number;
+      const activeTask = tasks.find((t) => t.id === activeId);
+      const overTask = tasks.find((t) => t.id === overId);
+      if (!activeTask || !overTask || activeTask.project_id !== overTask.project_id) return;
+      if (activeTask.parent_id || overTask.parent_id) return;
+      const projTasks = tasks
+        .filter((t) => t.project_id === activeTask.project_id && !t.parent_id)
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      const oldIndex = projTasks.findIndex((t) => t.id === activeId);
+      const newIndex = projTasks.findIndex((t) => t.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return;
+      const reordered = arrayMove(projTasks, oldIndex, newIndex);
+      onTaskReorder(reordered.map((t, i) => ({ id: t.id, display_order: i })));
+    },
+    [tasks, onTaskReorder]
   );
   const taskRows = useMemo(
     () => hierarchicalRows.filter((r): r is Extract<GanttRow, { type: 'task' }> => r.type === 'task'),
@@ -786,6 +852,8 @@ export default function GanttChart({
             {!isMobileChartSlim && <span className="gantt-hdr-from">From</span>}
             {!isMobileChartSlim && <span className="gantt-hdr-to">To</span>}
           </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={topLevelTaskIds} strategy={verticalListSortingStrategy}>
           {hierarchicalRows.map((row) => {
             if (row.type === 'category') {
               const exp = isExpanded(expanded, 'category', row.category.id);
@@ -860,40 +928,59 @@ export default function GanttChart({
             const children = tasks.filter((t) => t.parent_id === row.task.id);
             const hasChildren = children.length > 0;
             const exp = hasChildren ? isExpanded(expanded, 'task', row.task.id) : true;
+            const isTopLevel = !row.task.parent_id;
             return (
-              <div
-                key={row.task.id}
-                className={`gantt-list-row ${row.task.completed ? 'completed' : ''}`}
-              >
-                <div className="gantt-row-expand" style={{ paddingLeft: 8 + row.indent * 14 }}>
-                  {hasChildren ? (
-                    <button
-                      type="button"
-                      className="gantt-expand-btn"
-                      onClick={() => toggleExpanded('task', row.task.id)}
-                      title={exp ? 'Collapse' : 'Expand'}
-                      aria-label={exp ? 'Collapse' : 'Expand'}
-                    >
-                      {exp ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
-                  ) : (
-                    <span className="gantt-expand-spacer" />
-                  )}
-                </div>
-                <span className="gantt-list-name" style={{ paddingLeft: 16 + row.indent * 14 }}>{row.task.name}</span>
-                {!isMobileChartSlim && (
-                  <>
-                    <span className="gantt-list-date">
-                      {formatDate(new Date(row.task.start_date))}
-                    </span>
-                    <span className="gantt-list-date">
-                      {formatDate(new Date(row.task.end_date))}
-                    </span>
-                  </>
+              <TaskListRowSortable key={row.task.id} taskId={row.task.id} isTopLevel={!!isTopLevel}>
+                {({ setNodeRef, style, attributes, listeners, isDragging }) => (
+                  <div
+                    ref={setNodeRef}
+                    style={style}
+                    className={`gantt-list-row ${row.task.completed ? 'completed' : ''} ${isDragging ? 'gantt-dragging' : ''} ${isTopLevel && onTaskReorder ? 'gantt-row-sortable' : ''}`}
+                  >
+                    <div className="gantt-row-expand" style={{ paddingLeft: 8 + row.indent * 14 }}>
+                      {hasChildren ? (
+                        <button
+                          type="button"
+                          className="gantt-expand-btn"
+                          onClick={() => toggleExpanded('task', row.task.id)}
+                          title={exp ? 'Collapse' : 'Expand'}
+                          aria-label={exp ? 'Collapse' : 'Expand'}
+                        >
+                          {exp ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                      ) : (
+                        <span className="gantt-expand-spacer" />
+                      )}
+                    </div>
+                    <span className="gantt-list-name" style={{ paddingLeft: 16 + row.indent * 14 }}>{row.task.name}</span>
+                    {!isMobileChartSlim && (
+                      <>
+                        <span className="gantt-list-date">
+                          {formatDate(new Date(row.task.start_date))}
+                        </span>
+                        <span className="gantt-list-date">
+                          {formatDate(new Date(row.task.end_date))}
+                        </span>
+                      </>
+                    )}
+                    {isTopLevel && onTaskReorder && (
+                      <div
+                        className="gantt-drag-handle"
+                        {...attributes}
+                        {...(listeners ?? {})}
+                        title="Drag to reorder"
+                        aria-label="Drag to reorder"
+                      >
+                        <GripVertical size={14} />
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
+              </TaskListRowSortable>
             );
           })}
+          </SortableContext>
+          </DndContext>
         </div>
 
         <div className="gantt-timeline-wrap" style={{ minWidth: totalWidth }}>

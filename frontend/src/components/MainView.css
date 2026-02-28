@@ -57,6 +57,14 @@
   flex: 1;
 }
 
+.header-search-input {
+  width: 180px;
+  max-width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+}
+
 .header-actions {
   display: flex;
   gap: 6px;
