@@ -23,9 +23,9 @@
 
 @media (max-width: 480px) {
   .main-header {
-    padding: 6px 8px;
-    min-height: 40px;
-    gap: 6px;
+    padding: 8px 10px;
+    min-height: 48px;
+    gap: 8px;
   }
 
   .main-header h1 {
@@ -67,9 +67,11 @@
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
   overflow: visible;
+  flex-shrink: 0;
 }
 
 .header-actions-mobile {
@@ -167,7 +169,9 @@
 }
 
 .btn-sm svg {
+  flex-shrink: 0;
   vertical-align: middle;
+  display: block;
 }
 
 .btn-sm:hover:not(:disabled) {

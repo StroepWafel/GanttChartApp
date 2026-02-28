@@ -4,6 +4,9 @@
  * Requires: .env with PUBLIC_URL and MOBILE_APP_ENABLED=true
  * Produces: mobile/dist (web bundle), runs cap sync, builds APK at mobile/releases/app.apk
  * Requires: Java/Android SDK for APK build (Android Studio or JDK + Android SDK)
+ *
+ * iOS: npm run build:ios (macOS only). Produces mobile/releases/App.app (simulator).
+ *      Device/App Store: use Xcode (npm run setup:ios && cd mobile && npx cap open ios)
  */
 
 const fs = require('fs');
@@ -11,6 +14,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const isWindows = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
+
+const buildIos = process.argv.includes('--ios') || process.env.BUILD_IOS === 'true' || process.env.BUILD_IOS === '1';
 
 /** Find Android SDK for Gradle */
 function findAndroidSdk() {
@@ -192,8 +198,8 @@ console.log('Copied build to mobile/dist');
       const sharps = ico.sharpsFromIco(faviconPath);
       if (sharps.length > 0) {
         const best = sharps[sharps.length - 1];
-        // Maskable safe zone: center 80% of icon (outer 10% can be cropped by circle/shape masks)
-        const safeZoneScale = 0.8;
+        // Maskable safe zone: center 66% of icon – Android/iOS apply circle/squircle masks that crop edges
+        const safeZoneScale = 0.66;
 
         const makeMaskableIcon = async (size) => {
           const inner = Math.round(size * safeZoneScale);
@@ -212,11 +218,13 @@ console.log('Copied build to mobile/dist');
 
         const icon192 = await makeMaskableIcon(192);
         const icon512 = await makeMaskableIcon(512);
+        const icon1024 = await makeMaskableIcon(1024);
         await Promise.all([
           icon192.toFile(path.join(iconsDir, 'icon-192.png')),
           icon512.toFile(path.join(iconsDir, 'icon-512.png')),
+          icon1024.toFile(path.join(iconsDir, 'icon-1024.png')),
         ]);
-        console.log('Generated PWA maskable icons from favicon (with safe zone)');
+        console.log('Generated PWA/App icons from favicon (192, 512, 1024; safe zone)');
 
         const androidResDir = path.join(mobileDir, 'android', 'app', 'src', 'main', 'res');
         if (fs.existsSync(androidResDir)) {
@@ -308,8 +316,22 @@ console.log('Copied build to mobile/dist');
   }
 
   const androidDir = path.join(mobileDir, 'android');
-  if (!fs.existsSync(androidDir)) {
+  const iosDir = path.join(mobileDir, 'ios');
+  const releasesDir = path.join(mobileDir, 'releases');
+
+  if (buildIos && !isMac) {
+    console.log('iOS build requires macOS (Xcode). Use a Mac or CI with macos-latest.');
+    console.log('Android APK can be built on any platform. See docs/IOS_BUILD.md');
+    process.exit(0);
+  }
+
+  if (!buildIos && !fs.existsSync(androidDir)) {
     console.error('build-mobile: android/ missing. Run: npm run setup:android');
+    process.exit(1);
+  }
+
+  if (buildIos && !fs.existsSync(iosDir)) {
+    console.error('build-mobile: ios/ missing. Run: npm run setup:ios (on macOS)');
     process.exit(1);
   }
 
@@ -317,13 +339,50 @@ console.log('Copied build to mobile/dist');
     execSync('npx cap sync', { cwd: mobileDir, stdio: 'inherit' });
     console.log('Capacitor sync complete');
   } catch (e) {
-    console.warn('build-mobile: cap sync failed (run "cd mobile && npx cap add android" if android/ missing):', e.message);
+    console.warn('build-mobile: cap sync failed:', e.message);
   }
 
-  // Build APK and copy to mobile/releases/ for server download
-  const releasesDir = path.join(mobileDir, 'releases');
-  const apkOutput = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
-  const apkDest = path.join(releasesDir, 'app.apk');
+  if (buildIos) {
+    // iOS build (macOS only)
+    const iosAppDir = path.join(iosDir, 'App');
+    const derivedPath = path.join(iosAppDir, 'build');
+    const appOutput = path.join(derivedPath, 'Build', 'Products', 'Debug-iphonesimulator', 'App.app');
+
+    console.log('Running pod install...');
+    try {
+      execSync('pod install', { cwd: iosAppDir, stdio: 'inherit' });
+    } catch (e) {
+      console.error('build-mobile: pod install failed. Ensure CocoaPods is installed (brew install cocoapods or sudo gem install cocoapods)');
+      process.exit(1);
+    }
+
+    console.log('Building for iOS Simulator...');
+    try {
+      execSync(
+        `xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -derivedDataPath build -quiet`,
+        { cwd: iosAppDir, stdio: 'inherit' }
+      );
+    } catch (e) {
+      console.error('build-mobile: xcodebuild failed. Ensure Xcode is installed (xcode-select -p, xcodebuild -version)');
+      process.exit(1);
+    }
+
+    if (fs.existsSync(appOutput)) {
+      if (!fs.existsSync(releasesDir)) fs.mkdirSync(releasesDir, { recursive: true });
+      const appDest = path.join(releasesDir, 'App.app');
+      if (fs.existsSync(appDest)) fs.rmSync(appDest, { recursive: true });
+      fs.cpSync(appOutput, appDest, { recursive: true });
+      console.log('iOS app built: mobile/releases/App.app (simulator)');
+      console.log('To run: open mobile/releases/App.app');
+      console.log('For device/App Store: cd mobile && npx cap open ios');
+    } else {
+      console.error('build-mobile: App.app not found after xcodebuild');
+      process.exit(1);
+    }
+  } else {
+    // Android build
+    const apkOutput = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+    const apkDest = path.join(releasesDir, 'app.apk');
 
   if (fs.existsSync(androidDir)) {
     const gradleCmd = isWindows ? 'gradlew.bat' : './gradlew';
@@ -374,6 +433,7 @@ console.log('Copied build to mobile/dist');
     }
   } else {
     console.warn('build-mobile: android/ folder missing; run "cd mobile && npx cap add android"');
+  }
   }
 
   console.log('=== Mobile app build complete ===');

@@ -74,3 +74,45 @@ jobs:
         with:
           name: gantt-chart-app-debug
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm --prefix backend install
+          npm --prefix frontend install
+          npm --prefix mobile install
+
+      - name: Get PUBLIC_URL
+        id: url
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "url=${{ github.event.inputs.public_url }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ secrets.PUBLIC_URL }}" ]; then
+            echo "url=${{ secrets.PUBLIC_URL }}" >> $GITHUB_OUTPUT
+          else
+            echo "::error::PUBLIC_URL required."
+            exit 1
+          fi
+
+      - name: Setup iOS and build
+        env:
+          MOBILE_APP_ENABLED: 'true'
+          PUBLIC_URL: ${{ steps.url.outputs.url }}
+        run: npm run build:ios
+
+      - name: Upload iOS app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gantt-chart-ios-simulator
+          path: mobile/releases/App.app

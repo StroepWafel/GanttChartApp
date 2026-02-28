@@ -11,8 +11,10 @@
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
     "build:android": "npm run setup:android && npm run build:mobile",
+    "build:ios": "npm run setup:ios && node scripts/build-mobile.js --ios",
     "build:mobile": "node scripts/build-mobile.js",
     "setup:android": "node scripts/setup-android.js",
+    "setup:ios": "node scripts/setup-ios.js",
     "start": "cd backend && npm start",
     "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install && npm --prefix mobile install",
     "update": "bash scripts/update.sh"
