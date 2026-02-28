@@ -254,14 +254,31 @@ export async function getMobileAppStatus(): Promise<{ enabled: boolean; apkAvail
   return data;
 }
 
-export async function buildMobileApp(): Promise<{ ok: boolean; message: string; output?: string }> {
+/** Start mobile build (returns immediately; poll getMobileBuildStatus for progress) */
+export async function startMobileBuild(): Promise<{ ok: boolean; status?: string; error?: string }> {
   const res = await fetchApi('/admin/build-mobile', { method: 'POST' });
-  const data = await safeJson<{ ok?: boolean; error?: string; output?: string; message?: string }>(res);
-  // Don't throw on failure: return error details so the caller can show output (build logs)
+  const data = await safeJson<{ ok?: boolean; status?: string; error?: string }>(res);
   if (!res.ok) {
-    return { ok: false, message: data.error || 'Build failed', output: data.output };
+    return { ok: false, error: data.error || 'Failed to start build' };
   }
-  return { ok: data.ok ?? true, message: data.message ?? 'Build complete', output: data.output };
+  return { ok: data.ok ?? true, status: data.status };
+}
+
+/** Get mobile build status (for polling after startMobileBuild) */
+export async function getMobileBuildStatus(): Promise<{
+  status: 'idle' | 'building' | 'success' | 'failed';
+  output?: string;
+  error?: string | null;
+  ok: boolean;
+}> {
+  const res = await fetchApi('/admin/build-mobile/status');
+  const data = await res.json();
+  return {
+    status: data.status ?? 'idle',
+    output: data.output,
+    error: data.error,
+    ok: data.ok ?? data.status === 'success',
+  };
 }
 
 export async function getSettings() {

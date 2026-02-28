@@ -392,9 +392,26 @@ router.post('/full-restore', (req, res) => {
   }
 });
 
-/** Manually trigger mobile app build (admin only) */
+/** In-memory state for async mobile build (avoids proxy 502 on long-running builds) */
+let mobileBuildState = { status: 'idle', output: '', error: null };
+const MOBILE_BUILD_MAX_OUTPUT = 50_000;
+
+/** GET build status (for polling) */
+router.get('/build-mobile/status', (req, res) => {
+  res.json({
+    status: mobileBuildState.status,
+    output: mobileBuildState.output,
+    error: mobileBuildState.error,
+    ok: mobileBuildState.status === 'success',
+  });
+});
+
+/** Manually trigger mobile app build (admin only). Starts build in background, returns immediately to avoid proxy timeout. */
 router.post('/build-mobile', (req, res) => {
   try {
+    if (mobileBuildState.status === 'building') {
+      return res.status(409).json({ error: 'Build already in progress' });
+    }
     let rootDir = path.resolve(__dirname, '../../..');
     const publicUrlRow = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('public_url');
     let publicUrl = process.env.PUBLIC_URL || '';
@@ -413,7 +430,6 @@ router.post('/build-mobile', (req, res) => {
     }
     let buildScript = path.join(rootDir, 'scripts', 'build-mobile.js');
     if (!existsSync(buildScript)) {
-      // Fallback: repo root may be parent of cwd when server runs from backend/
       const cwdParent = path.resolve(process.cwd(), '..');
       const altScript = path.join(cwdParent, 'scripts', 'build-mobile.js');
       if (existsSync(altScript)) {
@@ -421,23 +437,38 @@ router.post('/build-mobile', (req, res) => {
         rootDir = cwdParent;
       }
     }
+    mobileBuildState = { status: 'building', output: '', error: null };
+    res.json({ ok: true, status: 'building', message: 'Build started. Poll /admin/build-mobile/status for progress.' });
     const proc = spawn('node', [buildScript], { cwd: rootDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
-    proc.stdout?.on('data', (d) => { stdout += d.toString(); });
-    proc.stderr?.on('data', (d) => { stderr += d.toString(); });
+    proc.stdout?.on('data', (d) => {
+      const s = d.toString();
+      stdout += s;
+      mobileBuildState.output = (stdout + stderr).slice(-MOBILE_BUILD_MAX_OUTPUT);
+    });
+    proc.stderr?.on('data', (d) => {
+      const s = d.toString();
+      stderr += s;
+      mobileBuildState.output = (stdout + stderr).slice(-MOBILE_BUILD_MAX_OUTPUT);
+    });
     proc.on('close', (code) => {
+      const output = (stdout + stderr).trim() || `Exit code ${code}`;
       if (code === 0) {
-        res.json({ ok: true, message: 'Mobile app built successfully', output: stdout || stderr || 'Build complete.' });
+        mobileBuildState = { status: 'success', output, error: null };
       } else {
-        res.status(500).json({ error: 'Build failed', output: (stdout + stderr).trim() || `Exit code ${code}` });
+        mobileBuildState = { status: 'failed', output, error: 'Build failed' };
       }
     });
     proc.on('error', (err) => {
-      res.status(500).json({ error: 'Failed to start build', output: err.message });
+      mobileBuildState = { status: 'failed', output: err.message, error: 'Failed to start build' };
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (mobileBuildState.status === 'building') {
+      mobileBuildState = { status: 'failed', output: err.message, error: err.message };
+    } else {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 

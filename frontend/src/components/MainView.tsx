@@ -903,25 +903,42 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     setMobileBuildInProgress(true);
                     setMobileBuildStatus({ status: 'idle' });
                     try {
-                      const result = await api.buildMobileApp();
-                      const status = { status: (result.ok ? 'success' : 'failed') as 'success' | 'failed', message: result.ok ? 'Built' : (result.output || result.message || 'Unknown error') };
-                      setMobileBuildStatus(status);
-                      if (!result.ok) {
-                        localStorage.setItem('gantt_mobile_build_status', JSON.stringify(status));
-                        adminAlerts.addAlert('Mobile app', 'Build failed', status.message);
-                        modal.showAlert({ title: 'Build failed', message: 'See Settings → Status for details.' });
-                      } else {
-                        localStorage.removeItem('gantt_mobile_build_status');
-                        api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); }).catch(() => {});
-                        modal.showAlert({ title: 'Build complete', message: status.message });
+                      const start = await api.startMobileBuild();
+                      if (!start.ok) {
+                        const msg = start.error || 'Failed to start build';
+                        setMobileBuildStatus({ status: 'failed', message: msg });
+                        localStorage.setItem('gantt_mobile_build_status', JSON.stringify({ status: 'failed', message: msg }));
+                        adminAlerts.addAlert('Mobile app', 'Build failed', msg);
+                        modal.showAlert({ title: 'Build failed', message: msg });
+                        setMobileBuildInProgress(false);
+                        return;
                       }
+                      const poll = async (): Promise<void> => {
+                        const s = await api.getMobileBuildStatus();
+                        setMobileBuildStatus({ status: s.status, message: s.output || s.error || undefined });
+                        if (s.status === 'building') {
+                          setTimeout(poll, 2500);
+                          return;
+                        }
+                        setMobileBuildInProgress(false);
+                        if (s.status === 'failed') {
+                          const msg = s.output || s.error || 'Unknown error';
+                          localStorage.setItem('gantt_mobile_build_status', JSON.stringify({ status: 'failed', message: msg }));
+                          adminAlerts.addAlert('Mobile app', 'Build failed', msg);
+                          modal.showAlert({ title: 'Build failed', message: 'See Settings → Status for details.' });
+                        } else {
+                          localStorage.removeItem('gantt_mobile_build_status');
+                          api.getMobileAppStatus().then((app) => { setMobileAppEnabled(app.enabled); setMobileApkAvailable(!!app.apkAvailable); }).catch(() => {});
+                          modal.showAlert({ title: 'Build complete', message: s.output || 'Build complete.' });
+                        }
+                      };
+                      await poll();
                     } catch (err) {
                       const msg = err instanceof Error ? err.message : 'Unknown error';
                       setMobileBuildStatus({ status: 'failed', message: msg });
                       localStorage.setItem('gantt_mobile_build_status', JSON.stringify({ status: 'failed', message: msg }));
                       adminAlerts.addAlert('Mobile app', 'Build failed', msg);
                       modal.showAlert({ title: 'Build failed', message: 'See Settings → Status for details.' });
-                    } finally {
                       setMobileBuildInProgress(false);
                     }
                   }}>{mobileBuildInProgress ? 'Building…' : 'Build app now'}</button>
