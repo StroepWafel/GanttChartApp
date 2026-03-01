@@ -9,7 +9,7 @@ export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download`
 /** URL for iOS build download */
 export const IOS_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download-ios` : '/api/mobile-app/download-ios';
 
-/** Download APK via fetch + blob. On native: use Filesystem.downloadFile + FileOpener for direct download. */
+/** Download APK. On native: use Filesystem.downloadFile + FileOpener. On web: use direct link (fetch+blob is blocked by browsers after async). */
 export async function downloadApk(): Promise<void> {
   const url = APK_DOWNLOAD_URL;
   if (isMobileNative()) {
@@ -31,24 +31,19 @@ export async function downloadApk(): Promise<void> {
     }
     return;
   }
-  const res = await fetch(url, { credentials: 'same-origin' });
-  const ct = res.headers.get('Content-Type') || '';
-  if (ct.includes('text/html') || ct.includes('application/json')) {
-    await res.text(); // consume body
-    throw new Error(res.ok ? 'Server returned HTML instead of APK' : `Download failed: ${res.status} ${res.statusText}`);
-  }
-  const blob = await res.blob();
+  // Use direct link so download happens in same user gesture (browsers block programmatic downloads after async)
+  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = absUrl;
   a.download = 'gantt-chart.apk';
+  a.rel = 'noopener noreferrer';
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
 }
 
-/** Download iOS build (.ipa) via fetch + blob. On native: use Filesystem.downloadFile + FileOpener for direct download. */
+/** Download iOS build (.ipa). On native: use Filesystem.downloadFile + FileOpener. On web: use direct link (fetch+blob is blocked by browsers after async). */
 export async function downloadIosBuild(): Promise<void> {
   const url = IOS_DOWNLOAD_URL;
   if (isMobileNative()) {
@@ -70,21 +65,16 @@ export async function downloadIosBuild(): Promise<void> {
     }
     return;
   }
-  const res = await fetch(url, { credentials: 'same-origin' });
-  const ct = res.headers.get('Content-Type') || '';
-  if (ct.includes('text/html') || ct.includes('application/json')) {
-    await res.text();
-    throw new Error(res.ok ? 'Server returned HTML instead of IPA' : `Download failed: ${res.status} ${res.statusText}`);
-  }
-  const blob = await res.blob();
+  // Use direct link so download happens in same user gesture (browsers block programmatic downloads after async)
+  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = absUrl;
   a.download = 'gantt-chart.ipa';
+  a.rel = 'noopener noreferrer';
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
 }
 
 /** Upload iOS build (.ipa) - admin only */
