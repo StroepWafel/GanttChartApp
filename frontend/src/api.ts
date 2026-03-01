@@ -9,40 +9,13 @@ export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download`
 /** URL for iOS build download */
 export const IOS_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download-ios` : '/api/mobile-app/download-ios';
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      resolve(result.includes(',') ? result.split(',')[1] : result);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-/** Download APK. On native: fetch, write to filesystem, open. On web: fetch, validate response, then trigger download. No auth needed (app requires sign-in). */
+/** Download APK. On native: open URL in system browser (most reliable for APK download). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadApk(): Promise<void> {
   const url = `${API}/mobile-app/download`;
+  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
-    const res = await fetch(url, { credentials: 'same-origin' });
-    const ct = (res.headers.get('Content-Type') || '').toLowerCase();
-    if (ct.includes('text/html') || ct.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(
-        res.ok
-          ? 'Server returned HTML instead of APK. Check proxy/base path configuration.'
-          : `Download failed (${res.status}): ${text.slice(0, 200)}`
-      );
-    }
-    if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
-    const blob = await res.blob();
-    const base64 = await blobToBase64(blob);
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
-    const { FileOpener } = await import('@capacitor-community/file-opener');
-    await Filesystem.writeFile({ path: 'gantt-chart.apk', data: base64, directory: Directory.Cache });
-    const { uri } = await Filesystem.getUri({ path: 'gantt-chart.apk', directory: Directory.Cache });
-    await FileOpener.open({ filePath: uri, contentType: 'application/vnd.android.package-archive' });
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({ url: absUrl });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -67,28 +40,13 @@ export async function downloadApk(): Promise<void> {
   URL.revokeObjectURL(a.href);
 }
 
-/** Download iOS build (.ipa). On native: fetch, write to filesystem, open. On web: fetch, validate response, then trigger download. No auth needed (app requires sign-in). */
+/** Download iOS build (.ipa). On native: open URL in system browser (most reliable for IPA download). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadIosBuild(): Promise<void> {
   const url = `${API}/mobile-app/download-ios`;
+  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
-    const res = await fetch(url, { credentials: 'same-origin' });
-    const ct = (res.headers.get('Content-Type') || '').toLowerCase();
-    if (ct.includes('text/html') || ct.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(
-        res.ok
-          ? 'Server returned HTML instead of IPA. Check proxy/base path configuration.'
-          : `Download failed (${res.status}): ${text.slice(0, 200)}`
-      );
-    }
-    if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
-    const blob = await res.blob();
-    const base64 = await blobToBase64(blob);
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
-    const { FileOpener } = await import('@capacitor-community/file-opener');
-    await Filesystem.writeFile({ path: 'gantt-chart.ipa', data: base64, directory: Directory.Cache });
-    const { uri } = await Filesystem.getUri({ path: 'gantt-chart.ipa', directory: Directory.Cache });
-    await FileOpener.open({ filePath: uri, contentType: 'application/octet-stream' });
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({ url: absUrl });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
