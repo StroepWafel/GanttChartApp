@@ -150,7 +150,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     try {
       await api.downloadApk();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Download failed';
+      const msg = err instanceof Error
+        ? (err.name === 'AbortError' ? 'Download timed out. Check your connection.' : err.message)
+        : 'Download failed';
       modal.showAlert({ title: 'Download failed', message: msg });
     } finally {
       setDownloadApkLoading(false);

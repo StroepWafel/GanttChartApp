@@ -29,9 +29,15 @@ export async function downloadApk(): Promise<void> {
     const { Filesystem, Directory } = await import('@capacitor/filesystem');
     const { FileOpener } = await import('@capacitor-community/file-opener');
     try {
-      await Filesystem.downloadFile({ url: absUrl, path: 'gantt-chart.apk', directory: Directory.Cache });
+      await Promise.race([
+        Filesystem.downloadFile({ url: absUrl, path: 'gantt-chart.apk', directory: Directory.Cache }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 60000)),
+      ]);
     } catch {
-      const res = await fetch(absUrl, { credentials: 'same-origin' });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const res = await fetch(absUrl, { credentials: 'same-origin', signal: controller.signal });
+      clearTimeout(timeoutId);
       const ct = (res.headers.get('Content-Type') || '').toLowerCase();
       if (ct.includes('text/html') || ct.includes('application/json')) {
         const text = await res.text();
@@ -47,7 +53,8 @@ export async function downloadApk(): Promise<void> {
       await Filesystem.writeFile({ path: 'gantt-chart.apk', data: base64, directory: Directory.Cache });
     }
     const { uri } = await Filesystem.getUri({ path: 'gantt-chart.apk', directory: Directory.Cache });
-    await FileOpener.open({ filePath: uri, contentType: 'application/vnd.android.package-archive', openWithDefault: true });
+    const openPromise = FileOpener.open({ filePath: uri, contentType: 'application/vnd.android.package-archive', openWithDefault: true });
+    await Promise.race([openPromise, new Promise<void>((resolve) => setTimeout(resolve, 3000))]);
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -80,9 +87,15 @@ export async function downloadIosBuild(): Promise<void> {
     const { Filesystem, Directory } = await import('@capacitor/filesystem');
     const { FileOpener } = await import('@capacitor-community/file-opener');
     try {
-      await Filesystem.downloadFile({ url: absUrl, path: 'gantt-chart.ipa', directory: Directory.Cache });
+      await Promise.race([
+        Filesystem.downloadFile({ url: absUrl, path: 'gantt-chart.ipa', directory: Directory.Cache }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 60000)),
+      ]);
     } catch {
-      const res = await fetch(absUrl, { credentials: 'same-origin' });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const res = await fetch(absUrl, { credentials: 'same-origin', signal: controller.signal });
+      clearTimeout(timeoutId);
       const ct = (res.headers.get('Content-Type') || '').toLowerCase();
       if (ct.includes('text/html') || ct.includes('application/json')) {
         const text = await res.text();
@@ -98,7 +111,8 @@ export async function downloadIosBuild(): Promise<void> {
       await Filesystem.writeFile({ path: 'gantt-chart.ipa', data: base64, directory: Directory.Cache });
     }
     const { uri } = await Filesystem.getUri({ path: 'gantt-chart.ipa', directory: Directory.Cache });
-    await FileOpener.open({ filePath: uri, contentType: 'application/octet-stream', openWithDefault: true });
+    const openPromise = FileOpener.open({ filePath: uri, contentType: 'application/octet-stream', openWithDefault: true });
+    await Promise.race([openPromise, new Promise<void>((resolve) => setTimeout(resolve, 3000))]);
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
