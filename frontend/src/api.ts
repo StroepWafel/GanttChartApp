@@ -9,14 +9,13 @@ export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download`
 /** URL for iOS build download */
 export const IOS_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download-ios` : '/api/mobile-app/download-ios';
 
-/** Download APK. On native: open mobile-app landing page in browser (has download link). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
+/** Download APK. On native: open download URL in external browser (triggers download). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadApk(): Promise<void> {
   const url = `${API}/mobile-app/download`;
+  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
-    const { Browser } = await import('@capacitor/browser');
-    const baseUrl = API_BASE || window.location.origin;
-    const landingUrl = baseUrl.startsWith('http') ? `${baseUrl}/mobile-app/` : `${window.location.origin}/mobile-app/`;
-    await Browser.open({ url: landingUrl });
+    const { InAppBrowser } = await import('@capacitor/inappbrowser');
+    await InAppBrowser.openInExternalBrowser({ url: absUrl });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -41,14 +40,13 @@ export async function downloadApk(): Promise<void> {
   URL.revokeObjectURL(a.href);
 }
 
-/** Download iOS build (.ipa). On native: open mobile-app landing page in browser (has download link). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
+/** Download iOS build (.ipa). On native: open download URL in external browser (triggers download). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadIosBuild(): Promise<void> {
   const url = `${API}/mobile-app/download-ios`;
+  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
-    const { Browser } = await import('@capacitor/browser');
-    const baseUrl = API_BASE || window.location.origin;
-    const landingUrl = baseUrl.startsWith('http') ? `${baseUrl}/mobile-app/` : `${window.location.origin}/mobile-app/`;
-    await Browser.open({ url: landingUrl });
+    const { InAppBrowser } = await import('@capacitor/inappbrowser');
+    await InAppBrowser.openInExternalBrowser({ url: absUrl });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
