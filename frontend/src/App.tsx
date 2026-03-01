@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getAuthStatus, getMe, getVersion, login } from './api';
 import { useServerConnected } from './hooks/useServerConnected';
+import { useMediaQuery } from './hooks/useMediaQuery';
 import { applyTheme, getStoredTheme } from './theme';
 import { clearCredentials, getCredentials, isMobileNative } from './credentialStorage';
 import AuthGate from './components/AuthGate';
@@ -26,6 +27,7 @@ const WAIT_TIMEOUT_MS = 120000;
 
 export default function App() {
   const { online, serverReachable } = useServerConnected();
+  const { isMobile } = useMediaQuery();
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('gantt_token'));
   const [mustChangePassword, setMustChangePassword] = useState<boolean | null>(null);
@@ -184,7 +186,9 @@ export default function App() {
       <div className="offline-banner" role="status" aria-live="polite">
         {!online
           ? 'You are offline. Some features may be unavailable.'
-          : 'Disconnected from server. Pull down to refresh when back online.'}
+          : isMobile
+            ? 'Disconnected from server. Pull down to refresh when back online.'
+            : 'Disconnected from server. Refresh the page when back online.'}
       </div>
     );
 
