@@ -194,28 +194,22 @@ console.log('Copied build to mobile/dist');
   const iconSourcePath = path.join(mobileDistDir, 'GWA.png');
   if (fs.existsSync(iconSourcePath)) {
     try {
-      const image = sharp(iconSourcePath);
+      const bg = { r: 51, g: 51, b: 51, alpha: 1 };
       // Maskable safe zone: center 80% of icon – Android/iOS apply circle/squircle masks that crop edges.
       const safeZoneScale = 0.8;
 
-      const makeMaskableIcon = async (size) => {
+      const makeMaskableIcon = (size) => {
         const inner = Math.round(size * safeZoneScale);
         const offset = Math.round((size - inner) / 2);
-        const resized = image.resize(inner, inner);
-        const base = sharp({
-          create: {
-            width: size,
-            height: size,
-            channels: 4,
-            background: { r: 51, g: 51, b: 51, alpha: 1 },
-          },
-        });
-        return base.composite([{ input: await resized.toBuffer(), left: offset, top: offset }]).png();
+        return sharp(iconSourcePath)
+          .resize(inner, inner, { fit: 'cover' })
+          .extend({ top: offset, bottom: offset, left: offset, right: offset, background: bg })
+          .png();
       };
 
-      const icon192 = await makeMaskableIcon(192);
-      const icon512 = await makeMaskableIcon(512);
-      const icon1024 = await makeMaskableIcon(1024);
+      const icon192 = makeMaskableIcon(192);
+      const icon512 = makeMaskableIcon(512);
+      const icon1024 = makeMaskableIcon(1024);
       await Promise.all([
         icon192.toFile(path.join(iconsDir, 'icon-192.png')),
         icon512.toFile(path.join(iconsDir, 'icon-512.png')),
@@ -239,45 +233,25 @@ console.log('Copied build to mobile/dist');
             const offsetL = Math.round((d.launcher - innerL) / 2);
             const innerF = Math.round(d.foreground * safeZoneScale);
             const offsetF = Math.round((d.foreground - innerF) / 2);
-            const resizedL = image.resize(innerL, innerL);
-            const resizedF = image.resize(innerF, innerF);
-            const launcherBuf = await resizedL.toBuffer();
-            const foregroundBuf = await resizedF.toBuffer();
-            await Promise.all([
-              sharp({
-                create: {
-                  width: d.launcher,
-                  height: d.launcher,
-                  channels: 4,
-                  background: { r: 51, g: 51, b: 51, alpha: 1 },
-                },
-              })
-                .composite([{ input: launcherBuf, left: offsetL, top: offsetL }])
+            const makeLauncher = () =>
+              sharp(iconSourcePath)
+                .resize(innerL, innerL, { fit: 'cover' })
+                .extend({ top: offsetL, bottom: offsetL, left: offsetL, right: offsetL, background: bg })
                 .png()
-                .toFile(path.join(dirPath, 'ic_launcher.png')),
-              sharp({
-                create: {
-                  width: d.launcher,
-                  height: d.launcher,
-                  channels: 4,
-                  background: { r: 51, g: 51, b: 51, alpha: 1 },
-                },
-              })
-                .composite([{ input: launcherBuf, left: offsetL, top: offsetL }])
+                .toFile(path.join(dirPath, 'ic_launcher.png'));
+            const makeLauncherRound = () =>
+              sharp(iconSourcePath)
+                .resize(innerL, innerL, { fit: 'cover' })
+                .extend({ top: offsetL, bottom: offsetL, left: offsetL, right: offsetL, background: bg })
                 .png()
-                .toFile(path.join(dirPath, 'ic_launcher_round.png')),
-              sharp({
-                create: {
-                  width: d.foreground,
-                  height: d.foreground,
-                  channels: 4,
-                  background: { r: 51, g: 51, b: 51, alpha: 1 },
-                },
-              })
-                .composite([{ input: foregroundBuf, left: offsetF, top: offsetF }])
+                .toFile(path.join(dirPath, 'ic_launcher_round.png'));
+            const makeForeground = () =>
+              sharp(iconSourcePath)
+                .resize(innerF, innerF, { fit: 'cover' })
+                .extend({ top: offsetF, bottom: offsetF, left: offsetF, right: offsetF, background: bg })
                 .png()
-                .toFile(path.join(dirPath, 'ic_launcher_foreground.png')),
-            ]);
+                .toFile(path.join(dirPath, 'ic_launcher_foreground.png'));
+            await Promise.all([makeLauncher(), makeLauncherRound(), makeForeground()]);
           }
         console.log('Generated Android launcher icons from GWA.png (with safe zone)');
       }

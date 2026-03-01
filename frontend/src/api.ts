@@ -9,9 +9,9 @@ export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download`
 /** URL for iOS build download */
 export const IOS_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download-ios` : '/api/mobile-app/download-ios';
 
-/** Download APK. On native: use Filesystem.downloadFile + FileOpener. On web: use direct link (fetch+blob is blocked by browsers after async). */
+/** Download APK. On native: use Filesystem.downloadFile + FileOpener. On web: fetch with auth, validate response, then trigger download. */
 export async function downloadApk(): Promise<void> {
-  const url = APK_DOWNLOAD_URL;
+  const url = `${API}/mobile-app/download`;
   if (isMobileNative()) {
     try {
       const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
@@ -31,21 +31,34 @@ export async function downloadApk(): Promise<void> {
     }
     return;
   }
-  // Use direct link so download happens in same user gesture (browsers block programmatic downloads after async)
-  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+  const res = await fetch(url, {
+    credentials: 'same-origin',
+    headers: getAuthHeaders(),
+  });
+  const ct = (res.headers.get('Content-Type') || '').toLowerCase();
+  if (ct.includes('text/html') || ct.includes('application/json')) {
+    const text = await res.text();
+    throw new Error(
+      res.ok
+        ? 'Server returned HTML instead of APK. Check proxy/base path configuration.'
+        : `Download failed (${res.status}): ${text.slice(0, 200)}`
+    );
+  }
+  if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+  const blob = await res.blob();
   const a = document.createElement('a');
-  a.href = absUrl;
+  a.href = URL.createObjectURL(blob);
   a.download = 'gantt-chart.apk';
-  a.rel = 'noopener noreferrer';
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
 }
 
-/** Download iOS build (.ipa). On native: use Filesystem.downloadFile + FileOpener. On web: use direct link (fetch+blob is blocked by browsers after async). */
+/** Download iOS build (.ipa). On native: use Filesystem.downloadFile + FileOpener. On web: fetch with auth, validate response, then trigger download. */
 export async function downloadIosBuild(): Promise<void> {
-  const url = IOS_DOWNLOAD_URL;
+  const url = `${API}/mobile-app/download-ios`;
   if (isMobileNative()) {
     try {
       const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
@@ -65,16 +78,29 @@ export async function downloadIosBuild(): Promise<void> {
     }
     return;
   }
-  // Use direct link so download happens in same user gesture (browsers block programmatic downloads after async)
-  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+  const res = await fetch(url, {
+    credentials: 'same-origin',
+    headers: getAuthHeaders(),
+  });
+  const ct = (res.headers.get('Content-Type') || '').toLowerCase();
+  if (ct.includes('text/html') || ct.includes('application/json')) {
+    const text = await res.text();
+    throw new Error(
+      res.ok
+        ? 'Server returned HTML instead of IPA. Check proxy/base path configuration.'
+        : `Download failed (${res.status}): ${text.slice(0, 200)}`
+    );
+  }
+  if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+  const blob = await res.blob();
   const a = document.createElement('a');
-  a.href = absUrl;
+  a.href = URL.createObjectURL(blob);
   a.download = 'gantt-chart.ipa';
-  a.rel = 'noopener noreferrer';
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
 }
 
 /** Upload iOS build (.ipa) - admin only */
