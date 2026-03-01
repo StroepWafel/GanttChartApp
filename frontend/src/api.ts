@@ -9,6 +9,12 @@ export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download`
 /** Download APK via fetch + blob. Works reliably on mobile where direct <a download> often returns HTML. */
 export async function downloadApk(): Promise<void> {
   const url = APK_DOWNLOAD_URL;
+  // In native app (Capacitor WebView), blob download doesn't work. Open in Browser so system can handle download.
+  if (isMobileNative()) {
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({ url });
+    return;
+  }
   const res = await fetch(url, { credentials: 'same-origin' });
   const ct = res.headers.get('Content-Type') || '';
   if (ct.includes('text/html') || ct.includes('application/json')) {
