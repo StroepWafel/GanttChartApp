@@ -71,8 +71,9 @@ fi
 [ -f "$EXTRACTED/mobile/capacitor.config.ts" ] && cp "$EXTRACTED/mobile/capacitor.config.ts" "$ROOT/mobile/" 2>/dev/null || true || true
 log "Version in package.json after copy: $(node -p "require('./package.json').version" 2>/dev/null || echo 'read failed')"
 
-echo "=== Installing backend dependencies ==="
-log "Running npm install in backend"
+echo "=== Installing dependencies ==="
+log "Running npm install (root and backend)"
+(cd "$ROOT" && npm install --omit=dev 2>/dev/null) || true
 (cd "$ROOT/backend" && npm install --omit=dev) || npm --prefix "$ROOT/backend" install --omit=dev || true
 
 # Build mobile app if enabled and frontend source available (requires .env: MOBILE_APP_ENABLED=true, PUBLIC_URL=...)

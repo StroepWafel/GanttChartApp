@@ -86,10 +86,10 @@ function getGitHubToken() {
 
 router.get('/check-update', async (req, res) => {
   const debug = req.query.debug === '1' || req.query.debug === 'true';
+  const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
   try {
     const debugInfo = getDebugInfo();
     const currentVersion = debugInfo.packageJsonVersion;
-    const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
     const url = `https://api.github.com/repos/${repo}/releases/latest`;
     const token = getGitHubToken();
     const headers = { Accept: 'application/vnd.github.v3+json' };
@@ -110,7 +110,6 @@ router.get('/check-update', async (req, res) => {
           errorMessage = `GitHub API rate limited. Limit resets at ${resetStr} UTC. Try again after that.`;
         }
       }
-      const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
       return res.json({
         updateAvailable: false,
         currentVersion,
@@ -122,7 +121,6 @@ router.get('/check-update', async (req, res) => {
     const data = await resp.json();
     const latestTag = data.tag_name?.replace(/^v/, '') || data.name || '';
     if (!latestTag) {
-      const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
       return res.json({
         updateAvailable: false,
         currentVersion,
@@ -133,7 +131,6 @@ router.get('/check-update', async (req, res) => {
     const updateAvailable = compareVersions(latestTag, currentVersion) > 0;
     console.log('[update] check-update: latestTag=%s updateAvailable=%s', latestTag, updateAvailable);
 
-    const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
     res.json({
       updateAvailable,
       currentVersion: normalizeVersion(currentVersion),

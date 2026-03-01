@@ -26,6 +26,7 @@ import mobileAppRouter from './routes/mobile-app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Path for "server is restarting" flag (cleared on startup so new process does not report updating)
 const DEFAULT_DB_PATH = path.join(__dirname, '..', '..', 'data', 'gantt.db');
@@ -50,6 +51,12 @@ const apkPath = path.join(mobileReleasesDir, 'app.apk');
 const ipaPath = path.join(mobileReleasesDir, 'app.ipa');
 
 const app = express();
+// Trust proxy when behind nginx/Cloudflare etc. (avoids ERR_ERL_UNEXPECTED_X_FORWARDED_FOR from rate-limit)
+const trustProxy = process.env.TRUST_PROXY;
+if (trustProxy !== undefined && trustProxy !== '') {
+  const n = parseInt(trustProxy, 10);
+  app.set('trust proxy', Number.isNaN(n) ? true : n);
+}
 app.use(cors());
 app.use(express.json());
 
@@ -186,8 +193,9 @@ app.get('*', (req, res, next) => {
   res.sendFile(path.join(frontendDist, 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Gantt Chart API running on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  const addr = HOST === '0.0.0.0' ? `http://localhost:${PORT} (and all interfaces)` : `http://${HOST}:${PORT}`;
+  console.log(`Gantt Chart API running on ${addr}`);
   if (isAuthEnabled()) console.log('Auth: enabled');
   else console.log('Auth: disabled');
 });
