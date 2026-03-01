@@ -9,27 +9,13 @@ export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download`
 /** URL for iOS build download */
 export const IOS_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download-ios` : '/api/mobile-app/download-ios';
 
-/** Download APK. On native: open download URL in external browser via Android intent (triggers download). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
+/** Download APK. On native: open download URL in browser. On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadApk(): Promise<void> {
   const url = `${API}/mobile-app/download`;
   const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
-    const { Capacitor } = await import('@capacitor/core');
     const { Browser } = await import('@capacitor/browser');
-    if (Capacitor.getPlatform() === 'android') {
-      const parsed = new URL(absUrl);
-      const intentUrl = `intent://${parsed.host}${parsed.pathname}${parsed.search}#Intent;scheme=${parsed.protocol.replace(':', '')};action=android.intent.action.VIEW;end`;
-      const a = document.createElement('a');
-      a.href = intentUrl;
-      a.rel = 'noopener noreferrer';
-      a.target = '_blank';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } else {
-      await Browser.open({ url: absUrl });
-    }
+    await Browser.open({ url: absUrl });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -54,27 +40,13 @@ export async function downloadApk(): Promise<void> {
   URL.revokeObjectURL(a.href);
 }
 
-/** Download iOS build (.ipa). On native: open download URL in external browser via Android intent (triggers download). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
+/** Download iOS build (.ipa). On native: open download URL in browser. On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadIosBuild(): Promise<void> {
   const url = `${API}/mobile-app/download-ios`;
   const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
-    const { Capacitor } = await import('@capacitor/core');
     const { Browser } = await import('@capacitor/browser');
-    if (Capacitor.getPlatform() === 'android') {
-      const parsed = new URL(absUrl);
-      const intentUrl = `intent://${parsed.host}${parsed.pathname}${parsed.search}#Intent;scheme=${parsed.protocol.replace(':', '')};action=android.intent.action.VIEW;end`;
-      const a = document.createElement('a');
-      a.href = intentUrl;
-      a.rel = 'noopener noreferrer';
-      a.target = '_blank';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } else {
-      await Browser.open({ url: absUrl });
-    }
+    await Browser.open({ url: absUrl });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
