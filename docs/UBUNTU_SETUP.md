@@ -341,3 +341,9 @@ pm2 restart gantt-tunnel
 
 **Upgrading from an older version?**
 - See [docs/MIGRATION.md](MIGRATION.md) for migration steps to the multi-user accounts system.
+
+**APK download returns HTML instead of the app**
+- If `/api/mobile-app/download` serves the web page, the request is not reaching the backend. Ensure:
+  - The backend is running and receives traffic (e.g. Cloudflare Tunnel forwards to `http://127.0.0.1:3001`).
+  - If using a reverse proxy (nginx, etc.), proxy `/api` to the backend before any SPA fallback.
+  - If the frontend is on a different host (e.g. Vercel), set `VITE_API_URL` to the backend URL when building so the download uses the correct server.

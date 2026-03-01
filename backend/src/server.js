@@ -52,6 +52,30 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// APK download - explicit route so it's never caught by static/SPA fallback (e.g. when behind proxy with base path)
+app.get('/api/mobile-app/download', (req, res) => {
+  try {
+    const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('mobile_app_enabled');
+    let enabled = false;
+    if (row?.value != null && row.value !== '') {
+      try {
+        const v = JSON.parse(row.value);
+        enabled = v === true || v === 'true';
+      } catch {
+        enabled = row.value === 'true' || row.value === true;
+      }
+    }
+    if (!enabled) return res.status(403).send('Mobile app is not enabled.');
+    if (!existsSync(apkPath)) return res.status(404).send('APK not available.');
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="gantt-chart.apk"');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.sendFile(apkPath);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 // Auth status (no auth required)
 app.use('/api/auth', authRouter);
 app.use('/api/auth', passwordResetRouter);

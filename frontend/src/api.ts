@@ -6,6 +6,26 @@ const API = API_BASE ? `${API_BASE}/api` : '/api';
 /** URL for APK download - under /api so it bypasses SPA static/catch-all. */
 export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download` : '/api/mobile-app/download';
 
+/** Download APK via fetch + blob. Works reliably on mobile where direct <a download> often returns HTML. */
+export async function downloadApk(): Promise<void> {
+  const url = APK_DOWNLOAD_URL;
+  const res = await fetch(url, { credentials: 'same-origin' });
+  const ct = res.headers.get('Content-Type') || '';
+  if (ct.includes('text/html') || ct.includes('application/json')) {
+    const text = await res.text();
+    throw new Error(res.ok ? 'Server returned HTML instead of APK' : `Download failed: ${res.status} ${res.statusText}`);
+  }
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'gantt-chart.apk';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
 /** Parse response as JSON, or throw a user-friendly error when body is empty/invalid (e.g. HTML error page) */
 async function safeJson<T = unknown>(res: Response): Promise<T> {
   const text = await res.text();
