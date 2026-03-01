@@ -946,12 +946,12 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       {mobileApkAvailable ? (
                         <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk}>{isNativeApp ? 'Update app' : 'Download Android (APK)'}</button>
                       ) : (
-                        <span className="settings-desc" style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>APK: use &quot;Build now&quot; below or GitHub workflow.</span>
+                        <span className="settings-desc" style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>APK: use &quot;Build now&quot; below or GitHub workflow.</span>
                       )}
                       {mobileIosAvailable ? (
                         <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadIos}>Download iOS (IPA)</button>
                       ) : (
-                        <span className="settings-desc" style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>iOS: upload .ipa via Admin section below.</span>
+                        <span className="settings-desc" style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>iOS: upload .ipa via Admin section below.</span>
                       )}
                     </div>
                     <p className="settings-desc" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>Android APK is built by the server. iOS requires macOS/Xcode — build locally or via CI, then upload.</p>
