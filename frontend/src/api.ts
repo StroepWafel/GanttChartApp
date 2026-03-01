@@ -21,11 +21,11 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-/** Download APK. On native: fetch with auth, write to filesystem, open. On web: fetch with auth, validate response, then trigger download. */
+/** Download APK. On native: fetch, write to filesystem, open. On web: fetch, validate response, then trigger download. No auth needed (app requires sign-in). */
 export async function downloadApk(): Promise<void> {
   const url = `${API}/mobile-app/download`;
   if (isMobileNative()) {
-    const res = await fetch(url, { credentials: 'same-origin', headers: getAuthHeaders() });
+    const res = await fetch(url, { credentials: 'same-origin' });
     const ct = (res.headers.get('Content-Type') || '').toLowerCase();
     if (ct.includes('text/html') || ct.includes('application/json')) {
       const text = await res.text();
@@ -45,10 +45,7 @@ export async function downloadApk(): Promise<void> {
     await FileOpener.open({ filePath: uri, contentType: 'application/vnd.android.package-archive' });
     return;
   }
-  const res = await fetch(url, {
-    credentials: 'same-origin',
-    headers: getAuthHeaders(),
-  });
+  const res = await fetch(url, { credentials: 'same-origin' });
   const ct = (res.headers.get('Content-Type') || '').toLowerCase();
   if (ct.includes('text/html') || ct.includes('application/json')) {
     const text = await res.text();
@@ -70,11 +67,11 @@ export async function downloadApk(): Promise<void> {
   URL.revokeObjectURL(a.href);
 }
 
-/** Download iOS build (.ipa). On native: fetch with auth, write to filesystem, open. On web: fetch with auth, validate response, then trigger download. */
+/** Download iOS build (.ipa). On native: fetch, write to filesystem, open. On web: fetch, validate response, then trigger download. No auth needed (app requires sign-in). */
 export async function downloadIosBuild(): Promise<void> {
   const url = `${API}/mobile-app/download-ios`;
   if (isMobileNative()) {
-    const res = await fetch(url, { credentials: 'same-origin', headers: getAuthHeaders() });
+    const res = await fetch(url, { credentials: 'same-origin' });
     const ct = (res.headers.get('Content-Type') || '').toLowerCase();
     if (ct.includes('text/html') || ct.includes('application/json')) {
       const text = await res.text();
@@ -94,10 +91,7 @@ export async function downloadIosBuild(): Promise<void> {
     await FileOpener.open({ filePath: uri, contentType: 'application/octet-stream' });
     return;
   }
-  const res = await fetch(url, {
-    credentials: 'same-origin',
-    headers: getAuthHeaders(),
-  });
+  const res = await fetch(url, { credentials: 'same-origin' });
   const ct = (res.headers.get('Content-Type') || '').toLowerCase();
   if (ct.includes('text/html') || ct.includes('application/json')) {
     const text = await res.text();
