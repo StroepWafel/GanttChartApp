@@ -12,7 +12,7 @@ export async function downloadApk(): Promise<void> {
   const res = await fetch(url, { credentials: 'same-origin' });
   const ct = res.headers.get('Content-Type') || '';
   if (ct.includes('text/html') || ct.includes('application/json')) {
-    const text = await res.text();
+    await res.text(); // consume body
     throw new Error(res.ok ? 'Server returned HTML instead of APK' : `Download failed: ${res.status} ${res.statusText}`);
   }
   const blob = await res.blob();
