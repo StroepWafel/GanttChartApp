@@ -12,7 +12,6 @@ export const IOS_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download-
 /** Download APK. On native: open mobile-app landing page in browser (has download link). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadApk(): Promise<void> {
   const url = `${API}/mobile-app/download`;
-  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
     const { Browser } = await import('@capacitor/browser');
     const baseUrl = API_BASE || window.location.origin;
@@ -45,7 +44,6 @@ export async function downloadApk(): Promise<void> {
 /** Download iOS build (.ipa). On native: open mobile-app landing page in browser (has download link). On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadIosBuild(): Promise<void> {
   const url = `${API}/mobile-app/download-ios`;
-  const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
     const { Browser } = await import('@capacitor/browser');
     const baseUrl = API_BASE || window.location.origin;
