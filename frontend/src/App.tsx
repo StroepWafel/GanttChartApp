@@ -1,20 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-
-function useOnline() {
-  const [online, setOnline] = useState(navigator.onLine);
-  useEffect(() => {
-    const onOnline = () => setOnline(true);
-    const onOffline = () => setOnline(false);
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
-    return () => {
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
-    };
-  }, []);
-  return online;
-}
 import { getAuthStatus, getMe, getVersion, login } from './api';
+import { useServerConnected } from './hooks/useServerConnected';
 import { applyTheme, getStoredTheme } from './theme';
 import { clearCredentials, getCredentials, isMobileNative } from './credentialStorage';
 import AuthGate from './components/AuthGate';
@@ -39,7 +25,7 @@ const RELOAD_DELAY_MS = 2500;
 const WAIT_TIMEOUT_MS = 120000;
 
 export default function App() {
-  const online = useOnline();
+  const { online, serverReachable } = useServerConnected();
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('gantt_token'));
   const [mustChangePassword, setMustChangePassword] = useState<boolean | null>(null);
@@ -186,10 +172,12 @@ export default function App() {
     return () => window.removeEventListener('popstate', handler);
   }, []);
 
-  const offlineBanner =
-    !online && (
+  const connectionBanner =
+    (!online || !serverReachable) && (
       <div className="offline-banner" role="status" aria-live="polite">
-        You are offline. Some features may be unavailable.
+        {!online
+          ? 'You are offline. Some features may be unavailable.'
+          : 'Disconnected from server. Pull down to refresh when back online.'}
       </div>
     );
 
@@ -224,7 +212,7 @@ export default function App() {
   if (authEnabled === null) {
     return (
       <>
-        {offlineBanner}
+        {connectionBanner}
         {updateOverlay}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           Loading...
@@ -236,7 +224,7 @@ export default function App() {
   if (resetToken && authEnabled) {
     return (
       <>
-        {offlineBanner}
+        {connectionBanner}
         {updateOverlay}
         <ResetPassword token={resetToken} onSuccess={goToSignIn} />
       </>
@@ -247,7 +235,7 @@ export default function App() {
     if (restoringFromCredentials) {
       return (
         <>
-          {offlineBanner}
+          {connectionBanner}
           {updateOverlay}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
             Restoring session…
@@ -257,7 +245,7 @@ export default function App() {
     }
     return (
       <>
-        {offlineBanner}
+        {connectionBanner}
         {updateOverlay}
         <AuthGate onLogin={handleLogin} />
       </>
@@ -267,7 +255,7 @@ export default function App() {
   if (authEnabled && token && mustChangePassword === null) {
     return (
       <>
-        {offlineBanner}
+        {connectionBanner}
         {updateOverlay}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           Loading...
@@ -279,20 +267,23 @@ export default function App() {
   if (authEnabled && token && mustChangePassword === true) {
     return (
       <>
-        {offlineBanner}
+        {connectionBanner}
         {updateOverlay}
         <ForceChangePassword onComplete={handleForceChangeComplete} />
       </>
     );
   }
 
+  const showConnectionBanner = !online || !serverReachable;
+
   return (
     <>
-      {offlineBanner}
+      {connectionBanner}
       {updateOverlay}
-      <AdminAlertsProvider>
-        <ModalProvider>
-          <MainView
+      <div className={showConnectionBanner ? 'app-main-with-banner' : undefined}>
+        <AdminAlertsProvider>
+          <ModalProvider>
+            <MainView
           authEnabled={authEnabled}
           onLogout={() => {
             clearCredentials();
@@ -303,8 +294,9 @@ export default function App() {
           }}
           onUpdateApplySucceeded={() => setUpdatePhase('waiting')}
         />
-        </ModalProvider>
-      </AdminAlertsProvider>
+          </ModalProvider>
+        </AdminAlertsProvider>
+      </div>
     </>
   );
 }

@@ -276,5 +276,10 @@ input, select, textarea {
   color: white;
   text-align: center;
   padding: 8px 16px;
+  padding-top: calc(8px + env(safe-area-inset-top));
   font-size: 13px;
+}
+
+.app-main-with-banner {
+  padding-top: calc(36px + env(safe-area-inset-top));
 }

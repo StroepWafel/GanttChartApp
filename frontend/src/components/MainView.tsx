@@ -11,6 +11,7 @@ import ClearAllConfirmModal from './ClearAllConfirmModal';
 import ClearEveryoneConfirmModal from './ClearEveryoneConfirmModal';
 import ConfirmModal from './ConfirmModal';
 import BottomNav from './BottomNav';
+import PullToRefresh from './PullToRefresh';
 import CategoriesPage from './CategoriesPage';
 import SettingsPage from './SettingsPage';
 import UpdatesSection from './settings/UpdatesSection';
@@ -1491,7 +1492,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
 
       <div className={`main-body ${isMobile ? 'main-body-mobile' : ''}`}>
         {isMobile ? (
-          <div className="mobile-page-container">
+          <PullToRefresh onRefresh={load} className="mobile-page-container">
             {mobilePage === 'chart' && (
               <main className="gantt-area">
                 <GanttChart
@@ -1586,7 +1587,7 @@ onTaskDelete={handleDeleteTask}
                 {renderSettingsTabContent()}
               </SettingsPage>
             )}
-          </div>
+          </PullToRefresh>
         ) : (
           <>
             {isSidebarOverlay && (
