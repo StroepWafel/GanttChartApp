@@ -130,6 +130,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     return localStorage.getItem('gantt_mobile_app_prompt_dismissed') === '1';
   });
   const [mobileAppUpdateAvailable, setMobileAppUpdateAvailable] = useState(false);
+  const [downloadApkLoading, setDownloadApkLoading] = useState(false);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
   const [webhooks, setWebhooks] = useState<{ id: string; url: string; type: 'generic' | 'discord'; events: { created: boolean; updated: boolean; deleted: boolean; completed: boolean } }[]>([]);
@@ -144,13 +145,17 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const adminAlerts = useAdminAlerts();
 
   const handleDownloadApk = useCallback(async () => {
+    if (downloadApkLoading) return;
+    setDownloadApkLoading(true);
     try {
       await api.downloadApk();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Download failed';
       modal.showAlert({ title: 'Download failed', message: msg });
+    } finally {
+      setDownloadApkLoading(false);
     }
-  }, [modal]);
+  }, [modal, downloadApkLoading]);
 
   const handleDownloadIos = useCallback(async () => {
     try {
@@ -944,7 +949,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                   <>
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
                       {mobileApkAvailable ? (
-                        <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk}>{isNativeApp ? 'Update app' : 'Download Android (APK)'}</button>
+                        <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk} disabled={downloadApkLoading}>{downloadApkLoading ? 'Downloading...' : (isNativeApp ? 'Update app' : 'Download Android (APK)')}</button>
                       ) : (
                         <span className="settings-desc" style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>APK: use &quot;Build now&quot; below or GitHub workflow.</span>
                       )}
@@ -960,7 +965,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                   <>
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
                       {mobileApkAvailable && (
-                        <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk}>{isNativeApp ? 'Update app' : 'Download Android (APK)'}</button>
+                        <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk} disabled={downloadApkLoading}>{downloadApkLoading ? 'Downloading...' : (isNativeApp ? 'Update app' : 'Download Android (APK)')}</button>
                       )}
                       {mobileIosAvailable && (
                         <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadIos}>Download iOS (IPA)</button>
@@ -1634,7 +1639,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         <div className="mobile-app-prompt-banner" role="status">
           <span>Use our mobile app for a better experience.</span>
           <div className="mobile-app-prompt-actions">
-            <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk}>Download app</button>
+            <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk} disabled={downloadApkLoading}>{downloadApkLoading ? 'Downloading...' : 'Download app'}</button>
             <button type="button" className="btn-sm" onClick={() => { localStorage.setItem('gantt_mobile_app_prompt_dismissed', '1'); setMobileAppPromptDismissed(true); }}>Dismiss</button>
           </div>
         </div>
@@ -1643,7 +1648,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       {isNativeApp && mobileAppUpdateAvailable && (
         <div className="mobile-app-prompt-banner mobile-app-update-banner" role="status">
           <span>App update available.</span>
-          <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk}>Update app</button>
+          <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk} disabled={downloadApkLoading}>{downloadApkLoading ? 'Downloading...' : 'Update app'}</button>
         </div>
       )}
 

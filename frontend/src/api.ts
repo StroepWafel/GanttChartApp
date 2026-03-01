@@ -47,7 +47,7 @@ export async function downloadApk(): Promise<void> {
       await Filesystem.writeFile({ path: 'gantt-chart.apk', data: base64, directory: Directory.Cache });
     }
     const { uri } = await Filesystem.getUri({ path: 'gantt-chart.apk', directory: Directory.Cache });
-    await FileOpener.open({ filePath: uri, contentType: 'application/vnd.android.package-archive' });
+    await FileOpener.open({ filePath: uri, contentType: 'application/vnd.android.package-archive', openWithDefault: true });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -98,7 +98,7 @@ export async function downloadIosBuild(): Promise<void> {
       await Filesystem.writeFile({ path: 'gantt-chart.ipa', data: base64, directory: Directory.Cache });
     }
     const { uri } = await Filesystem.getUri({ path: 'gantt-chart.ipa', directory: Directory.Cache });
-    await FileOpener.open({ filePath: uri, contentType: 'application/octet-stream' });
+    await FileOpener.open({ filePath: uri, contentType: 'application/octet-stream', openWithDefault: true });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
