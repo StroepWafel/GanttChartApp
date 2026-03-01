@@ -1,0 +1,55 @@
+name: Mobile App Issue
+description: Issues specific to Android or iOS builds
+title: "[Mobile]: "
+labels: ["mobile"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For mobile app issues (Android / iOS). See [docs/IOS_BUILD.md](https://github.com/maxku/GanttChartApp/blob/main/docs/IOS_BUILD.md) for iOS setup.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android
+        - iOS
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What's the issue?
+      placeholder: Describe the problem...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Build with npm run build:android (or build:ios)
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device / Emulator
+      placeholder: e.g. Pixel 7, iPhone 15 Simulator
+  - type: input
+    id: public_url
+    attributes:
+      label: PUBLIC_URL
+      description: The backend URL the app connects to
+      placeholder: e.g. https://gantt.example.com
+  - type: dropdown
+    id: build_source
+    attributes:
+      label: Build source
+      description: How was the app built?
+      options:
+        - Local (npm run build:android / build:ios)
+        - GitHub Actions (workflow artifact)
+        - Other

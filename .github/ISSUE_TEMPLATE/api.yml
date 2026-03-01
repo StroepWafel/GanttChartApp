@@ -1,0 +1,47 @@
+name: IoT API Issue
+description: Issues with the read-only IoT API endpoints
+title: "[API]: "
+labels: ["api"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For the read-only IoT API (`/api/readonly/*`). See [docs/API.md](https://github.com/maxku/GanttChartApp/blob/main/docs/API.md).
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Bug (wrong response, error)
+        - Feature request (new endpoint, behavior)
+        - Documentation
+    validations:
+      required: true
+  - type: input
+    id: endpoint
+    attributes:
+      label: Endpoint
+      placeholder: e.g. GET /api/readonly/tasks
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What's the issue or request?
+    validations:
+      required: true
+  - type: textarea
+    id: request
+    attributes:
+      label: Request (curl or example)
+      description: How are you calling the API?
+      placeholder: |
+        curl -H "X-API-Username: user" -H "X-API-Key: xxx" https://...
+      render: shell
+  - type: textarea
+    id: response
+    attributes:
+      label: Response
+      description: What do you get? (status code, body, error)
+      render: shell

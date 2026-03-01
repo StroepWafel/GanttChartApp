@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/maxku/GanttChartApp/blob/main/README.md
+    about: View project documentation
+  - name: API Reference
+    url: https://github.com/maxku/GanttChartApp/blob/main/docs/API.md
+    about: Read-only IoT API documentation

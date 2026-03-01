@@ -1,0 +1,50 @@
+name: Security Vulnerability
+description: Report a security issue (auth, API keys, data isolation, etc.)
+title: "[Security]: "
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please do not disclose security vulnerabilities publicly.** We will respond as quickly as possible.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the security issue
+      placeholder: What vulnerability did you find?
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What could an attacker do? Who is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this? (Be as specific as possible)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Where is the vulnerability?
+      options:
+        - Authentication / Login
+        - API keys / IoT API
+        - Data isolation (user data leakage)
+        - Admin / Masquerade
+        - JWT / Session handling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: suggested_fix
+    attributes:
+      label: Suggested fix (optional)
+      description: Do you have a fix or mitigation in mind?

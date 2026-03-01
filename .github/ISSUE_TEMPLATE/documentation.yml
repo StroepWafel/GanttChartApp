@@ -1,0 +1,38 @@
+name: Documentation
+description: Improve or fix documentation
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For documentation improvements. Docs live in `README.md` and `docs/`.
+  - type: dropdown
+    id: doc
+    attributes:
+      label: Document
+      options:
+        - README.md
+        - docs/API.md
+        - docs/UBUNTU_SETUP.md
+        - docs/IOS_BUILD.md
+        - docs/MIGRATION.md
+        - Other / New
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: Issue or improvement
+      description: What's wrong or what should be added?
+      placeholder: |
+        - Missing: ...
+        - Unclear: ...
+        - Outdated: ...
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested change
+      description: Proposed text or structure (optional)
