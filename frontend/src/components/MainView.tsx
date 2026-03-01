@@ -1027,7 +1027,10 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                       }
                       const poll = async (): Promise<void> => {
                         const s = await api.getMobileBuildStatus();
-                        setMobileBuildStatus({ status: s.status, message: s.output || s.error || undefined });
+                        setMobileBuildStatus({
+                          status: s.status,
+                          message: s.status === 'success' ? undefined : (s.output || s.error || undefined),
+                        });
                         if (s.status === 'building' || s.status === 'idle') {
                           setTimeout(poll, 2500);
                           return;
@@ -1041,7 +1044,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         } else if (s.status === 'success') {
                           localStorage.removeItem('gantt_mobile_build_status');
                           api.getMobileAppStatus().then((app) => { setMobileAppEnabled(app.enabled); setMobileApkAvailable(!!app.apkAvailable); setMobileIosAvailable(!!app.iosAvailable); }).catch(() => {});
-                          modal.showAlert({ title: 'Build complete', message: s.output || 'Build complete.' });
+                          modal.showAlert({ title: 'Build complete', message: 'APK built successfully. Users can download it from the Mobile app section.' });
                         }
                       };
                       await poll();

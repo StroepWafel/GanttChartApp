@@ -32,6 +32,7 @@ export default function App() {
   const [restoringFromCredentials, setRestoringFromCredentials] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(() => getResetToken());
   const [updatePhase, setUpdatePhase] = useState<null | 'waiting' | 'reloading'>(null);
+  const [updatePhaseDetail, setUpdatePhaseDetail] = useState<'preparing' | 'restarting' | null>(null);
   const [updateReloadTimedOut, setUpdateReloadTimedOut] = useState(false);
   const updatePollRef = useRef<{ intervalId: ReturnType<typeof setInterval>; timeoutId: ReturnType<typeof setTimeout>; hasSeenFailure: boolean } | null>(null);
 
@@ -43,7 +44,10 @@ export default function App() {
     const check = async () => {
       try {
         const data = await getVersion();
-        if (data.updating) setUpdatePhase('waiting');
+        if (data.updating) {
+          setUpdatePhase('waiting');
+          setUpdatePhaseDetail('preparing');
+        }
       } catch {
         // Connection error—do not treat as server restart; ignore
       }
@@ -79,6 +83,7 @@ export default function App() {
         })
         .catch(() => {
           hasSeenFailure = true;
+          setUpdatePhaseDetail('restarting');
         });
     }
     checkAndReload();
@@ -190,7 +195,13 @@ export default function App() {
           {updatePhase === 'waiting' && (
             <>
               <p className="update-reload-title">Update in progress</p>
-              <p className="update-reload-message">The server is restarting. This page will reload automatically when it is back.</p>
+              <p className="update-reload-message">
+                {updatePhaseDetail === 'preparing'
+                  ? 'Notifying active users. Server will restart shortly and this page will reload automatically.'
+                  : updatePhaseDetail === 'restarting'
+                    ? 'Server is restarting and building the update. This page will reload automatically when it is back.'
+                    : 'The server is restarting. This page will reload automatically when it is back.'}
+              </p>
               {updateReloadTimedOut && (
                 <>
                   <p className="update-reload-timeout">If the page did not reload, click below to refresh now.</p>
@@ -203,7 +214,7 @@ export default function App() {
           )}
           {updatePhase === 'reloading' && (
             <>
-              <p className="update-reload-title">Application is reloading</p>
+              <p className="update-reload-title">Update complete</p>
               <p className="update-reload-message">The app was updated. Reloading now…</p>
             </>
           )}
@@ -294,7 +305,10 @@ export default function App() {
             setToken(null);
             setMustChangePassword(null);
           }}
-          onUpdateApplySucceeded={() => setUpdatePhase('waiting')}
+          onUpdateApplySucceeded={() => {
+            setUpdatePhase('waiting');
+            setUpdatePhaseDetail('preparing');
+          }}
         />
           </ModalProvider>
         </AdminAlertsProvider>
