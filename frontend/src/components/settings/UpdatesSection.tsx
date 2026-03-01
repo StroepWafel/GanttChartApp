@@ -8,6 +8,7 @@ interface UpdateCheck {
   latestVersion?: string;
   releaseName?: string | null;
   releaseUrl?: string;
+  releasesUrl?: string;
   error?: string;
   _debug?: Record<string, unknown>;
 }
@@ -221,6 +222,15 @@ export default function UpdatesSection({
             ) : (
               <>Up to date (v{updateCheck.currentVersion})</>
             )}
+          </p>
+          <p className="settings-desc" style={{ marginTop: '0.25rem' }}>
+            <a
+              href={updateCheck.releaseUrl ?? updateCheck.releasesUrl ?? 'https://github.com/StroepWafel/GanttChartApp/releases'}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {updateCheck.releaseUrl ? 'View release notes on GitHub' : 'View releases on GitHub'}
+            </a>
           </p>
           {updateCheck._debug && (
             <div className="update-debug">

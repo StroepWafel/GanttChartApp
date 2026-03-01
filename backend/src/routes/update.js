@@ -110,27 +110,37 @@ router.get('/check-update', async (req, res) => {
           errorMessage = `GitHub API rate limited. Limit resets at ${resetStr} UTC. Try again after that.`;
         }
       }
+      const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
       return res.json({
         updateAvailable: false,
         currentVersion,
         error: errorMessage,
+        releasesUrl: `https://github.com/${repo}/releases`,
         ...(debug && { _debug: debugInfo }),
       });
     }
     const data = await resp.json();
     const latestTag = data.tag_name?.replace(/^v/, '') || data.name || '';
     if (!latestTag) {
-      return res.json({ updateAvailable: false, currentVersion, ...(debug && { _debug: debugInfo }) });
+      const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
+      return res.json({
+        updateAvailable: false,
+        currentVersion,
+        releasesUrl: `https://github.com/${repo}/releases`,
+        ...(debug && { _debug: debugInfo }),
+      });
     }
     const updateAvailable = compareVersions(latestTag, currentVersion) > 0;
     console.log('[update] check-update: latestTag=%s updateAvailable=%s', latestTag, updateAvailable);
 
+    const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
     res.json({
       updateAvailable,
       currentVersion: normalizeVersion(currentVersion),
       latestVersion: normalizeVersion(latestTag),
       releaseName: data.name || null,
       releaseUrl: data.html_url,
+      releasesUrl: `https://github.com/${repo}/releases`,
       ...(debug && { _debug: debugInfo }),
     });
   } catch (err) {
