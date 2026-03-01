@@ -2,6 +2,8 @@ import { useRef, useState, useCallback } from 'react';
 
 const PULL_THRESHOLD = 80;
 const RESISTANCE = 0.5;
+/** Distance user must pull before the refresh indicator appears (reduces accidental triggers) */
+const DEAD_ZONE = 28;
 
 interface Props {
   onRefresh: () => Promise<void>;
@@ -35,8 +37,9 @@ export default function PullToRefresh({ onRefresh, children, disabled, className
       const canPull = scrollTop <= 0;
       if (!canPull) return;
       const deltaY = e.touches[0].clientY - startY.current;
-      if (deltaY <= 0) return;
-      const resisted = Math.min(deltaY * RESISTANCE, deltaY);
+      if (deltaY <= DEAD_ZONE) return;
+      const effectiveDelta = deltaY - DEAD_ZONE;
+      const resisted = Math.min(effectiveDelta * RESISTANCE, effectiveDelta);
       setPullDistance(resisted);
     },
     [disabled, refreshing]
@@ -74,7 +77,7 @@ export default function PullToRefresh({ onRefresh, children, disabled, className
           className="pull-to-refresh-indicator"
           style={{
             opacity: progress || (refreshing ? 1 : 0),
-            transform: `translateY(${refreshing ? 0 : Math.min(pullDistance, 60)}px)`,
+            transform: `translate(-50%, ${refreshing ? 0 : Math.min(pullDistance, 60)}px)`,
           }}
           aria-hidden
         >

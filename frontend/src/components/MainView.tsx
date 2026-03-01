@@ -353,6 +353,85 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     }
   }, [authEnabled]);
 
+  const refreshAll = useCallback(async () => {
+    await load();
+    api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); }).catch(() => {});
+    if (authEnabled) {
+      api.getMe()
+        .then((u) => setCurrentUser({ id: u.id, username: u.username, isAdmin: u.isAdmin, apiKey: u.apiKey ?? null }))
+        .catch(() => setCurrentUser(null));
+      api.getUserPreferences()
+        .then((prefs) => {
+          const pc = prefs.priority_colors ?? prefs.priorityColors;
+          if (pc && typeof pc === 'object') {
+            const valid: PriorityColors = {};
+            for (let p = 1; p <= 10; p++) {
+              const v = (pc as Record<number, { bg?: string; progress?: string }>)[p];
+              if (v?.bg && v?.progress) valid[p] = { bg: v.bg, progress: v.progress };
+            }
+            if (Object.keys(valid).length > 0) {
+              setPriorityColors((prev) => ({ ...DEFAULT_PRIORITY_COLORS, ...prev, ...valid }));
+            }
+          }
+          const t = prefs.theme as Theme | undefined;
+          if (t === 'light' || t === 'dark') {
+            applyTheme(t);
+            setThemeState(t);
+          }
+          const wh = prefs.webhooks;
+          if (Array.isArray(wh)) {
+            setWebhooks(wh.filter((w) => w?.url && typeof w.url === 'string').map((w) => ({
+              id: w.id || `wh_${Math.random().toString(36).slice(2)}`,
+              url: String(w.url).trim(),
+              type: w.type === 'discord' ? 'discord' : 'generic',
+              events: {
+                created: (w.events as { created?: boolean })?.created !== false,
+                updated: (w.events as { updated?: boolean })?.updated !== false,
+                deleted: (w.events as { deleted?: boolean })?.deleted !== false,
+                completed: (w.events as { completed?: boolean })?.completed !== false,
+              },
+            })));
+          } else {
+            const legacy = prefs.webhook_url;
+            if (typeof legacy === 'string' && legacy.trim()) {
+              setWebhooks([{ id: `wh_${Math.random().toString(36).slice(2)}`, url: legacy.trim(), type: 'generic', events: { created: true, updated: true, deleted: true, completed: true } }]);
+            } else {
+              setWebhooks([]);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+    if (currentUser?.isAdmin) {
+      api.getUsers().then(setUsers).catch(() => setUsers([]));
+      api.getSettings()
+        .then((s) => {
+          setAutoUpdateEnabled(!!s.auto_update_enabled);
+          setGithubTokenSet(!!s.github_token_set);
+          setMobileAppEnabledSetting(!!s.mobile_app_enabled);
+          setPublicUrl(typeof s.public_url === 'string' ? s.public_url : '');
+          const eoKeys = [
+            'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
+            'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
+            'email_onboarding_app_domain', 'email_onboarding_your_name', 'email_onboarding_login_url', 'password_reset_base_url',
+            'email_onboarding_subject', 'email_onboarding_template',
+          ];
+          const eo: api.EmailOnboardingSettings = {};
+          for (const k of eoKeys) {
+            if (s[k] !== undefined) eo[k as keyof api.EmailOnboardingSettings] = s[k];
+          }
+          setEmailOnboardingSettings(eo);
+        })
+        .catch(() => {});
+      api.checkUpdate(false)
+        .then((d) => setUpdateCheck(normalizeUpdateCheck(d)))
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : 'Check failed';
+          setUpdateCheck({ updateAvailable: false, error: msg });
+        });
+    }
+  }, [load, authEnabled, currentUser?.isAdmin, normalizeUpdateCheck]);
+
   async function handleCreateCategory(name: string) {
     await api.createCategory(name);
     await load();
@@ -1492,7 +1571,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
 
       <div className={`main-body ${isMobile ? 'main-body-mobile' : ''}`}>
         {isMobile ? (
-          <PullToRefresh onRefresh={load} className="mobile-page-container">
+          <PullToRefresh onRefresh={refreshAll} className="mobile-page-container">
             {mobilePage === 'chart' && (
               <main className="gantt-area">
                 <GanttChart

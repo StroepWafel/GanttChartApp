@@ -124,7 +124,6 @@ function findJavaHome() {
 }
 
 const sharp = require('sharp');
-const ico = require('sharp-ico');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -188,47 +187,45 @@ fs.cpSync(frontendMobileDist, mobileDistDir, { recursive: true });
 console.log('Copied build to mobile/dist');
 
 (async () => {
-  // Generate app icons from favicon (for Capacitor app icon / resources)
+  // Generate app icons from GWA.jpg (for Capacitor app icon / resources)
   const iconsDir = path.join(mobileDistDir, 'icons');
   if (fs.existsSync(iconsDir)) fs.rmSync(iconsDir, { recursive: true });
   fs.mkdirSync(iconsDir, { recursive: true });
-  const faviconPath = path.join(mobileDistDir, 'favicon.ico');
-  if (fs.existsSync(faviconPath)) {
+  const iconSourcePath = path.join(mobileDistDir, 'GWA.jpg');
+  if (fs.existsSync(iconSourcePath)) {
     try {
-      const sharps = ico.sharpsFromIco(faviconPath);
-      if (sharps.length > 0) {
-        const best = sharps[sharps.length - 1];
-        // Maskable safe zone: center 50% of icon – Android/iOS apply circle/squircle masks that crop edges.
-        const safeZoneScale = 0.5;
+      const image = sharp(iconSourcePath);
+      // Maskable safe zone: center 80% of icon – Android/iOS apply circle/squircle masks that crop edges.
+      const safeZoneScale = 0.8;
 
-        const makeMaskableIcon = async (size) => {
-          const inner = Math.round(size * safeZoneScale);
-          const offset = Math.round((size - inner) / 2);
-          const resized = best.resize(inner, inner);
-          const base = sharp({
-            create: {
-              width: size,
-              height: size,
-              channels: 4,
-              background: { r: 51, g: 51, b: 51, alpha: 1 },
-            },
-          });
-          return base.composite([{ input: await resized.toBuffer(), left: offset, top: offset }]).png();
-        };
+      const makeMaskableIcon = async (size) => {
+        const inner = Math.round(size * safeZoneScale);
+        const offset = Math.round((size - inner) / 2);
+        const resized = image.resize(inner, inner);
+        const base = sharp({
+          create: {
+            width: size,
+            height: size,
+            channels: 4,
+            background: { r: 51, g: 51, b: 51, alpha: 1 },
+          },
+        });
+        return base.composite([{ input: await resized.toBuffer(), left: offset, top: offset }]).png();
+      };
 
-        const icon192 = await makeMaskableIcon(192);
-        const icon512 = await makeMaskableIcon(512);
-        const icon1024 = await makeMaskableIcon(1024);
-        await Promise.all([
-          icon192.toFile(path.join(iconsDir, 'icon-192.png')),
-          icon512.toFile(path.join(iconsDir, 'icon-512.png')),
-          icon1024.toFile(path.join(iconsDir, 'icon-1024.png')),
-        ]);
-        console.log('Generated PWA/App icons from favicon (192, 512, 1024; safe zone)');
+      const icon192 = await makeMaskableIcon(192);
+      const icon512 = await makeMaskableIcon(512);
+      const icon1024 = await makeMaskableIcon(1024);
+      await Promise.all([
+        icon192.toFile(path.join(iconsDir, 'icon-192.png')),
+        icon512.toFile(path.join(iconsDir, 'icon-512.png')),
+        icon1024.toFile(path.join(iconsDir, 'icon-1024.png')),
+      ]);
+      console.log('Generated PWA/App icons from GWA.jpg (192, 512, 1024; safe zone)');
 
-        const androidResDir = path.join(mobileDir, 'android', 'app', 'src', 'main', 'res');
-        if (fs.existsSync(androidResDir)) {
-          const densities = [
+      const androidResDir = path.join(mobileDir, 'android', 'app', 'src', 'main', 'res');
+      if (fs.existsSync(androidResDir)) {
+        const densities = [
             { dir: 'mipmap-mdpi', launcher: 48, foreground: 108 },
             { dir: 'mipmap-hdpi', launcher: 72, foreground: 162 },
             { dir: 'mipmap-xhdpi', launcher: 96, foreground: 216 },
@@ -242,8 +239,8 @@ console.log('Copied build to mobile/dist');
             const offsetL = Math.round((d.launcher - innerL) / 2);
             const innerF = Math.round(d.foreground * safeZoneScale);
             const offsetF = Math.round((d.foreground - innerF) / 2);
-            const resizedL = best.resize(innerL, innerL);
-            const resizedF = best.resize(innerF, innerF);
+            const resizedL = image.resize(innerL, innerL);
+            const resizedF = image.resize(innerF, innerF);
             const launcherBuf = await resizedL.toBuffer();
             const foregroundBuf = await resizedF.toBuffer();
             await Promise.all([
@@ -282,11 +279,10 @@ console.log('Copied build to mobile/dist');
                 .toFile(path.join(dirPath, 'ic_launcher_foreground.png')),
             ]);
           }
-          console.log('Generated Android launcher icons from favicon (with safe zone)');
-        }
+        console.log('Generated Android launcher icons from GWA.jpg (with safe zone)');
       }
     } catch (err) {
-      console.warn('build-mobile: Could not generate icons from favicon:', err.message);
+      console.warn('build-mobile: Could not generate icons from GWA.jpg:', err.message);
     }
   }
 
