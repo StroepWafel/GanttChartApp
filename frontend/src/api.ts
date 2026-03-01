@@ -9,61 +9,13 @@ export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download`
 /** URL for iOS build download */
 export const IOS_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download-ios` : '/api/mobile-app/download-ios';
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      resolve(result.includes(',') ? result.split(',')[1] : result);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-/** Download APK. On native: Filesystem.downloadFile + FileOpener, fallback to fetch+write. On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
+/** Download APK. On native: open URL in browser. On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadApk(): Promise<void> {
   const url = `${API}/mobile-app/download`;
   const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
-    if (!absUrl.startsWith('https://') && !absUrl.startsWith('http://')) {
-      throw new Error('Server URL not configured. Rebuild the app with PUBLIC_URL set in .env.');
-    }
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
-    const { FileOpener } = await import('@capacitor-community/file-opener');
     const { Browser } = await import('@capacitor/browser');
-    try {
-      try {
-        await Promise.race([
-          Filesystem.downloadFile({ url: absUrl, path: 'gantt-chart.apk', directory: Directory.Cache }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 60000)),
-        ]);
-      } catch {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
-        const res = await fetch(absUrl, { credentials: 'same-origin', signal: controller.signal });
-        clearTimeout(timeoutId);
-        const ct = (res.headers.get('Content-Type') || '').toLowerCase();
-        if (ct.includes('text/html') || ct.includes('application/json')) {
-          const text = await res.text();
-          throw new Error(
-            res.ok
-              ? 'Server returned HTML instead of APK. Check proxy/base path configuration.'
-              : `Download failed (${res.status}): ${text.slice(0, 200)}`
-          );
-        }
-        if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
-        const blob = await res.blob();
-        const base64 = await blobToBase64(blob);
-        await Filesystem.writeFile({ path: 'gantt-chart.apk', data: base64, directory: Directory.Cache });
-      }
-      const { uri } = await Filesystem.getUri({ path: 'gantt-chart.apk', directory: Directory.Cache });
-      const openPromise = FileOpener.open({ filePath: uri, contentType: 'application/vnd.android.package-archive', openWithDefault: true });
-      await Promise.race([openPromise, new Promise<void>((resolve) => setTimeout(resolve, 3000))]);
-    } catch {
-      await Browser.open({ url: absUrl });
-      return;
-    }
+    await Browser.open({ url: absUrl });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -88,49 +40,13 @@ export async function downloadApk(): Promise<void> {
   URL.revokeObjectURL(a.href);
 }
 
-/** Download iOS build (.ipa). On native: Filesystem.downloadFile + FileOpener, fallback to fetch+write. On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
+/** Download iOS build (.ipa). On native: open URL in browser. On web: fetch, validate, trigger download. No auth needed (app requires sign-in). */
 export async function downloadIosBuild(): Promise<void> {
   const url = `${API}/mobile-app/download-ios`;
   const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   if (isMobileNative()) {
-    if (!absUrl.startsWith('https://') && !absUrl.startsWith('http://')) {
-      throw new Error('Server URL not configured. Rebuild the app with PUBLIC_URL set in .env.');
-    }
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
-    const { FileOpener } = await import('@capacitor-community/file-opener');
     const { Browser } = await import('@capacitor/browser');
-    try {
-      try {
-        await Promise.race([
-          Filesystem.downloadFile({ url: absUrl, path: 'gantt-chart.ipa', directory: Directory.Cache }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 60000)),
-        ]);
-      } catch {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
-        const res = await fetch(absUrl, { credentials: 'same-origin', signal: controller.signal });
-        clearTimeout(timeoutId);
-        const ct = (res.headers.get('Content-Type') || '').toLowerCase();
-        if (ct.includes('text/html') || ct.includes('application/json')) {
-          const text = await res.text();
-          throw new Error(
-            res.ok
-              ? 'Server returned HTML instead of IPA. Check proxy/base path configuration.'
-              : `Download failed (${res.status}): ${text.slice(0, 200)}`
-          );
-        }
-        if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
-        const blob = await res.blob();
-        const base64 = await blobToBase64(blob);
-        await Filesystem.writeFile({ path: 'gantt-chart.ipa', data: base64, directory: Directory.Cache });
-      }
-      const { uri } = await Filesystem.getUri({ path: 'gantt-chart.ipa', directory: Directory.Cache });
-      const openPromise = FileOpener.open({ filePath: uri, contentType: 'application/octet-stream', openWithDefault: true });
-      await Promise.race([openPromise, new Promise<void>((resolve) => setTimeout(resolve, 3000))]);
-    } catch {
-      await Browser.open({ url: absUrl });
-      return;
-    }
+    await Browser.open({ url: absUrl });
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
