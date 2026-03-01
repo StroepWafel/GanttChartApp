@@ -138,7 +138,7 @@ jobs:
         run: |
           mkdir -p release
           cp -r frontend backend package.json scripts release/
-          rm -rf release/frontend/node_modules
+          rm -rf release/frontend/node_modules release/backend/node_modules
           mkdir -p release/mobile
           [ -f mobile/package.json ] && cp mobile/package.json release/mobile/
           [ -f mobile/capacitor.config.ts ] && cp mobile/capacitor.config.ts release/mobile/
