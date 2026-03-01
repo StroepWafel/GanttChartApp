@@ -13,6 +13,16 @@ mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
 log "=== update-zip.sh started ==="
 log "ROOT=$ROOT REPO=${GITHUB_REPO:-StroepWafel/GanttChartApp}"
 
+# Stop PM2 so server stays down for the full update (prevents PM2 from restarting during build).
+# Sleep 20s first so clients have time to poll and see updating=true before we go offline.
+echo "=== Waiting for clients to detect update (20s) ==="
+log "Sleeping 20s for clients to poll updating flag"
+sleep 20
+if command -v pm2 &>/dev/null; then
+  pm2 stop gantt-api 2>/dev/null || true
+  log "PM2 stopped gantt-api"
+fi
+
 REPO="${GITHUB_REPO:-StroepWafel/GanttChartApp}"
 TMP_DIR="$(mktemp -d)"
 trap "rm -rf '$TMP_DIR'" EXIT

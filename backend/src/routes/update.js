@@ -149,7 +149,8 @@ function runZipUpdate() {
     env: { ...process.env, GITHUB_REPO: repo, PM2_HOME: process.env.PM2_HOME || '' },
   });
   proc.unref();
-  process.exit(0);
+  // Do NOT process.exit: server must stay up so clients can poll
+  // data.updating for ~20s. The update script will pm2 stop after that.
 }
 
 router.post('/apply-update', async (req, res) => {
@@ -190,7 +191,8 @@ router.post('/apply-update', async (req, res) => {
           env: { ...process.env, PM2_HOME: process.env.PM2_HOME || '' },
         });
         proc.unref();
-        process.exit(0);
+        // Do NOT process.exit here: server must stay up so clients can poll
+        // data.updating for ~20s. The update script will pm2 stop after that.
       }, 500);
       return;
     }

@@ -942,7 +942,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 <p className="settings-desc">Download the native Android or iOS app for Gantt Chart. Built with Capacitor.</p>
                 {(currentUser?.isAdmin || !authEnabled) ? (
                   <>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
                       {mobileApkAvailable ? (
                         <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk}>{isNativeApp ? 'Update app' : 'Download Android (APK)'}</button>
                       ) : (
@@ -958,7 +958,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                   </>
                 ) : (
                   <>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
                       {mobileApkAvailable && (
                         <button type="button" className="btn-sm btn-sm-primary" onClick={handleDownloadApk}>{isNativeApp ? 'Update app' : 'Download Android (APK)'}</button>
                       )}

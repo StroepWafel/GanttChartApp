@@ -19,8 +19,8 @@ function getResetToken(): string | null {
   return null;
 }
 
-const SLOW_POLL_MS = 3 * 60 * 1000; // 3 minutes
-const AGGRESSIVE_POLL_MS = 10000; // 10 seconds when waiting for server restart
+const SLOW_POLL_MS = 15 * 1000; // 15 seconds - frequent enough to catch updating flag before server goes down (~20s window)
+const AGGRESSIVE_POLL_MS = 3000; // 3 seconds when waiting for server restart
 const RELOAD_DELAY_MS = 2500;
 const WAIT_TIMEOUT_MS = 120000;
 
@@ -40,14 +40,16 @@ export default function App() {
   // should NOT trigger the overlay, as they are often transient.
   useEffect(() => {
     if (updatePhase !== null) return;
-    const id = setInterval(async () => {
+    const check = async () => {
       try {
         const data = await getVersion();
         if (data.updating) setUpdatePhase('waiting');
       } catch {
         // Connection error—do not treat as server restart; ignore
       }
-    }, SLOW_POLL_MS);
+    };
+    check(); // immediate first check
+    const id = setInterval(check, SLOW_POLL_MS);
     return () => clearInterval(id);
   }, [updatePhase]);
 
