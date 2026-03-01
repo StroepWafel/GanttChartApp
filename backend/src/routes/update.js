@@ -142,15 +142,16 @@ router.get('/check-update', async (req, res) => {
 function runZipUpdate() {
   const repo = process.env.GITHUB_REPO || 'StroepWafel/GanttChartApp';
   const scriptPath = join(ROOT_DIR, 'scripts', 'update-zip.sh');
-  const proc = spawn('bash', [scriptPath], {
+  const proc = spawn('bash', ['-c', 'nohup bash "$UPDATE_SCRIPT" </dev/null >>/dev/null 2>&1 &'], {
     cwd: ROOT_DIR,
     stdio: 'inherit',
     detached: true,
-    env: { ...process.env, GITHUB_REPO: repo, PM2_HOME: process.env.PM2_HOME || '' },
+    env: { ...process.env, GITHUB_REPO: repo, PM2_HOME: process.env.PM2_HOME || '', UPDATE_SCRIPT: scriptPath },
   });
   proc.unref();
   // Do NOT process.exit: server must stay up so clients can poll
   // data.updating for ~20s. The update script will pm2 stop after that.
+  // nohup ensures the script survives when pm2 stop kills this process.
 }
 
 router.post('/apply-update', async (req, res) => {
@@ -184,15 +185,16 @@ router.post('/apply-update', async (req, res) => {
         _debug: debug ? { ...debugInfo, scriptUsed: 'update.sh' } : undefined,
       });
       setTimeout(() => {
-        const proc = spawn('bash', [scriptPath], {
+        const proc = spawn('bash', ['-c', 'nohup bash "$UPDATE_SCRIPT" </dev/null >>/dev/null 2>&1 &'], {
           cwd: ROOT_DIR,
           stdio: 'inherit',
           detached: true,
-          env: { ...process.env, PM2_HOME: process.env.PM2_HOME || '' },
+          env: { ...process.env, PM2_HOME: process.env.PM2_HOME || '', UPDATE_SCRIPT: scriptPath },
         });
         proc.unref();
         // Do NOT process.exit here: server must stay up so clients can poll
         // data.updating for ~20s. The update script will pm2 stop after that.
+        // nohup ensures the script survives when pm2 stop kills this process.
       }, 500);
       return;
     }
