@@ -9,10 +9,12 @@
     "cap:ios": "npx cap add ios"
   },
   "dependencies": {
+    "@capacitor-community/file-opener": "^6.0.0",
     "@capacitor/android": "^6.0.0",
     "@capacitor/browser": "^6.0.6",
     "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0",
+    "@capacitor/filesystem": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
     "@capacitor/local-notifications": "^6.1.3",
     "@capacitor/preferences": "^6.0.0",

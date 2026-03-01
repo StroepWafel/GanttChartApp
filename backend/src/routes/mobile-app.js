@@ -6,6 +6,7 @@ import db from '../db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const apkPath = path.resolve(__dirname, '../../../mobile/releases/app.apk');
+const ipaPath = path.resolve(__dirname, '../../../mobile/releases/app.ipa');
 
 const router = express.Router();
 
@@ -32,7 +33,31 @@ router.get('/download', (req, res) => {
   }
 });
 
-/** Public endpoint: returns whether mobile app download is enabled and if APK is available */
+/** Serve iOS build (.ipa) - admin uploads via Settings → App */
+router.get('/download-ios', (req, res) => {
+  try {
+    const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('mobile_app_enabled');
+    let enabled = false;
+    if (row?.value != null && row.value !== '') {
+      try {
+        const v = JSON.parse(row.value);
+        enabled = v === true || v === 'true';
+      } catch {
+        enabled = row.value === 'true' || row.value === true;
+      }
+    }
+    if (!enabled) return res.status(403).send('Mobile app is not enabled.');
+    if (!existsSync(ipaPath)) return res.status(404).send('iOS build not available. Upload via Settings → App.');
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', 'attachment; filename="gantt-chart.ipa"');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.sendFile(ipaPath);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+/** Public endpoint: returns whether mobile app download is enabled and if APK/iOS build is available */
 router.get('/status', (req, res) => {
   try {
     const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('mobile_app_enabled');
@@ -47,7 +72,8 @@ router.get('/status', (req, res) => {
       }
     }
     const apkAvailable = enabled && existsSync(apkPath);
-    res.json({ enabled, apkAvailable });
+    const iosAvailable = enabled && existsSync(ipaPath);
+    res.json({ enabled, apkAvailable, iosAvailable });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

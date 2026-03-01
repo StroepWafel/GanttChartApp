@@ -47,6 +47,7 @@ const SERVER_BOOT_ID = crypto.randomUUID();
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 const mobileReleasesDir = path.resolve(__dirname, '../../mobile/releases');
 const apkPath = path.join(mobileReleasesDir, 'app.apk');
+const ipaPath = path.join(mobileReleasesDir, 'app.ipa');
 
 const app = express();
 app.use(cors());
@@ -159,10 +160,16 @@ app.get(['/mobile-app', '/mobile-app/'], (req, res) => {
     );
   }
   const apkAvailable = existsSync(apkPath);
+  const iosAvailable = existsSync(ipaPath);
   const apkSection = apkAvailable
     ? '<a href="/api/mobile-app/download" class="btn" download="gantt-chart.apk">Download Android app (APK)</a>'
     : '<p><em>APK available after build. Use "Build now" in Settings → App or run the GitHub workflow.</em></p>';
-  const html = mobileLandingTemplate.replace('{{APK_SECTION}}', apkSection);
+  const iosSection = iosAvailable
+    ? '<a href="/api/mobile-app/download-ios" class="btn" download="gantt-chart.ipa" style="margin-left: 0.5rem;">Download iOS app (IPA)</a>'
+    : '<p><em>iOS build: build on Mac/CI, then upload via Settings → App.</em></p>';
+  const html = mobileLandingTemplate
+    .replace('{{APK_SECTION}}', apkSection)
+    .replace('{{IOS_SECTION}}', iosSection);
   res.setHeader('Content-Type', 'text/html');
   res.send(html);
 });

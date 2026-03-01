@@ -187,11 +187,11 @@ fs.cpSync(frontendMobileDist, mobileDistDir, { recursive: true });
 console.log('Copied build to mobile/dist');
 
 (async () => {
-  // Generate app icons from GWA.jpg (for Capacitor app icon / resources)
+  // Generate app icons from GWA.png (for Capacitor app icon / resources)
   const iconsDir = path.join(mobileDistDir, 'icons');
   if (fs.existsSync(iconsDir)) fs.rmSync(iconsDir, { recursive: true });
   fs.mkdirSync(iconsDir, { recursive: true });
-  const iconSourcePath = path.join(mobileDistDir, 'GWA.jpg');
+  const iconSourcePath = path.join(mobileDistDir, 'GWA.png');
   if (fs.existsSync(iconSourcePath)) {
     try {
       const image = sharp(iconSourcePath);
@@ -221,7 +221,7 @@ console.log('Copied build to mobile/dist');
         icon512.toFile(path.join(iconsDir, 'icon-512.png')),
         icon1024.toFile(path.join(iconsDir, 'icon-1024.png')),
       ]);
-      console.log('Generated PWA/App icons from GWA.jpg (192, 512, 1024; safe zone)');
+      console.log('Generated PWA/App icons from GWA.png (192, 512, 1024; safe zone)');
 
       const androidResDir = path.join(mobileDir, 'android', 'app', 'src', 'main', 'res');
       if (fs.existsSync(androidResDir)) {
@@ -279,10 +279,10 @@ console.log('Copied build to mobile/dist');
                 .toFile(path.join(dirPath, 'ic_launcher_foreground.png')),
             ]);
           }
-        console.log('Generated Android launcher icons from GWA.jpg (with safe zone)');
+        console.log('Generated Android launcher icons from GWA.png (with safe zone)');
       }
     } catch (err) {
-      console.warn('build-mobile: Could not generate icons from GWA.jpg:', err.message);
+      console.warn('build-mobile: Could not generate icons from GWA.png:', err.message);
     }
   }
 

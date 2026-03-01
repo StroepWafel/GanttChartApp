@@ -6,13 +6,29 @@ const API = API_BASE ? `${API_BASE}/api` : '/api';
 /** URL for APK download - under /api so it bypasses SPA static/catch-all. */
 export const APK_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download` : '/api/mobile-app/download';
 
-/** Download APK via fetch + blob. Works reliably on mobile where direct <a download> often returns HTML. */
+/** URL for iOS build download */
+export const IOS_DOWNLOAD_URL = API_BASE ? `${API_BASE}/api/mobile-app/download-ios` : '/api/mobile-app/download-ios';
+
+/** Download APK via fetch + blob. On native: use Filesystem.downloadFile + FileOpener for direct download. */
 export async function downloadApk(): Promise<void> {
   const url = APK_DOWNLOAD_URL;
-  // In native app (Capacitor WebView), blob download doesn't work. Open in Browser so system can handle download.
   if (isMobileNative()) {
-    const { Browser } = await import('@capacitor/browser');
-    await Browser.open({ url });
+    try {
+      const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const { FileOpener } = await import('@capacitor-community/file-opener');
+      await Filesystem.downloadFile({
+        url: absUrl,
+        path: 'gantt-chart.apk',
+        directory: Directory.Cache,
+      });
+      const { uri } = await Filesystem.getUri({ path: 'gantt-chart.apk', directory: Directory.Cache });
+      await FileOpener.open({ filePath: uri, contentType: 'application/vnd.android.package-archive' });
+      return;
+    } catch {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url: url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}` });
+    }
     return;
   }
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -30,6 +46,62 @@ export async function downloadApk(): Promise<void> {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
+}
+
+/** Download iOS build (.ipa) via fetch + blob. On native: use Filesystem.downloadFile + FileOpener for direct download. */
+export async function downloadIosBuild(): Promise<void> {
+  const url = IOS_DOWNLOAD_URL;
+  if (isMobileNative()) {
+    try {
+      const absUrl = url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const { FileOpener } = await import('@capacitor-community/file-opener');
+      await Filesystem.downloadFile({
+        url: absUrl,
+        path: 'gantt-chart.ipa',
+        directory: Directory.Cache,
+      });
+      const { uri } = await Filesystem.getUri({ path: 'gantt-chart.ipa', directory: Directory.Cache });
+      await FileOpener.open({ filePath: uri, contentType: 'application/octet-stream' });
+      return;
+    } catch {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url: url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}` });
+    }
+    return;
+  }
+  const res = await fetch(url, { credentials: 'same-origin' });
+  const ct = res.headers.get('Content-Type') || '';
+  if (ct.includes('text/html') || ct.includes('application/json')) {
+    await res.text();
+    throw new Error(res.ok ? 'Server returned HTML instead of IPA' : `Download failed: ${res.status} ${res.statusText}`);
+  }
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'gantt-chart.ipa';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+/** Upload iOS build (.ipa) - admin only */
+export async function uploadIosBuild(file: File): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = localStorage.getItem('gantt_token');
+  const res = await fetch(`${API}/admin/upload-ios-build`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, error: data.error || `Upload failed (${res.status})` };
+  }
+  return { ok: true, message: data.message };
 }
 
 /** Parse response as JSON, or throw a user-friendly error when body is empty/invalid (e.g. HTML error page) */
@@ -271,7 +343,7 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-export async function getMobileAppStatus(): Promise<{ enabled: boolean; apkAvailable?: boolean }> {
+export async function getMobileAppStatus(): Promise<{ enabled: boolean; apkAvailable?: boolean; iosAvailable?: boolean }> {
   const base = API_BASE || '';
   const url = base ? `${base}/api/mobile-app/status` : '/api/mobile-app/status';
   const res = await fetch(url);

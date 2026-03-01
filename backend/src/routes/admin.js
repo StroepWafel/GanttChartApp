@@ -5,10 +5,33 @@ import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import { randomUUID, randomBytes } from 'crypto';
+import multer from 'multer';
 import db, { runUserIdMigrations } from '../db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { optionalAuth, requireAdmin } from '../auth.js';
+
+const mobileReleasesDir = path.resolve(__dirname, '../../../mobile/releases');
+const iosUploadMulter = multer({
+  storage: multer.diskStorage({
+    destination: (_, __, cb) => {
+      if (!existsSync(mobileReleasesDir)) {
+        const fs = require('fs');
+        fs.mkdirSync(mobileReleasesDir, { recursive: true });
+      }
+      cb(null, mobileReleasesDir);
+    },
+    filename: (_, __, cb) => cb(null, 'app.ipa'),
+  }),
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB for .ipa
+  fileFilter: (_, file, cb) => {
+    const ok = file.mimetype === 'application/octet-stream' ||
+      file.originalname?.toLowerCase().endsWith('.ipa') ||
+      (file.mimetype || '').includes('zip');
+    if (ok) cb(null, true);
+    else cb(new Error('Only .ipa files are accepted'));
+  },
+});
 import {
   getEmailOnboardingConfig,
   renderOnboardingTemplate,
@@ -387,6 +410,25 @@ router.post('/full-restore', (req, res) => {
     }
 
     res.json({ ok: true, message: 'Full backup restored successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Admin upload iOS build (.ipa). iOS requires macOS/Xcode; build locally or via CI, then upload here. */
+router.post('/upload-ios-build', (req, res, next) => {
+  iosUploadMulter.single('file')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Upload failed' });
+    }
+    next();
+  });
+}, (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded. Use form field "file" with a .ipa file.' });
+    }
+    res.json({ ok: true, message: 'iOS build uploaded successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
