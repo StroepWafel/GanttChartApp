@@ -1,0 +1,44 @@
+.create-space-modal {
+  max-width: 360px;
+}
+
+.create-space-form-row {
+  margin-bottom: 16px;
+}
+
+.create-space-form-row label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.create-space-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.create-space-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.create-space-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.create-space-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 8px;
+}

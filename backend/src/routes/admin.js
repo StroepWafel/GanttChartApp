@@ -1,12 +1,14 @@
 import express from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { existsSync } from 'fs';
+import os from 'os';
+import { existsSync, createReadStream, unlinkSync, copyFileSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import Database from 'better-sqlite3';
 import { randomUUID, randomBytes } from 'crypto';
 import multer from 'multer';
-import db, { runUserIdMigrations } from '../db.js';
+import db, { runUserIdMigrations, closeDb, DB_PATH } from '../db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { optionalAuth, requireAdmin } from '../auth.js';
@@ -30,6 +32,25 @@ const iosUploadMulter = multer({
       (file.mimetype || '').includes('zip');
     if (ok) cb(null, true);
     else cb(new Error('Only .ipa files are accepted'));
+  },
+});
+
+const dbRestoreMulter = multer({
+  storage: multer.diskStorage({
+    destination: (_, __, cb) => {
+      const dataDir = path.dirname(DB_PATH);
+      const restoreDir = path.join(dataDir, 'restore-pending');
+      if (!existsSync(restoreDir)) mkdirSync(restoreDir, { recursive: true });
+      cb(null, restoreDir);
+    },
+    filename: (_, __, cb) => cb(null, 'upload.db'),
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB for .db
+  fileFilter: (_, file, cb) => {
+    const ok = file.originalname?.toLowerCase().endsWith('.db') ||
+      file.mimetype === 'application/octet-stream';
+    if (ok) cb(null, true);
+    else cb(new Error('Only .db files are accepted'));
   },
 });
 import {
@@ -56,19 +77,19 @@ router.use(optionalAuth, requireAdmin);
 
 export function fetchFullBackup() {
   const users = db.prepare(`
-    SELECT id, username, password_hash, is_admin, api_key, created_at, email, token_version FROM users ORDER BY id
+    SELECT id, username, password_hash, is_admin, is_active, api_key, created_at, email, token_version, must_change_password FROM users ORDER BY id
   `).all();
   const userPrefs = db.prepare(`
     SELECT user_id, key, value FROM user_preferences
   `).all();
   const categories = db.prepare(`
-    SELECT id, user_id, name, display_order, created_at FROM categories ORDER BY id
+    SELECT id, user_id, space_id, name, display_order, created_at FROM categories ORDER BY id
   `).all();
   const projects = db.prepare(`
-    SELECT id, user_id, category_id, name, start_date, due_date, created_at FROM projects ORDER BY id
+    SELECT id, user_id, space_id, category_id, name, start_date, due_date, created_at FROM projects ORDER BY id
   `).all();
   const tasks = db.prepare(`
-    SELECT id, user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, created_at, updated_at FROM tasks ORDER BY id
+    SELECT id, user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, display_order, created_at, updated_at FROM tasks ORDER BY id
   `).all();
   const ganttExpanded = db.prepare(`
     SELECT user_id, item_type, item_id, expanded FROM gantt_expanded
@@ -98,11 +119,20 @@ export function fetchFullBackup() {
     system_settings[r.key] = r.value;
   }
 
+  const spacesRows = db.prepare('SELECT * FROM spaces').all();
+  const spaceMembersRows = db.prepare('SELECT * FROM space_members').all();
+  const userSharesRows = db.prepare('SELECT * FROM user_shares').all();
+  const shareLinksRows = db.prepare('SELECT * FROM share_links').all();
+
   return {
     version: 2,
     exportedAt: new Date().toISOString(),
     users: usersWithData,
     system_settings,
+    spaces: spacesRows,
+    space_members: spaceMembersRows,
+    user_shares: userSharesRows,
+    share_links: shareLinksRows,
   };
 }
 
@@ -200,6 +230,27 @@ router.post('/test-onboard-email', async (req, res) => {
       text: body,
     });
     res.json({ mailgunResponse: mailgunRes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Admin export database: raw SQLite .db file for disaster recovery / external tools */
+router.get('/export-database', async (req, res) => {
+  try {
+    const destPath = path.join(os.tmpdir(), `gantt-export-${Date.now()}.db`);
+    await db.backup(destPath);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="gantt-export-${dateStr}.db"`);
+    const stream = createReadStream(destPath);
+    stream.pipe(res);
+    stream.on('end', () => {
+      try { unlinkSync(destPath); } catch (_) {}
+    });
+    stream.on('error', () => {
+      try { unlinkSync(destPath); } catch (_) {}
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -310,21 +361,25 @@ router.post('/full-restore', (req, res) => {
 
     db.exec('BEGIN TRANSACTION');
     try {
+      db.prepare('DELETE FROM share_links').run();
+      db.prepare('DELETE FROM user_shares').run();
       db.prepare('DELETE FROM gantt_expanded').run();
       db.prepare('DELETE FROM tasks').run();
       db.prepare('DELETE FROM projects').run();
       db.prepare('DELETE FROM categories').run();
+      db.prepare('DELETE FROM space_members').run();
+      db.prepare('DELETE FROM spaces').run();
       db.prepare('DELETE FROM user_preferences').run();
       db.prepare('DELETE FROM users').run();
 
       if (Array.isArray(usersData) && usersData.length > 0) {
         const insertUser = db.prepare(`
-          INSERT INTO users (id, username, password_hash, is_admin, api_key, created_at, email, token_version)
-          VALUES (?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, COALESCE(?, 0))
+          INSERT INTO users (id, username, password_hash, is_admin, is_active, api_key, created_at, email, token_version, must_change_password)
+          VALUES (?, ?, ?, ?, COALESCE(?, 1), ?, COALESCE(?, datetime('now')), ?, COALESCE(?, 0), COALESCE(?, 0))
         `);
         for (const u of usersData) {
           if (!u.password_hash) continue;
-          insertUser.run(u.id, u.username, u.password_hash, u.is_admin ? 1 : 0, u.api_key || null, u.created_at, u.email || null, u.token_version);
+          insertUser.run(u.id, u.username, u.password_hash, u.is_admin ? 1 : 0, u.is_active ?? 1, u.api_key || null, u.created_at, u.email || null, u.token_version, u.must_change_password ?? 0);
         }
       }
 
@@ -337,33 +392,50 @@ router.post('/full-restore', (req, res) => {
         }
       }
 
+      if (Array.isArray(body.spaces) && body.spaces.length > 0) {
+        const insertSpace = db.prepare(`
+          INSERT INTO spaces (id, name, created_by, created_at) VALUES (?, ?, ?, COALESCE(?, datetime('now')))
+        `);
+        for (const s of body.spaces) {
+          insertSpace.run(s.id, s.name, s.created_by, s.created_at);
+        }
+      }
+      if (Array.isArray(body.space_members) && body.space_members.length > 0) {
+        const insertSm = db.prepare(`
+          INSERT INTO space_members (id, space_id, user_id, role, joined_at) VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))
+        `);
+        for (const sm of body.space_members) {
+          insertSm.run(sm.id, sm.space_id, sm.user_id, sm.role || 'member', sm.joined_at);
+        }
+      }
+
       if (Array.isArray(catData) && catData.length > 0) {
         const insertCat = db.prepare(`
-          INSERT INTO categories (id, user_id, name, display_order, created_at)
+          INSERT INTO categories (id, user_id, space_id, name, display_order, created_at)
           VALUES (?, ?, ?, COALESCE(?, 0), COALESCE(?, datetime('now')))
         `);
         for (const c of catData) {
-          insertCat.run(c.id, c.user_id, c.name, c.display_order, c.created_at);
+          insertCat.run(c.id, c.user_id, c.space_id ?? null, c.name, c.display_order, c.created_at);
         }
       }
 
       if (Array.isArray(projData) && projData.length > 0) {
         const insertProj = db.prepare(`
-          INSERT INTO projects (id, user_id, category_id, name, start_date, due_date, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
+          INSERT INTO projects (id, user_id, space_id, category_id, name, start_date, due_date, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
         `);
         for (const p of projData) {
-          insertProj.run(p.id, p.user_id, p.category_id, p.name, p.start_date ?? null, p.due_date ?? null, p.created_at);
+          insertProj.run(p.id, p.user_id, p.space_id ?? null, p.category_id, p.name, p.start_date ?? null, p.due_date ?? null, p.created_at);
         }
       }
 
       if (Array.isArray(taskData) && taskData.length > 0) {
         const insertTask = db.prepare(`
-          INSERT INTO tasks (id, user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), COALESCE(?, 0), ?, COALESCE(?, 5), COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))
+          INSERT INTO tasks (id, user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, completed, completed_at, base_priority, display_order, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), COALESCE(?, 0), ?, COALESCE(?, 5), COALESCE(?, 0), COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))
         `);
         for (const t of taskData) {
-          insertTask.run(t.id, t.user_id, t.project_id, t.parent_id || null, t.name, t.start_date, t.end_date, t.due_date || null, t.progress, t.completed ? 1 : 0, t.completed_at, t.base_priority, t.created_at, t.updated_at);
+          insertTask.run(t.id, t.user_id, t.project_id, t.parent_id || null, t.name, t.start_date, t.end_date, t.due_date || null, t.progress, t.completed ? 1 : 0, t.completed_at, t.base_priority, t.display_order, t.created_at, t.updated_at);
         }
       }
 
@@ -388,6 +460,25 @@ router.post('/full-restore', (req, res) => {
               insertExp.run(uid, type, parseInt(itemId, 10), expanded ? 1 : 0);
             }
           }
+        }
+      }
+
+      if (Array.isArray(body.user_shares) && body.user_shares.length > 0) {
+        const insertUs = db.prepare(`
+          INSERT INTO user_shares (id, owner_id, target_user_id, item_type, item_id, permission, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
+        `);
+        for (const us of body.user_shares) {
+          insertUs.run(us.id, us.owner_id, us.target_user_id, us.item_type, us.item_id, us.permission || 'view', us.created_at);
+        }
+      }
+      if (Array.isArray(body.share_links) && body.share_links.length > 0) {
+        const insertSl = db.prepare(`
+          INSERT INTO share_links (id, owner_id, token, item_type, item_id, permission, expires_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
+        `);
+        for (const sl of body.share_links) {
+          insertSl.run(sl.id, sl.owner_id, sl.token, sl.item_type, sl.item_id, sl.permission || 'view', sl.expires_at ?? null, sl.created_at);
         }
       }
 
@@ -429,6 +520,70 @@ router.post('/upload-ios-build', (req, res, next) => {
       return res.status(400).json({ error: 'No file uploaded. Use form field "file" with a .ipa file.' });
     }
     res.json({ ok: true, message: 'iOS build uploaded successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Admin restore from .db file: replaces entire SQLite database. Server restarts after restore. */
+router.post('/restore-db', (req, res, next) => {
+  dbRestoreMulter.single('file')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Upload failed' });
+    }
+    next();
+  });
+}, (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded. Use form field "file" with a .db file.' });
+    }
+    const uploadedPath = req.file.path;
+
+    // Validate: must be a valid SQLite database
+    let testDb;
+    try {
+      testDb = new Database(uploadedPath, { readonly: true });
+      testDb.prepare('SELECT 1').get();
+      testDb.close();
+    } catch (e) {
+      try {
+        if (testDb) testDb.close();
+      } catch (_) {}
+      unlinkSync(uploadedPath);
+      return res.status(400).json({ error: 'Invalid SQLite database file' });
+    }
+
+    const dataDir = path.dirname(DB_PATH);
+    const backupDir = path.join(dataDir, 'backups');
+    if (!existsSync(backupDir)) mkdirSync(backupDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(backupDir, `gantt.db.bak-${timestamp}`);
+
+    closeDb();
+    try {
+      copyFileSync(DB_PATH, backupPath);
+    } catch (e) {
+      res.status(500).json({ error: `Failed to backup current database: ${e.message}` });
+      setTimeout(() => process.exit(1), 500);
+      return;
+    }
+    try {
+      copyFileSync(uploadedPath, DB_PATH);
+    } catch (e) {
+      try {
+        copyFileSync(backupPath, DB_PATH);
+      } catch (_) {}
+      res.status(500).json({ error: `Failed to replace database: ${e.message}` });
+      setTimeout(() => process.exit(1), 500);
+      return;
+    }
+    try {
+      unlinkSync(uploadedPath);
+    } catch (_) {}
+
+    res.json({ ok: true, message: 'Database restored. Server will restart.' });
+    setTimeout(() => process.exit(0), 500);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

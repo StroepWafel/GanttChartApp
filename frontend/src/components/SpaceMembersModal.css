@@ -1,0 +1,150 @@
+.space-members-modal {
+  max-width: 420px;
+}
+
+.space-members-tabs {
+  margin-bottom: 12px;
+}
+
+.space-members-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.space-members-header h3 {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.space-members-rename-btn {
+  padding: 4px 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.space-members-rename-btn:hover {
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.space-members-rename-form {
+  width: 100%;
+}
+
+.space-members-rename-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+
+.space-members-rename-input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+
+.space-members-rename-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.space-members-rename-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.space-members-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.space-members-add {
+  margin-bottom: 16px;
+}
+
+.space-members-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.space-members-select {
+  flex: 1;
+  min-width: 120px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.space-members-role-select {
+  padding: 6px 10px;
+  font-size: 13px;
+  width: 90px;
+}
+
+.space-members-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.space-members-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.space-members-item:last-child {
+  border-bottom: none;
+}
+
+.space-members-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.space-members-role {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.space-members-remove {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.space-members-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.space-members-modal-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}

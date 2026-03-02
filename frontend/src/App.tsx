@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAuthStatus, getMe, getVersion, login } from './api';
+import { getAuthStatus, getMe, getVersion, login, setShareToken } from './api';
 import { useServerConnected } from './hooks/useServerConnected';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { applyTheme, getStoredTheme } from './theme';
@@ -105,6 +105,15 @@ export default function App() {
 
   useEffect(() => {
     applyTheme(getStoredTheme());
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('share_token');
+    if (token) {
+      setShareToken(token);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
 
   useEffect(() => {

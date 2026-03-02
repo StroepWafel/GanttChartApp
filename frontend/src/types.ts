@@ -3,6 +3,8 @@ export interface Category {
   name: string;
   display_order: number;
   created_at?: string;
+  space_id?: number | null;
+  space_name?: string | null;
 }
 
 export interface Project {
@@ -13,6 +15,8 @@ export interface Project {
   due_date?: string | null;
   category_name?: string;
   created_at?: string;
+  space_id?: number | null;
+  space_name?: string | null;
 }
 
 export interface Task {
@@ -31,4 +35,19 @@ export interface Task {
   urgency?: number;
   project_name?: string;
   category_name?: string;
+}
+
+export interface Space {
+  id: number;
+  name: string;
+  role?: string;
+  member_count?: number;
+  created_by?: number;
+  created_at?: string;
+}
+
+export interface SpaceMember {
+  user_id: number;
+  username: string;
+  role: string;
 }
