@@ -108,6 +108,25 @@ Copy `.env.example` to `.env` and configure:
 
 When auth is enabled, the first user (admin) is created from `AUTH_USERNAME` and `AUTH_PASSWORD` if the users table is empty. Each user gets their own API key from **Settings → Account** for the read-only IoT API.
 
+## Funding the Project
+
+If this project saves you time, powers your workflow, or ends up running on your server 24/7, consider supporting its development.
+
+Maintaining a full-stack app with authentication, data isolation, mobile builds, and an IoT API takes ongoing time for:
+
+- Bug fixes and security updates  
+- Dependency upgrades (Node, Vite, Capacitor, etc.)  
+- Feature development  
+- Documentation and deployment guides  
+
+You can support the project via:
+
+- ⭐ Starring the repository  
+- 💬 Contributing issues, suggestions, or pull requests  
+- 💰 Sponsorship / donations (see repository sponsor links if available)
+
+Even small contributions help keep the project maintained and actively improved.
+
 ## Deployment
 
 See [docs/UBUNTU_SETUP.md](docs/UBUNTU_SETUP.md) for Ubuntu server deployment with PM2 and cloudflared (Cloudflare Tunnel).
