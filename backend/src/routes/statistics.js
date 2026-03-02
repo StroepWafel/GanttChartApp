@@ -39,14 +39,12 @@ function buildPayload(preferences) {
   if (!optIn) return base;
 
   const payload = { ...base };
-  if (preferences.serverId) {
-    let serverId = getSetting('statistics_server_id');
-    if (!serverId) {
-      serverId = randomUUID();
-      upsertSetting.run('statistics_server_id', JSON.stringify(serverId));
-    }
-    payload.serverId = serverId;
+  let serverId = getSetting('statistics_server_id');
+  if (!serverId) {
+    serverId = randomUUID();
+    upsertSetting.run('statistics_server_id', JSON.stringify(serverId));
   }
+  payload.serverId = serverId;
   if (preferences.country && typeof preferences.country === 'string' && preferences.country.trim() !== '') {
     payload.country = preferences.country.trim();
   }
