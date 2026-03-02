@@ -13,6 +13,7 @@ const loginLimit = rateLimit({
   message: { error: 'Too many login attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true, // Only count failed login attempts
 });
 
 const changePasswordLimit = rateLimit({

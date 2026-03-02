@@ -181,6 +181,70 @@ try {
   db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash ON password_reset_tokens(token_hash)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id)');
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS spaces (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      created_by INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS space_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      space_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      joined_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(space_id, user_id),
+      FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_space_members_space ON space_members(space_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_space_members_user ON space_members(user_id)');
+
+  const catCols = db.prepare('PRAGMA table_info(categories)').all();
+  if (!catCols.some((c) => c.name === 'space_id')) {
+    db.exec('ALTER TABLE categories ADD COLUMN space_id INTEGER');
+  }
+  const projCols2 = db.prepare('PRAGMA table_info(projects)').all();
+  if (!projCols2.some((c) => c.name === 'space_id')) {
+    db.exec('ALTER TABLE projects ADD COLUMN space_id INTEGER');
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_shares (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_id INTEGER NOT NULL,
+      target_user_id INTEGER NOT NULL,
+      item_type TEXT NOT NULL,
+      item_id INTEGER NOT NULL,
+      permission TEXT NOT NULL DEFAULT 'view',
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(owner_id, target_user_id, item_type, item_id),
+      FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_user_shares_target ON user_shares(target_user_id)');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS share_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      item_type TEXT NOT NULL,
+      item_id INTEGER NOT NULL,
+      permission TEXT NOT NULL DEFAULT 'view',
+      expires_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_share_links_token ON share_links(token)');
+
   const ganttCols = db.prepare("PRAGMA table_info(gantt_expanded)").all();
   const ganttNewExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gantt_expanded_new'").get();
   if (!ganttCols.some((c) => c.name === 'user_id')) {
@@ -329,4 +393,9 @@ export function runUserIdMigrations() {
   assignOrphanRowsToAdmin();
 }
 
+export function closeDb() {
+  db.close();
+}
+
+export { DB_PATH };
 export default db;

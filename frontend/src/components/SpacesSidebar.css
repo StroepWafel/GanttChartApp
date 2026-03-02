@@ -1,0 +1,123 @@
+.spaces-sidebar {
+  padding: 0 0 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.spaces-section-all {
+  margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-panel);
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+
+.spaces-section-all .spaces-item {
+  width: 100%;
+}
+
+.spaces-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.spaces-sidebar-title svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.spaces-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.spaces-list > li {
+  margin: 0 0 2px;
+}
+
+.spaces-list-item-with-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+}
+
+.spaces-list-item-with-actions .spaces-item {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.spaces-manage-btn {
+  flex-shrink: 0;
+  padding: 4px 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spaces-manage-btn:hover {
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.spaces-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.3;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text-muted);
+}
+
+.spaces-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spaces-item:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.spaces-item.active {
+  background: var(--accent);
+  color: white;
+}
+
+.spaces-item .spaces-item-count {
+  flex-shrink: 0;
+  margin-left: 2px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.spaces-create-btn {
+  margin-top: 10px;
+  width: 100%;
+}

@@ -3,7 +3,7 @@ import { Menu, X } from 'lucide-react';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import './SettingsPage.css';
 
-export type SettingsTab = 'personal' | 'app' | 'admin' | 'status' | 'emailOnboarding' | 'updates' | 'danger';
+export type SettingsTab = 'personal' | 'app' | 'spaces' | 'admin' | 'status' | 'emailOnboarding' | 'updates' | 'danger';
 
 interface Section {
   id: SettingsTab;

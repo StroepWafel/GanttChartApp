@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus, MoreVertical } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -17,6 +17,9 @@ import SettingsPage from './SettingsPage';
 import UpdatesSection from './settings/UpdatesSection';
 import UserManagementSection from './settings/UserManagementSection';
 import ShortcutsHelpModal from './ShortcutsHelpModal';
+import SpacesSidebar from './SpacesSidebar';
+import SpaceMembersModal from './SpaceMembersModal';
+import CreateSpaceModal from './CreateSpaceModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useMainData } from '../hooks/useMainData';
@@ -53,7 +56,16 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
-  const { categories, projects, tasks, load, setCategories, setProjects } = useMainData(includeCompleted);
+  const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(null);
+  const [spaces, setSpaces] = useState<{ id: number; name: string; member_count?: number; role?: string }[]>([]);
+  const [spaceMembersTarget, setSpaceMembersTarget] = useState<{ id: number; name: string; role?: string } | null>(null);
+  const [showCreateSpaceModal, setShowCreateSpaceModal] = useState(false);
+  const mainDataFilters = useMemo(() => {
+    const f: { filterScope?: api.ShareFilterScope } = {};
+    f.filterScope = selectedSpaceId != null ? (`space:${selectedSpaceId}` as api.ShareFilterScope) : 'personal';
+    return f;
+  }, [selectedSpaceId]);
+  const { categories, projects, tasks, load, setCategories, setProjects } = useMainData(includeCompleted, mainDataFilters);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [showClearEveryoneConfirm, setShowClearEveryoneConfirm] = useState(false);
   const [clearEveryoneError, setClearEveryoneError] = useState<string | null>(null);
@@ -97,9 +109,11 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [githubTokenSet, setGithubTokenSet] = useState(false);
   const [githubTokenInput, setGithubTokenInput] = useState('');
   const [githubTokenSaving, setGithubTokenSaving] = useState(false);
-  type SettingsTab = 'personal' | 'app' | 'admin' | 'status' | 'emailOnboarding' | 'updates' | 'danger';
+  type SettingsTab = 'personal' | 'app' | 'spaces' | 'admin' | 'status' | 'emailOnboarding' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
   const settingsOpenToTabRef = useRef<SettingsTab | null>(null);
+  const [spacesMenuOpen, setSpacesMenuOpen] = useState<number | null>(null);
+  const spacesMenuRef = useRef<HTMLDivElement>(null);
   const [emailOnboardingSettings, setEmailOnboardingSettings] = useState<api.EmailOnboardingSettings>({});
   const [showEmailOnboardingSetup, setShowEmailOnboardingSetup] = useState(false);
   const [emailOnboardingSaving, setEmailOnboardingSaving] = useState(false);
@@ -124,6 +138,20 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     return { status: 'idle' };
   });
   const { isMobile } = useMediaQuery();
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window === 'undefined') return 240;
+    const v = localStorage.getItem('gantt_sidebar_width');
+    const n = v ? parseInt(v, 10) : NaN;
+    return Number.isFinite(n) && n >= 160 && n <= 480 ? n : 240;
+  });
+  const [spacesSectionHeight, setSpacesSectionHeight] = useState(() => {
+    if (typeof window === 'undefined') return 180;
+    const v = localStorage.getItem('gantt_spaces_section_height');
+    const n = v ? parseInt(v, 10) : NaN;
+    return Number.isFinite(n) && n >= 80 && n <= 400 ? n : 180;
+  });
+  const sidebarResizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const spacesResizeRef = useRef<{ startY: number; startH: number } | null>(null);
   const [isNativeApp, setIsNativeApp] = useState(false);
   const [mobileAppPromptDismissed, setMobileAppPromptDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -222,6 +250,17 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   }, [showHeaderMenu]);
 
   useEffect(() => {
+    if (spacesMenuOpen == null) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (spacesMenuRef.current && !spacesMenuRef.current.contains(e.target as Node)) {
+        setSpacesMenuOpen(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [spacesMenuOpen]);
+
+  useEffect(() => {
     if (authEnabled) {
       api.getMe()
         .then((u) => setCurrentUser({ id: u.id, username: u.username, isAdmin: u.isAdmin, apiKey: u.apiKey ?? null }))
@@ -232,10 +271,70 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   }, [authEnabled]);
 
   useEffect(() => {
+    localStorage.setItem('gantt_sidebar_width', String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem('gantt_spaces_section_height', String(spacesSectionHeight));
+  }, [spacesSectionHeight]);
+
+  const startSidebarResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    sidebarResizeRef.current = { startX: e.clientX, startW: sidebarWidth };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (ev: MouseEvent) => {
+      if (!sidebarResizeRef.current) return;
+      const dx = ev.clientX - sidebarResizeRef.current.startX;
+      const next = Math.max(160, Math.min(480, sidebarResizeRef.current.startW + dx));
+      setSidebarWidth(next);
+      sidebarResizeRef.current = { startX: ev.clientX, startW: next };
+    };
+    const onUp = () => {
+      sidebarResizeRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
+
+  const startSpacesResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    spacesResizeRef.current = { startY: e.clientY, startH: spacesSectionHeight };
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (ev: MouseEvent) => {
+      if (!spacesResizeRef.current) return;
+      const dy = ev.clientY - spacesResizeRef.current.startY;
+      const next = Math.max(80, Math.min(400, spacesResizeRef.current.startH + dy));
+      setSpacesSectionHeight(next);
+      spacesResizeRef.current = { startY: ev.clientY, startH: next };
+    };
+    const onUp = () => {
+      spacesResizeRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [spacesSectionHeight]);
+
+  useEffect(() => {
     if (authEnabled && currentUser?.isAdmin) {
       api.getUsers().then(setUsers).catch(() => setUsers([]));
     }
   }, [authEnabled, currentUser?.isAdmin]);
+
+  useEffect(() => {
+    if (authEnabled && currentUser) {
+      api.getSpaces().then(setSpaces).catch(() => setSpaces([]));
+    }
+  }, [authEnabled, currentUser]);
 
   useEffect(() => {
     if (authEnabled && currentUser?.isAdmin) {
@@ -290,18 +389,21 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     _debug: d._debug != null && typeof d._debug === 'object' && !Array.isArray(d._debug) ? (d._debug as Record<string, unknown>) : undefined,
   }), []);
 
-  // One-time update check when admin loads (so we can show "Update available" in corner)
+  const isPageReload = typeof performance !== 'undefined' &&
+    (performance.getEntriesByType?.('navigation')?.[0] as { type?: string } | undefined)?.type === 'reload';
+
+  // One-time update check when admin loads (so we can show "Update available" in corner). Skip on reload.
   useEffect(() => {
-    if (!authEnabled || !currentUser?.isAdmin) return;
+    if (!authEnabled || !currentUser?.isAdmin || isPageReload) return;
     api.checkUpdate(false)
       .then((d) => setUpdateCheck(normalizeUpdateCheck(d)))
       .catch((err) => {
         const msg = err instanceof Error ? err.message : 'Check failed';
         setUpdateCheck({ updateAvailable: false, error: msg });
       });
-  }, [authEnabled, currentUser?.isAdmin, normalizeUpdateCheck]);
+  }, [authEnabled, currentUser?.isAdmin, normalizeUpdateCheck, isPageReload]);
 
-  // Automatic update check every ~10 minutes when enabled (admin only)
+  // Automatic update check every ~10 minutes when enabled (admin only). Skip initial check on reload.
   const AUTO_UPDATE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
   useEffect(() => {
     if (!autoUpdateEnabled || !currentUser?.isAdmin) return;
@@ -313,10 +415,10 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           setUpdateCheck({ updateAvailable: false, error: msg });
         });
     }
-    runCheck();
+    if (!isPageReload) runCheck();
     const id = setInterval(runCheck, AUTO_UPDATE_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [autoUpdateEnabled, currentUser?.isAdmin, normalizeUpdateCheck]);
+  }, [autoUpdateEnabled, currentUser?.isAdmin, normalizeUpdateCheck, isPageReload]);
 
   useEffect(() => {
     if (showSettings) {
@@ -450,18 +552,23 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           setEmailOnboardingSettings(eo);
         })
         .catch(() => {});
-      api.checkUpdate(false)
-        .then((d) => setUpdateCheck(normalizeUpdateCheck(d)))
-        .catch((err) => {
-          const msg = err instanceof Error ? err.message : 'Check failed';
-          setUpdateCheck({ updateAvailable: false, error: msg });
-        });
+      if (!isPageReload) {
+        api.checkUpdate(false)
+          .then((d) => setUpdateCheck(normalizeUpdateCheck(d)))
+          .catch((err) => {
+            const msg = err instanceof Error ? err.message : 'Check failed';
+            setUpdateCheck({ updateAvailable: false, error: msg });
+          });
+      }
     }
-  }, [load, authEnabled, currentUser?.isAdmin, normalizeUpdateCheck]);
+  }, [load, authEnabled, currentUser?.isAdmin, normalizeUpdateCheck, isPageReload]);
 
   async function handleCreateCategory(name: string) {
-    await api.createCategory(name);
+    await api.createCategory(name, selectedSpaceId ?? undefined);
     await load();
+    if (authEnabled) {
+      api.getSpaces().then(setSpaces).catch(() => {});
+    }
   }
 
   async function handleCreateProject(name: string, categoryId: number, dueDate?: string, startDate?: string) {
@@ -613,6 +720,34 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     savePriorityColors(DEFAULT_PRIORITY_COLORS);
     if (authEnabled) {
       api.patchUserPreferences('priority_colors', DEFAULT_PRIORITY_COLORS).catch(() => {});
+    }
+  }
+
+  async function handleDbRestoreFileSelect(file: File) {
+    if (!file.name.toLowerCase().endsWith('.db')) {
+      adminAlerts.addAlert('Restore DB', 'Error', 'Please select a .db file');
+      modal.showAlert({ title: 'Error', message: 'Please select a .db file' });
+      return;
+    }
+    const confirmed = await modal.showConfirm({
+      title: 'Import .db backup',
+      message: 'This will replace the entire database with the selected file. The server will restart. Continue?',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    try {
+      const result = await api.adminRestoreDb(file);
+      if (result.ok) {
+        adminAlerts.addAlert('Restore DB', 'Success', result.message || 'Database restored. Refresh the page.');
+        modal.showAlert({ title: 'Success', message: result.message || 'Database restored. The server will restart—refresh the page in a few seconds.' });
+      } else {
+        adminAlerts.addAlert('Restore DB', 'Error', result.error || 'Restore failed');
+        modal.showAlert({ title: 'Error', message: result.error || 'Restore failed' });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to restore database';
+      adminAlerts.addAlert('Restore DB', 'Error', msg);
+      modal.showAlert({ title: 'Error', message: msg });
     }
   }
 
@@ -913,10 +1048,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
             </div>
             <div className="settings-section">
               <h4>Backup</h4>
-              <p className="settings-desc">Download a copy of your data or restore from a previous backup.</p>
+              <p className="settings-desc">Download a copy of your data.</p>
               <div className="settings-actions">
                 <button className="btn-sm" onClick={handleDownloadBackup}>Download backup</button>
-                <label className="btn-sm btn-sm-restore">Restore backup<input type="file" accept=".json,application/json" onChange={handleRestoreFileSelect} style={{ display: 'none' }} /></label>
               </div>
             </div>
             <div className="settings-section">
@@ -939,6 +1073,63 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
               </div>
             )}
             <a href="https://github.com/StroepWafel/GanttChartApp" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub" style={{ display: 'inline-block', color: 'var(--muted)', marginTop: 8 }}><Github size={20} /></a>
+          </div>
+        )}
+        {settingsTab === 'spaces' && authEnabled && currentUser && (
+          <div className="settings-tab-content" role="tabpanel">
+            <div className="settings-section">
+              <h4>Spaces</h4>
+              <p className="settings-desc">Manage and share spaces. On desktop, the sidebar shows the full space list.</p>
+              <div className="spaces-settings-list">
+                <div className="spaces-settings-item spaces-settings-myspace">
+                  <span className="spaces-settings-name">My space</span>
+                  <span className="settings-desc" style={{ margin: 0 }}>Personal tasks (no space)</span>
+                </div>
+                {spaces.map((s) => (
+                  <div key={s.id} className="spaces-settings-item">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span className="spaces-settings-name">{s.name}</span>
+                      {s.member_count != null && (
+                        <span className="settings-desc" style={{ margin: '0 0 0 6px' }}>({s.member_count} members)</span>
+                      )}
+                    </div>
+                    {s.role === 'admin' && (
+                      <div ref={spacesMenuOpen === s.id ? spacesMenuRef : undefined} className="spaces-settings-menu-wrap">
+                        <button
+                          type="button"
+                          className="btn-sm spaces-settings-menu-btn"
+                          onClick={() => setSpacesMenuOpen(spacesMenuOpen === s.id ? null : s.id)}
+                          title="Space options"
+                          aria-label="Space options"
+                          aria-expanded={spacesMenuOpen === s.id}
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                        {spacesMenuOpen === s.id && (
+                          <div className="spaces-settings-menu">
+                            <button
+                              type="button"
+                              className="spaces-settings-menu-item"
+                              onClick={() => {
+                                setSpaceMembersTarget({ id: s.id, name: s.name, role: s.role });
+                                setSpacesMenuOpen(null);
+                              }}
+                            >
+                              <Settings size={14} />
+                              Manage space (members & share)
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="btn-sm" style={{ marginTop: 12 }} onClick={() => setShowCreateSpaceModal(true)}>
+                <Plus size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                New space
+              </button>
+            </div>
           </div>
         )}
         {settingsTab === 'app' && (mobileAppEnabled || currentUser?.isAdmin || !authEnabled) && (
@@ -1523,6 +1714,33 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                   <button type="button" className="btn-danger" onClick={() => { setClearEveryoneError(null); setShowClearEveryoneConfirm(true); }}>Delete everyone&apos;s data</button>
                 )}
               </div>
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                <h5 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Restore backup</h5>
+                <p className="settings-desc">Replace all current data with a backup file. This cannot be undone.</p>
+                <label className="btn-sm btn-sm-restore" style={{ marginTop: '0.5rem' }}>
+                  Import backup
+                  <input type="file" accept=".json,application/json" onChange={handleRestoreFileSelect} style={{ display: 'none' }} />
+                </label>
+              </div>
+              {currentUser?.isAdmin && (
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                  <h5 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Import .db backup (admin)</h5>
+                  <p className="settings-desc">Replace the entire SQLite database with a .db file. Server will restart. Use Export database first to create a backup.</p>
+                  <label className="btn-sm btn-sm-restore" style={{ marginTop: '0.5rem' }}>
+                    Import .db file
+                    <input
+                      type="file"
+                      accept=".db"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (file) handleDbRestoreFileSelect(file);
+                      }}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1567,15 +1785,35 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         )}
         <div className={`header-actions ${isMobile ? 'header-actions-mobile' : ''}`}>
           {isMobile ? (
-            <button
-              type="button"
-              className="btn-sm btn-sm-settings"
-              onClick={() => setMobilePage('settings')}
-              title="Settings"
-              aria-label="Settings"
-            >
-              <Settings size={20} />
-            </button>
+            <>
+              {authEnabled && currentUser && (
+                <select
+                  className="header-space-select"
+                  value={selectedSpaceId == null ? 'all' : `space:${selectedSpaceId}`}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === 'all') setSelectedSpaceId(null);
+                    else setSelectedSpaceId(parseInt(v.replace('space:', ''), 10) || null);
+                  }}
+                  title="Switch space"
+                  aria-label="Switch space"
+                >
+                  <option value="all">My space</option>
+                  {spaces.map((s) => (
+                    <option key={s.id} value={`space:${s.id}`}>{s.name}</option>
+                  ))}
+                </select>
+              )}
+              <button
+                type="button"
+                className="btn-sm btn-sm-settings"
+                onClick={() => setMobilePage('settings')}
+                title="Settings"
+                aria-label="Settings"
+              >
+                <Settings size={20} />
+              </button>
+            </>
           ) : (
             <>
               <button
@@ -1627,6 +1865,15 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           )}
         </div>
       </header>
+
+      {api.getShareToken() && (
+        <div className="masquerade-banner share-link-banner" role="status">
+          <span>Viewing shared content via link.</span>
+          <button type="button" className="btn-sm" onClick={() => { api.setShareToken(null); window.location.reload(); }}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {authEnabled && isMasquerading && currentUser && (
         <div className="masquerade-banner" role="status">
@@ -1741,6 +1988,7 @@ onTaskDelete={handleDeleteTask}
                 sections={[
                   { id: 'personal', label: 'Personal' },
                   { id: 'app', label: 'App', show: !!(mobileAppEnabled || currentUser?.isAdmin || !authEnabled) },
+                  { id: 'spaces', label: 'Spaces', show: !!(authEnabled && currentUser) },
                   { id: 'status', label: 'Status', show: !!(currentUser?.isAdmin || !authEnabled) },
                   { id: 'admin', label: 'Admin', show: !!currentUser?.isAdmin },
                   { id: 'emailOnboarding', label: 'Email invite', show: !!currentUser?.isAdmin },
@@ -1762,69 +2010,165 @@ onTaskDelete={handleDeleteTask}
               />
             )}
             {!sidebarCollapsed && (
-              <aside
-                className={`sidebar ${isSidebarOverlay ? 'sidebar-overlay' : ''}`}
-                aria-label="Categories and projects"
-              >
-                <section className="sidebar-section">
-                  <h3>Categories</h3>
-                  {categories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
-                  {categories.map((c) => (
-                    <div key={c.id} className="cat-block">
-                      <div className="cat-item">
-                        <span className="cat-name">{c.name}</span>
-                        <button
-                          type="button"
-                          className="sidebar-edit"
-                          onClick={() => { setEditCategory(c); setEditProject(null); setShowCatProj(true); }}
-                          title="Edit category"
-                          aria-label="Edit category"
-                        >
-                          <Pencil size={12} />
-                        </button>
-                        <button
-                          type="button"
-                          className="sidebar-delete"
-                          onClick={() => setDeleteCategoryConfirm(c)}
-                          title="Delete category"
-                          aria-label="Delete category"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                      {projects.filter((p) => p.category_id === c.id).map((p) => (
-                        <div key={p.id} className="proj-item">
-                          <span>{p.name}</span>
-                          <button
-                            type="button"
-                            className="sidebar-edit"
-                            onClick={(e) => { e.stopPropagation(); setEditProject(p); setEditCategory(null); setShowCatProj(true); }}
-                            title="Edit project"
-                            aria-label="Edit project"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                          <button
-                            type="button"
-                            className="sidebar-delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteProjectConfirm(p);
-                            }}
-                            title="Delete project"
-                            aria-label="Delete project"
-                          >
-                            <Trash2 size={12} />
-                          </button>
+              <>
+                <aside
+                  className={`sidebar ${isSidebarOverlay ? 'sidebar-overlay' : ''}`}
+                  aria-label="Categories and projects"
+                  style={!isMobile ? { width: sidebarWidth } : undefined}
+                >
+                  <div className={`sidebar-inner ${authEnabled && currentUser && !isMobile ? 'sidebar-inner-flex' : ''}`}>
+                    {authEnabled && currentUser ? (
+                      <>
+                        <div className="sidebar-spaces" style={!isMobile ? { height: spacesSectionHeight } : undefined}>
+                  <SpacesSidebar
+                    spaces={spaces}
+                    selectedSpaceId={selectedSpaceId}
+                    onSpaceSelect={setSelectedSpaceId}
+                    onRefresh={() => { api.getSpaces().then(setSpaces).catch(() => {}); load(); }}
+                    onManageSpace={(s) => setSpaceMembersTarget({ id: s.id, name: s.name, role: s.role })}
+                    onCreateSpace={() => setShowCreateSpaceModal(true)}
+                  />
                         </div>
-                      ))}
-                    </div>
-                  ))}
-                  <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
-                    + Category / Project
-                  </button>
-                </section>
-              </aside>
+                        {!isMobile && (
+                          <div
+                            className="resize-handle resize-handle-h"
+                            onMouseDown={startSpacesResize}
+                            role="separator"
+                            aria-orientation="horizontal"
+                            aria-label="Resize spaces and categories"
+                          />
+                        )}
+                        <section className={`sidebar-section ${!isMobile ? 'sidebar-section-flex' : ''}`}>
+                          <h3>Categories</h3>
+                          {categories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
+                          {categories.map((c) => (
+                            <div key={c.id} className="cat-block">
+                              <div className="cat-item">
+                                <span className="cat-name">{c.name}</span>
+                                <button
+                                  type="button"
+                                  className="sidebar-edit"
+                                  onClick={() => { setEditCategory(c); setEditProject(null); setShowCatProj(true); }}
+                                  title="Edit category"
+                                  aria-label="Edit category"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="sidebar-delete"
+                                  onClick={() => setDeleteCategoryConfirm(c)}
+                                  title="Delete category"
+                                  aria-label="Delete category"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                              {projects.filter((p) => p.category_id === c.id).map((p) => (
+                                <div key={p.id} className="proj-item">
+                                  <span>{p.name}</span>
+                                  <button
+                                    type="button"
+                                    className="sidebar-edit"
+                                    onClick={(e) => { e.stopPropagation(); setEditProject(p); setEditCategory(null); setShowCatProj(true); }}
+                                    title="Edit project"
+                                    aria-label="Edit project"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="sidebar-delete"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteProjectConfirm(p);
+                                    }}
+                                    title="Delete project"
+                                    aria-label="Delete project"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                          <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
+                            + Category / Project
+                          </button>
+                        </section>
+                      </>
+                    ) : (
+                      <section className="sidebar-section">
+                        <h3>Categories</h3>
+                        {categories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
+                        {categories.map((c) => (
+                          <div key={c.id} className="cat-block">
+                            <div className="cat-item">
+                              <span className="cat-name">{c.name}</span>
+                              <button
+                                type="button"
+                                className="sidebar-edit"
+                                onClick={() => { setEditCategory(c); setEditProject(null); setShowCatProj(true); }}
+                                title="Edit category"
+                                aria-label="Edit category"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                className="sidebar-delete"
+                                onClick={() => setDeleteCategoryConfirm(c)}
+                                title="Delete category"
+                                aria-label="Delete category"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                            {projects.filter((p) => p.category_id === c.id).map((p) => (
+                              <div key={p.id} className="proj-item">
+                                <span>{p.name}</span>
+                                <button
+                                  type="button"
+                                  className="sidebar-edit"
+                                  onClick={(e) => { e.stopPropagation(); setEditProject(p); setEditCategory(null); setShowCatProj(true); }}
+                                  title="Edit project"
+                                  aria-label="Edit project"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="sidebar-delete"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteProjectConfirm(p);
+                                  }}
+                                  title="Delete project"
+                                  aria-label="Delete project"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                        <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
+                          + Category / Project
+                        </button>
+                      </section>
+                    )}
+                  </div>
+                </aside>
+                {!isMobile && (
+                  <div
+                    className="resize-handle resize-handle-v"
+                    onMouseDown={startSidebarResize}
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Resize sidebar"
+                  />
+                )}
+              </>
             )}
 
             <main className="gantt-area">
@@ -1867,6 +2211,28 @@ onTaskDelete={handleDeleteTask}
           }}
           onCreate={handleCreateTask}
           onUpdate={editTask ? handleUpdateTask : undefined}
+        />
+      )}
+
+      {showCreateSpaceModal && (
+        <CreateSpaceModal
+          onClose={() => setShowCreateSpaceModal(false)}
+          onCreated={() => { load(); api.getSpaces().then(setSpaces).catch(() => {}); }}
+        />
+      )}
+
+      {spaceMembersTarget && currentUser && (
+        <SpaceMembersModal
+          spaceId={spaceMembersTarget.id}
+          spaceName={spaceMembersTarget.name}
+          currentUserId={currentUser.id}
+          isAdmin={spaceMembersTarget.role === 'admin'}
+          onClose={() => setSpaceMembersTarget(null)}
+          onDone={() => { api.getSpaces().then(setSpaces).catch(() => {}); load(); }}
+          onSpaceRenamed={(newName) => {
+            setSpaceMembersTarget((prev) => prev ? { ...prev, name: newName } : null);
+            api.getSpaces().then(setSpaces).catch(() => {});
+          }}
         />
       )}
 
@@ -2009,6 +2375,17 @@ onTaskDelete={handleDeleteTask}
                     onClick={() => setSettingsTab('app')}
                   >
                     App
+                  </button>
+                )}
+                {authEnabled && currentUser && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === 'spaces'}
+                    className={`settings-tab ${settingsTab === 'spaces' ? 'active' : ''}`}
+                    onClick={() => setSettingsTab('spaces')}
+                  >
+                    Spaces
                   </button>
                 )}
                 {(currentUser?.isAdmin || !authEnabled) && (

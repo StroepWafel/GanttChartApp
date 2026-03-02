@@ -110,10 +110,33 @@ function getAuthHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+const SHARE_TOKEN_KEY = 'gantt_share_token';
+
+export function getShareToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(SHARE_TOKEN_KEY);
+}
+
+export function setShareToken(token: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (token) sessionStorage.setItem(SHARE_TOKEN_KEY, token);
+  else sessionStorage.removeItem(SHARE_TOKEN_KEY);
+}
+
 export async function fetchApi(path: string, opts: RequestInit = {}) {
-  let res = await fetch(`${API}${path}`, {
+  const shareToken = getShareToken();
+  let urlStr = `${API}${path}`;
+  if (shareToken) {
+    const sep = path.includes('?') ? '&' : '?';
+    urlStr += `${sep}share_token=${encodeURIComponent(shareToken)}`;
+  }
+  const headers: HeadersInit = { 'Content-Type': 'application/json', ...getAuthHeaders(), ...opts.headers };
+  if (shareToken) {
+    (headers as Record<string, string>)['X-Share-Token'] = shareToken;
+  }
+  let res = await fetch(urlStr, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(), ...opts.headers },
+    headers,
   });
   if (res.status === 401 && isMobileNative()) {
     const creds = await getCredentials();
@@ -305,6 +328,33 @@ export async function getAdminFullBackup(): Promise<Blob> {
   return res.blob();
 }
 
+/** Admin restore from .db file - replaces entire database, server restarts (admin only) */
+export async function adminRestoreDb(file: File): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = localStorage.getItem('gantt_token');
+  const res = await fetch(`${API}/admin/restore-db`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, error: data.error || `Restore failed (${res.status})` };
+  }
+  return { ok: true, message: data.message };
+}
+
+/** Admin export raw SQLite database file (admin only) */
+export async function getAdminExportDatabase(): Promise<Blob> {
+  const res = await fetchApi('/admin/export-database');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Failed to export database (${res.status})`);
+  }
+  return res.blob();
+}
+
 export async function getVersion(): Promise<{ version: string; updating?: boolean; bootId?: string }> {
   const res = await fetch(`${API}/version?_t=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Version check failed: ${res.status}`);
@@ -463,15 +513,23 @@ export async function applyUpdate(debug = false) {
   return data;
 }
 
-export async function getCategories() {
-  const res = await fetchApi('/categories');
+export type ShareFilterScope = 'all' | 'personal' | 'shared' | 'spaces' | `space:${number}`;
+export type ShareSort = 'name' | 'display_order' | 'shared_first' | 'collaborators';
+
+export async function getCategories(opts?: { shareToken?: string; filterScope?: ShareFilterScope; filterCollaborator?: string; sort?: ShareSort }) {
+  const q = new URLSearchParams();
+  if (opts?.shareToken) q.set('share_token', opts.shareToken);
+  if (opts?.filterScope) q.set('filter_scope', opts.filterScope);
+  if (opts?.filterCollaborator) q.set('filter_collaborator', opts.filterCollaborator);
+  if (opts?.sort) q.set('sort', opts.sort);
+  const res = await fetchApi(`/categories${q.toString() ? '?' + q : ''}`);
   return res.json();
 }
 
-export async function createCategory(name: string) {
+export async function createCategory(name: string, spaceId?: number) {
   const res = await fetchApi('/categories', {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, space_id: spaceId }),
   });
   return res.json();
 }
@@ -491,8 +549,14 @@ export async function deleteCategory(id: number) {
   return res.json();
 }
 
-export async function getProjects() {
-  const res = await fetchApi('/projects');
+export async function getProjects(opts?: { categoryId?: number; shareToken?: string; filterScope?: ShareFilterScope; filterCollaborator?: string; sort?: ShareSort }) {
+  const q = new URLSearchParams();
+  if (opts?.categoryId) q.set('category_id', String(opts.categoryId));
+  if (opts?.shareToken) q.set('share_token', opts.shareToken);
+  if (opts?.filterScope) q.set('filter_scope', opts.filterScope);
+  if (opts?.filterCollaborator) q.set('filter_collaborator', opts.filterCollaborator);
+  if (opts?.sort) q.set('sort', opts.sort);
+  const res = await fetchApi(`/projects${q.toString() ? '?' + q : ''}`);
   return res.json();
 }
 
@@ -519,9 +583,15 @@ export async function deleteProject(id: number) {
   return res.json();
 }
 
-export async function getTasks(includeCompleted = false) {
-  const q = includeCompleted ? '?include_completed=true' : '';
-  const res = await fetchApi(`/tasks${q}`);
+export async function getTasks(includeCompleted = false, opts?: { projectId?: number; shareToken?: string; filterScope?: ShareFilterScope; filterCollaborator?: string; sort?: ShareSort }) {
+  const q = new URLSearchParams();
+  if (includeCompleted) q.set('include_completed', 'true');
+  if (opts?.projectId) q.set('project_id', String(opts.projectId));
+  if (opts?.shareToken) q.set('share_token', opts.shareToken);
+  if (opts?.filterScope) q.set('filter_scope', opts.filterScope);
+  if (opts?.filterCollaborator) q.set('filter_collaborator', opts.filterCollaborator);
+  if (opts?.sort) q.set('sort', opts.sort);
+  const res = await fetchApi(`/tasks${q.toString() ? '?' + q : ''}`);
   return res.json();
 }
 
@@ -602,6 +672,129 @@ export async function setGanttExpanded(
     body: JSON.stringify({ item_type: itemType, item_id: itemId, expanded }),
   });
   return res.json();
+}
+
+export async function getShareableUsers(): Promise<{ id: number; username: string }[]> {
+  const res = await fetchApi('/users/shareable');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get shareable users');
+  return data;
+}
+
+export async function getCollaborators(): Promise<{ id: number; username: string }[]> {
+  const res = await fetchApi('/users/collaborators');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get collaborators');
+  return data;
+}
+
+export async function getSpaces() {
+  const res = await fetchApi('/spaces');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get spaces');
+  return data;
+}
+
+export async function createSpace(name: string) {
+  const res = await fetchApi('/spaces', { method: 'POST', body: JSON.stringify({ name }) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to create space');
+  return data;
+}
+
+export async function updateSpace(id: number, data: { name?: string }) {
+  const res = await fetchApi(`/spaces/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  const out = await res.json();
+  if (!res.ok) throw new Error(out.error || 'Failed to update space');
+  return out;
+}
+
+export async function deleteSpace(id: number) {
+  const res = await fetchApi(`/spaces/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to delete space');
+  }
+  return res.json();
+}
+
+export async function getSpaceMembers(spaceId: number) {
+  const res = await fetchApi(`/spaces/${spaceId}/members`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get space members');
+  return data;
+}
+
+export async function inviteSpaceMember(spaceId: number, userId: number, role?: 'admin' | 'member') {
+  const res = await fetchApi(`/spaces/${spaceId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, role: role || 'member' }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to invite member');
+  return data;
+}
+
+export async function removeSpaceMember(spaceId: number, userId: number) {
+  const res = await fetchApi(`/spaces/${spaceId}/members/${userId}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to remove member');
+  return data;
+}
+
+export async function leaveSpace(spaceId: number) {
+  const res = await fetchApi(`/spaces/${spaceId}/leave`, { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to leave space');
+  return data;
+}
+
+export async function getShares() {
+  const res = await fetchApi('/shares');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get shares');
+  return data;
+}
+
+export async function createUserShare(itemType: 'category' | 'project' | 'task' | 'space', itemId: number, targetUserId: number, permission: 'view' | 'edit') {
+  const res = await fetchApi('/shares/users', {
+    method: 'POST',
+    body: JSON.stringify({ item_type: itemType, item_id: itemId, target_user_id: targetUserId, permission }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to share');
+  return data;
+}
+
+export async function deleteUserShare(shareId: number) {
+  const res = await fetchApi(`/shares/users/${shareId}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to remove share');
+  return data;
+}
+
+export async function createShareLink(itemType: 'category' | 'project' | 'task' | 'space', itemId: number, permission: 'view' | 'edit', expiresDays?: number) {
+  const res = await fetchApi('/shares/links', {
+    method: 'POST',
+    body: JSON.stringify({ item_type: itemType, item_id: itemId, permission, expires_days: expiresDays }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to create share link');
+  return data;
+}
+
+export async function deleteShareLink(linkId: number) {
+  const res = await fetchApi(`/shares/links/${linkId}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to revoke link');
+  return data;
+}
+
+export async function getShareLinks() {
+  const res = await fetchApi('/shares/links');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get share links');
+  return data;
 }
 
 export async function clearAllData() {

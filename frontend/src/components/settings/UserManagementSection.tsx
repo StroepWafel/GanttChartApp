@@ -424,27 +424,50 @@ export default function UserManagementSection({
       <div className="settings-section">
         <h5>Full backup</h5>
         <p className="settings-desc">Download backup of all users and data (admin only).</p>
-        <button
-          type="button"
-          className="btn-sm"
-          onClick={async () => {
-            try {
-              const blob = await api.getAdminFullBackup();
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `gantt-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : 'Failed to download full backup';
-              adminAlerts.addAlert('Backup', 'Error', msg);
-              modal.showAlert({ title: 'Error', message: msg });
-            }
-          }}
-        >
-          Download full backup
-        </button>
+        <div className="settings-button-row">
+          <button
+            type="button"
+            className="btn-sm"
+            onClick={async () => {
+              try {
+                const blob = await api.getAdminFullBackup();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `gantt-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Failed to download full backup';
+                adminAlerts.addAlert('Backup', 'Error', msg);
+                modal.showAlert({ title: 'Error', message: msg });
+              }
+            }}
+          >
+            Download full backup
+          </button>
+          <button
+            type="button"
+            className="btn-sm"
+            onClick={async () => {
+              try {
+                const blob = await api.getAdminExportDatabase();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `gantt-export-${new Date().toISOString().slice(0, 10)}.db`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Failed to export database';
+                adminAlerts.addAlert('Backup', 'Error', msg);
+                modal.showAlert({ title: 'Error', message: msg });
+              }
+            }}
+          >
+            Export database
+          </button>
+        </div>
       </div>
     </>
   );

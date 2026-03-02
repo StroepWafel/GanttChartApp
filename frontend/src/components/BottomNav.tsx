@@ -1,4 +1,4 @@
-import { BarChart2, List, FolderOpen, Plus, CheckSquare } from 'lucide-react';
+import { BarChart2, List, FolderOpen, Plus, CheckSquare, Settings } from 'lucide-react';
 import './BottomNav.css';
 
 export type MobilePage = 'chart' | 'list' | 'categories' | 'add-task' | 'completed' | 'settings';
@@ -15,7 +15,7 @@ export default function BottomNav({
   projectsLength,
 }: Props) {
   return (
-    <nav className="bottom-nav bottom-nav-5" aria-label="Main navigation">
+    <nav className="bottom-nav bottom-nav-6" aria-label="Main navigation">
       <button
         type="button"
         className={`bottom-nav-item ${currentPage === 'chart' ? 'active' : ''}`}
@@ -66,6 +66,16 @@ export default function BottomNav({
       >
         <FolderOpen size={18} />
         <span className="bottom-nav-label">Categories</span>
+      </button>
+      <button
+        type="button"
+        className={`bottom-nav-item ${currentPage === 'settings' ? 'active' : ''}`}
+        onClick={() => onPageChange('settings')}
+        title="Settings"
+        aria-label="Settings"
+      >
+        <Settings size={18} />
+        <span className="bottom-nav-label">Settings</span>
       </button>
     </nav>
   );

@@ -25,6 +25,44 @@ router.get('/me', optionalAuth, (req, res) => {
   });
 });
 
+/** List users that can be shared with (all active users except self). Any authenticated user. */
+router.get('/shareable', optionalAuth, (req, res) => {
+  if (!req.user?.userId) return res.status(401).json({ error: 'Authentication required' });
+  const rows = db.prepare(`
+    SELECT id, username FROM users WHERE is_active = 1 AND id != ? ORDER BY username
+  `).all(req.user.userId);
+  res.json(rows);
+});
+
+/** List collaborators (share targets, share owners, space co-members). Any authenticated user. */
+router.get('/collaborators', optionalAuth, (req, res) => {
+  if (!req.user?.userId) return res.status(401).json({ error: 'Authentication required' });
+  const userId = req.user.userId;
+  const byShare = db.prepare(`
+    SELECT DISTINCT u.id, u.username FROM users u
+    WHERE u.id IN (
+      SELECT owner_id FROM user_shares WHERE target_user_id = ?
+      UNION SELECT target_user_id FROM user_shares WHERE owner_id = ?
+    ) AND u.id != ?
+  `).all(userId, userId, userId);
+  const bySpace = db.prepare(`
+    SELECT DISTINCT u.id, u.username FROM users u
+    JOIN space_members sm ON sm.user_id = u.id
+    WHERE sm.space_id IN (SELECT space_id FROM space_members WHERE user_id = ?)
+    AND u.id != ?
+  `).all(userId, userId);
+  const seen = new Set();
+  const out = [];
+  for (const r of [...byShare, ...bySpace]) {
+    if (!seen.has(r.id)) {
+      seen.add(r.id);
+      out.push({ id: r.id, username: r.username });
+    }
+  }
+  out.sort((a, b) => a.username.localeCompare(b.username));
+  res.json(out);
+});
+
 router.get('/', optionalAuth, requireAdmin, (req, res) => {
   const rows = db.prepare(`
     SELECT id, username, is_admin, is_active, api_key, created_at, email FROM users ORDER BY username

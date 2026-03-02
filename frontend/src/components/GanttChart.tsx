@@ -717,17 +717,18 @@ export default function GanttChart({
               className="gantt-context-menu"
               style={{ left: contextMenu.x, top: contextMenu.y }}
             >
-              <button onClick={() => { onTaskEdit(contextMenu.task); setContextMenu(null); }}>Edit</button>
+              <button type="button" onClick={() => { onTaskEdit(contextMenu.task); setContextMenu(null); }}>Edit</button>
               {!contextMenu.task.completed && (
-                <button onClick={() => { onTaskComplete(contextMenu.task.id); setContextMenu(null); }}>Complete</button>
+                <button type="button" onClick={() => { onTaskComplete(contextMenu.task.id); setContextMenu(null); }}>Complete</button>
               )}
               {contextMenu.task.completed && (
-                <button onClick={() => { onTaskUncomplete(contextMenu.task.id); setContextMenu(null); }}>Uncomplete</button>
+                <button type="button" onClick={() => { onTaskUncomplete(contextMenu.task.id); setContextMenu(null); }}>Uncomplete</button>
               )}
               {!contextMenu.task.completed && (
-                <button onClick={() => { onTaskSplit(contextMenu.task); setContextMenu(null); }}>Split</button>
+                <button type="button" onClick={() => { onTaskSplit(contextMenu.task); setContextMenu(null); }}>Split</button>
               )}
               <button
+                type="button"
                 className="danger"
                 onClick={() => { setDeleteConfirmTask(contextMenu.task); setContextMenu(null); }}
               >
@@ -878,7 +879,9 @@ export default function GanttChart({
                       <span className="gantt-expand-spacer" />
                     )}
                   </div>
-                  <span className="gantt-list-name">{row.category.name}</span>
+                  <div className="gantt-list-name-wrap">
+                    <span className="gantt-list-name">{row.category.name}</span>
+                  </div>
                   {!isMobileChartSlim && (
                     <>
                       <span className="gantt-list-date">
@@ -913,7 +916,9 @@ export default function GanttChart({
                       <span className="gantt-expand-spacer" />
                     )}
                   </div>
-                  <span className="gantt-list-name" style={{ paddingLeft: 16 }}>{row.project.name}</span>
+                  <div className="gantt-list-name-wrap" style={{ paddingLeft: 16 }}>
+                    <span className="gantt-list-name">{row.project.name}</span>
+                  </div>
                   {!isMobileChartSlim && (
                     <>
                       <span className="gantt-list-date">
