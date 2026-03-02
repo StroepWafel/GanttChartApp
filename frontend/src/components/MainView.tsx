@@ -20,6 +20,7 @@ import ShortcutsHelpModal from './ShortcutsHelpModal';
 import SpacesSidebar from './SpacesSidebar';
 import SpaceMembersModal from './SpaceMembersModal';
 import CreateSpaceModal from './CreateSpaceModal';
+import StatisticsPrompt from './StatisticsPrompt';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useMainData } from '../hooks/useMainData';
@@ -60,6 +61,8 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [spaces, setSpaces] = useState<{ id: number; name: string; member_count?: number; role?: string }[]>([]);
   const [spaceMembersTarget, setSpaceMembersTarget] = useState<{ id: number; name: string; role?: string } | null>(null);
   const [showCreateSpaceModal, setShowCreateSpaceModal] = useState(false);
+  const [showStatisticsPrompt, setShowStatisticsPrompt] = useState(false);
+  const [statisticsPromptDismissed, setStatisticsPromptDismissed] = useState(false);
   const mainDataFilters = useMemo(() => {
     const f: { filterScope?: api.ShareFilterScope } = {};
     f.filterScope = selectedSpaceId != null ? (`space:${selectedSpaceId}` as api.ShareFilterScope) : 'personal';
@@ -335,6 +338,14 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       api.getSpaces().then(setSpaces).catch(() => setSpaces([]));
     }
   }, [authEnabled, currentUser]);
+
+  const isEffectiveAdmin = !authEnabled || (!!authEnabled && !!currentUser?.isAdmin);
+  useEffect(() => {
+    if (!isEffectiveAdmin) return;
+    api.getStatisticsStatus()
+      .then((s) => setShowStatisticsPrompt(s.showPrompt))
+      .catch(() => setShowStatisticsPrompt(false));
+  }, [isEffectiveAdmin]);
 
   useEffect(() => {
     if (authEnabled && currentUser?.isAdmin) {
@@ -2218,6 +2229,16 @@ onTaskDelete={handleDeleteTask}
         <CreateSpaceModal
           onClose={() => setShowCreateSpaceModal(false)}
           onCreated={() => { load(); api.getSpaces().then(setSpaces).catch(() => {}); }}
+        />
+      )}
+
+      {showStatisticsPrompt && !statisticsPromptDismissed && (
+        <StatisticsPrompt
+          onConfirm={async (preferences) => {
+            await api.confirmStatistics(preferences);
+            setShowStatisticsPrompt(false);
+          }}
+          onNotNow={() => setStatisticsPromptDismissed(true)}
         />
       )}
 
