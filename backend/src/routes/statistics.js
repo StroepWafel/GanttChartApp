@@ -75,8 +75,10 @@ function buildPayload(preferences) {
   return payload;
 }
 
+const STATS_UPDATE_INTERVAL_MS = (parseInt(process.env.STATS_UPDATE_INTERVAL_HOURS, 10) || 168) * 60 * 60 * 1000;
+
 async function sendToStatsEndpoint(payload) {
-  // TODO: Add back before release: if (process.env.NODE_ENV !== 'production') return;
+  // TODO: Add back before release: if (process.env.NODE_ENV !== 'production') return false;
   const url = 'https://ganttstats.stroepwafel.au/collect';
   const endpoint = url.replace(/\/$/, '');
   const collectUrl = endpoint.includes('/collect') ? endpoint : `${endpoint}/collect`;
@@ -91,11 +93,35 @@ async function sendToStatsEndpoint(payload) {
     });
     if (!res.ok) {
       console.warn('[statistics] Stats endpoint returned', res.status, await res.text().catch(() => ''));
+      return false;
     }
+    return true;
   } catch (err) {
     console.warn('[statistics] Failed to send to stats endpoint:', err?.message);
+    return false;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export async function sendPeriodicStats() {
+  const sent = getSetting('statistics_prompt_sent');
+  if (sent !== 'opted_in') return;
+
+  const prefsRaw = getSetting('statistics_preferences');
+  const prefs = prefsRaw && typeof prefsRaw === 'object' ? prefsRaw : {};
+  if (!hasAnyPreference(prefs)) return;
+
+  const lastSentRaw = getSetting('statistics_last_sent');
+  if (lastSentRaw) {
+    const lastSent = new Date(lastSentRaw).getTime();
+    if (Date.now() - lastSent < STATS_UPDATE_INTERVAL_MS) return;
+  }
+
+  const payload = buildPayload(prefs);
+  const ok = await sendToStatsEndpoint(payload);
+  if (ok) {
+    upsertSetting.run('statistics_last_sent', JSON.stringify(new Date().toISOString()));
   }
 }
 

@@ -25,7 +25,7 @@ import sharesRouter from './routes/shares.js';
 import updateRouter from './routes/update.js';
 import apiRouter from './routes/api.js';
 import mobileAppRouter from './routes/mobile-app.js';
-import statisticsRouter from './routes/statistics.js';
+import statisticsRouter, { sendPeriodicStats } from './routes/statistics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -204,4 +204,8 @@ app.listen(PORT, HOST, () => {
   console.log(`Gantt Chart API running on ${addr}`);
   if (isAuthEnabled()) console.log('Auth: enabled');
   else console.log('Auth: disabled');
+
+  const STATS_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+  setTimeout(() => sendPeriodicStats().catch(() => {}), 5 * 60 * 1000);
+  setInterval(() => sendPeriodicStats().catch(() => {}), STATS_INTERVAL_MS);
 });
