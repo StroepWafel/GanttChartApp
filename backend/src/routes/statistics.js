@@ -78,7 +78,7 @@ function buildPayload(preferences) {
 const STATS_UPDATE_INTERVAL_MS = (parseInt(process.env.STATS_UPDATE_INTERVAL_HOURS, 10) || 168) * 60 * 60 * 1000;
 
 async function sendToStatsEndpoint(payload) {
-  // TODO: Add back before release: if (process.env.NODE_ENV !== 'production') return false;
+  if (process.env.NODE_ENV !== 'production') return false;
   const url = 'https://ganttstats.stroepwafel.au/collect';
   const endpoint = url.replace(/\/$/, '');
   const collectUrl = endpoint.includes('/collect') ? endpoint : `${endpoint}/collect`;
