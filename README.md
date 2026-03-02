@@ -108,6 +108,17 @@ Copy `.env.example` to `.env` and configure:
 
 When auth is enabled, the first user (admin) is created from `AUTH_USERNAME` and `AUTH_PASSWORD` if the users table is empty. Each user gets their own API key from **Settings → Account** for the read-only IoT API.
 
+## Statistics collection
+
+On first load, admins see a one-time prompt to opt in or out of sharing anonymous usage statistics. You control exactly what is shared:
+
+- **Environment** — OS, Node.js version, system architecture
+- **Usage counts** — Number of users, projects, tasks, categories, spaces
+- **Country** — User-selected country (optional)
+- **Installation ID** — UUID for update tracking without double-counting
+
+Choose none to send only a minimal "installed" ping. Only data you consent to is ever sent. The prompt appears once per installation and never again after you confirm. Statistics are sent to the configured endpoint when in production.
+
 ## Deployment
 
 See [docs/UBUNTU_SETUP.md](docs/UBUNTU_SETUP.md) for Ubuntu server deployment with PM2 and cloudflared (Cloudflare Tunnel).
