@@ -39,3 +39,4 @@ Thumbs.db
 .cache/
 .turbo/
 /mobile/releases
+/statistics-server
