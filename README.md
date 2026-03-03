@@ -119,6 +119,25 @@ On first load, admins see a one-time prompt to opt in or out of sharing anonymou
 
 Choose none to send only a minimal "installed" ping. Only data you consent to is ever sent. The prompt appears once per installation and never again after you confirm. Statistics are sent to the configured endpoint when in production.
 
+## Funding the Project
+
+If this project saves you time, powers your workflow, or ends up running on your server 24/7, consider supporting its development.
+
+Maintaining a full-stack app with authentication, data isolation, mobile builds, and an IoT API takes ongoing time for:
+
+- Bug fixes and security updates  
+- Dependency upgrades (Node, Vite, Capacitor, etc.)  
+- Feature development  
+- Documentation and deployment guides  
+
+You can support the project via:
+
+- ⭐ Starring the repository  
+- 💬 Contributing issues, suggestions, or pull requests  
+- 💰 Sponsorship / donations (see repository sponsor links if available)
+
+Even small contributions help keep the project maintained and actively improved.
+
 ## Deployment
 
 See [docs/UBUNTU_SETUP.md](docs/UBUNTU_SETUP.md) for Ubuntu server deployment with PM2 and cloudflared (Cloudflare Tunnel).
