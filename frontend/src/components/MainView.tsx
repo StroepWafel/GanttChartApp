@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus, MoreVertical } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus, MoreVertical, LogOut } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -53,6 +53,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [showAddForm, setShowAddForm] = useState(false);
   const [splitTask, setSplitTask] = useState<Task | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [addTaskFormKey, setAddTaskFormKey] = useState(0);
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
@@ -1093,20 +1094,20 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         <span className="settings-desc" style={{ margin: '0 0 0 6px' }}>({s.member_count} members)</span>
                       )}
                     </div>
-                    {s.role === 'admin' && (
-                      <div ref={spacesMenuOpen === s.id ? spacesMenuRef : undefined} className="spaces-settings-menu-wrap">
-                        <button
-                          type="button"
-                          className="btn-sm spaces-settings-menu-btn"
-                          onClick={() => setSpacesMenuOpen(spacesMenuOpen === s.id ? null : s.id)}
-                          title="Space options"
-                          aria-label="Space options"
-                          aria-expanded={spacesMenuOpen === s.id}
-                        >
-                          <MoreVertical size={16} />
-                        </button>
-                        {spacesMenuOpen === s.id && (
-                          <div className="spaces-settings-menu">
+                    <div ref={spacesMenuOpen === s.id ? spacesMenuRef : undefined} className="spaces-settings-menu-wrap">
+                      <button
+                        type="button"
+                        className="btn-sm spaces-settings-menu-btn"
+                        onClick={() => setSpacesMenuOpen(spacesMenuOpen === s.id ? null : s.id)}
+                        title="Space options"
+                        aria-label="Space options"
+                        aria-expanded={spacesMenuOpen === s.id}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      {spacesMenuOpen === s.id && (
+                        <div className="spaces-settings-menu">
+                          {s.role === 'admin' ? (
                             <button
                               type="button"
                               className="spaces-settings-menu-item"
@@ -1118,10 +1119,22 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                               <Settings size={14} />
                               Manage space (members & share)
                             </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          ) : (
+                            <button
+                              type="button"
+                              className="spaces-settings-menu-item"
+                              onClick={() => {
+                                setSpaceMembersTarget({ id: s.id, name: s.name, role: s.role });
+                                setSpacesMenuOpen(null);
+                              }}
+                            >
+                              <LogOut size={14} />
+                              Leave space
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1964,10 +1977,12 @@ onTaskDelete={handleDeleteTask}
             )}
             {mobilePage === 'add-task' && (
               <TaskForm
+                key={addTaskFormKey}
                 categories={categories}
                 projects={projects}
                 task={editTask}
                 onClose={() => { setEditTask(null); setMobilePage('chart'); }}
+                onAddAnother={() => { setEditTask(null); setAddTaskFormKey((k) => k + 1); }}
                 onCreate={handleCreateTask}
                 onUpdate={editTask ? handleUpdateTask : undefined}
                 embedded

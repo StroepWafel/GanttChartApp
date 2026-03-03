@@ -1,4 +1,4 @@
-import { Users, Plus, Settings } from 'lucide-react';
+import { Users, Plus, Settings, LogOut } from 'lucide-react';
 import type { Space } from '../types';
 import './SpacesSidebar.css';
 
@@ -45,15 +45,19 @@ export default function SpacesSidebar({
                 <span className="spaces-item-count">({s.member_count})</span>
               )}
             </button>
-            {s.role === 'admin' && onManageSpace && (
+            {onManageSpace && (
               <button
                 type="button"
                 className="spaces-manage-btn"
                 onClick={(e) => { e.stopPropagation(); onManageSpace({ id: s.id, name: s.name, role: s.role }); }}
-                title="Manage space (members & share)"
-                aria-label="Manage space"
+                title={s.role === 'admin' ? 'Manage space (members & share)' : 'Leave space'}
+                aria-label={s.role === 'admin' ? 'Manage space' : 'Leave space'}
               >
-                <Settings size={14} />
+                {s.role === 'admin' ? (
+                  <Settings size={14} />
+                ) : (
+                  <LogOut size={14} />
+                )}
               </button>
             )}
           </li>
