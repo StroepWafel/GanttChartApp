@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
 import type { Category, Project, Task } from '../types';
 import { useModal } from '../context/ModalContext';
 import type { updateTask } from '../api';
@@ -12,8 +11,6 @@ interface Props {
   onClose: () => void;
   /** When true, render as page content without modal overlay (for mobile) */
   embedded?: boolean;
-  /** When embedded, called to reset form for adding another task */
-  onAddAnother?: () => void;
   onCreate: (data: {
     project_id: number;
     name: string;
@@ -25,7 +22,7 @@ interface Props {
   onUpdate?: (id: number, data: Parameters<typeof updateTask>[1]) => void;
 }
 
-export default function TaskForm({ categories, projects, task, onClose, embedded = false, onAddAnother, onCreate, onUpdate }: Props) {
+export default function TaskForm({ categories, projects, task, onClose, embedded = false, onCreate, onUpdate }: Props) {
   const modal = useModal();
   const today = new Date().toISOString().slice(0, 10);
   const isEdit = !!task;
@@ -109,7 +106,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
 
   const formContent = (
     <div className={embedded ? 'task-form-embedded' : 'modal task-form'} onClick={embedded ? undefined : (e: React.MouseEvent) => e.stopPropagation()}>
-      {!embedded && <h3>{isEdit ? 'Edit Task' : 'New Task'}</h3>}
+      <h3>{isEdit ? 'Edit Task' : 'New Task'}</h3>
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <label>Category</label>
@@ -236,26 +233,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
   );
 
   if (embedded) {
-    return (
-      <div className="mobile-page add-task-page">
-        <div className="add-task-page-header">
-          <h3 className="add-task-page-title">{isEdit ? 'Edit Task' : 'New Task'}</h3>
-          {!isEdit && onAddAnother && (
-            <button
-              type="button"
-              className="btn-sm add-task-page-add-btn"
-              onClick={onAddAnother}
-              title="Add another task"
-              aria-label="Add another task"
-            >
-              <Plus size={18} />
-              <span>Task</span>
-            </button>
-          )}
-        </div>
-        <div className="add-task-page-form">{formContent}</div>
-      </div>
-    );
+    return <div className="mobile-page add-task-page">{formContent}</div>;
   }
   return (
     <div className="modal-overlay" onClick={onClose}>

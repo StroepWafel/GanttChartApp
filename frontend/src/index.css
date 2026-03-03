@@ -149,52 +149,8 @@ input, select, textarea {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-}
-
-.add-task-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 16px 12px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-
-.add-task-page-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.add-task-page-add-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.add-task-page-add-btn:hover {
-  background: var(--accent-hover);
-}
-
-.add-task-page-form {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   padding: 20px 16px;
-}
-
-.add-task-page-form .task-form-embedded {
-  padding: 0;
+  overflow-y: auto;
 }
 
 .add-task-page .task-form-embedded {

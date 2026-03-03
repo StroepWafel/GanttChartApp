@@ -53,7 +53,6 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [showAddForm, setShowAddForm] = useState(false);
   const [splitTask, setSplitTask] = useState<Task | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
-  const [addTaskFormKey, setAddTaskFormKey] = useState(0);
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
@@ -1977,12 +1976,10 @@ onTaskDelete={handleDeleteTask}
             )}
             {mobilePage === 'add-task' && (
               <TaskForm
-                key={addTaskFormKey}
                 categories={categories}
                 projects={projects}
                 task={editTask}
                 onClose={() => { setEditTask(null); setMobilePage('chart'); }}
-                onAddAnother={() => { setEditTask(null); setAddTaskFormKey((k) => k + 1); }}
                 onCreate={handleCreateTask}
                 onUpdate={editTask ? handleUpdateTask : undefined}
                 embedded
