@@ -150,12 +150,59 @@ input, select, textarea {
   flex: 1;
   min-height: 0;
   padding: 20px 16px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom) + 72px); /* space above bottom nav */
   overflow-y: auto;
 }
 
 .add-task-page .task-form-embedded {
   flex: 1;
   min-height: 0;
+}
+
+/* Mobile select: z-index 99 so it stays below bottom nav (z-index 100) */
+.mobile-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.mobile-select-trigger {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mobile-select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  max-height: min(200px, 50vh);
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  list-style: none;
+  z-index: 99;
+}
+
+.mobile-select-option {
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.mobile-select-option:hover,
+.mobile-select-option.selected {
+  background: var(--bg-elevated);
 }
 
 .split-modal .subtask-row {

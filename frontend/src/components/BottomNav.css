@@ -87,6 +87,12 @@
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
+/* Keep icon/label visible when active (avoid accent-on-accent) */
+.bottom-nav-add,
+.bottom-nav-add.active {
+  color: white;
+}
+
 .bottom-nav-add:hover:not(:disabled) {
   background: var(--accent-hover);
   color: white;

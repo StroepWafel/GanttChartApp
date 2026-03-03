@@ -45,12 +45,12 @@ export default function SpacesSidebar({
                 <span className="spaces-item-count">({s.member_count})</span>
               )}
             </button>
-            {s.role === 'admin' && onManageSpace && (
+            {onManageSpace && (
               <button
                 type="button"
                 className="spaces-manage-btn"
                 onClick={(e) => { e.stopPropagation(); onManageSpace({ id: s.id, name: s.name, role: s.role }); }}
-                title="Manage space (members & share)"
+                title={s.role === 'admin' ? 'Manage space (members & share)' : 'View members & leave space'}
                 aria-label="Manage space"
               >
                 <Settings size={14} />

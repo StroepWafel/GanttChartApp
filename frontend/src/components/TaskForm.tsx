@@ -3,6 +3,7 @@ import type { Category, Project, Task } from '../types';
 import { useModal } from '../context/ModalContext';
 import type { updateTask } from '../api';
 import { scheduleReminder, cancelReminder, getStoredReminder, isMobileNative, type ReminderOffset } from '../reminders';
+import MobileSelect from './MobileSelect';
 
 interface Props {
   categories: Category[];
@@ -110,27 +111,45 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <label>Category</label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(Number(e.target.value))}
-              required
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            {embedded ? (
+              <MobileSelect
+                value={categoryId}
+                options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                onChange={setCategoryId}
+                aria-label="Category"
+              />
+            ) : (
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(Number(e.target.value))}
+                required
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="form-row">
             <label>Project</label>
-            <select
-              value={projectId}
-              onChange={(e) => setProjectId(Number(e.target.value))}
-              required
-            >
-              {projectsInCategory.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+            {embedded ? (
+              <MobileSelect
+                value={projectId}
+                options={projectsInCategory.map((p) => ({ value: p.id, label: p.name }))}
+                onChange={setProjectId}
+                aria-label="Project"
+              />
+            ) : (
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(Number(e.target.value))}
+                required
+              >
+                {projectsInCategory.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="form-row">
             <label>Name</label>
@@ -181,15 +200,29 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
           {dueDate && isMobileNative() && (
             <div className="form-row">
               <label>Remind me</label>
-              <select
-                value={reminderOption}
-                onChange={(e) => setReminderOption(e.target.value as ReminderOffset)}
-              >
-                <option value="off">Off</option>
-                <option value="1d">1 day before</option>
-                <option value="day">Day of</option>
-                <option value="1h">1 hour before</option>
-              </select>
+              {embedded ? (
+                <MobileSelect
+                  value={reminderOption}
+                  options={[
+                    { value: 'off', label: 'Off' },
+                    { value: '1d', label: '1 day before' },
+                    { value: 'day', label: 'Day of' },
+                    { value: '1h', label: '1 hour before' },
+                  ]}
+                  onChange={(v) => setReminderOption(v as ReminderOffset)}
+                  aria-label="Remind me"
+                />
+              ) : (
+                <select
+                  value={reminderOption}
+                  onChange={(e) => setReminderOption(e.target.value as ReminderOffset)}
+                >
+                  <option value="off">Off</option>
+                  <option value="1d">1 day before</option>
+                  <option value="day">Day of</option>
+                  <option value="1h">1 hour before</option>
+                </select>
+              )}
             </div>
           )}
           <div className="form-row">
