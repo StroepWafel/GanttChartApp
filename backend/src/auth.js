@@ -54,6 +54,13 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
+/** Pass when auth disabled OR user is admin. Used for statistics prompt. */
+export function requireAdminOrNoAuth(req, res, next) {
+  if (!isAuthEnabled()) return next();
+  if (!req.user?.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+  next();
+}
+
 export function requireAuth(req, res, next) {
   if (!isAuthEnabled()) return next();
   if (!req.user) {

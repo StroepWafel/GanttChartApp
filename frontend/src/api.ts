@@ -232,6 +232,29 @@ export type MeResponse = {
   mustChangePassword?: boolean;
 };
 
+export type StatisticsPreferences = {
+  environment?: boolean;
+  usageCounts?: boolean;
+  country?: string | null;
+  serverId?: boolean;
+};
+
+export async function getStatisticsStatus(): Promise<{ showPrompt: boolean }> {
+  const res = await fetchApi('/statistics/status');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get status');
+  return data;
+}
+
+export async function confirmStatistics(preferences: StatisticsPreferences): Promise<void> {
+  const res = await fetchApi('/statistics/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ preferences }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to confirm');
+}
+
 export async function getMe(): Promise<MeResponse> {
   const res = await fetchApi('/users/me');
   const data = await res.json();
