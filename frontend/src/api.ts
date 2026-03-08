@@ -550,15 +550,15 @@ export async function getCategories(opts?: { shareToken?: string; filterScope?: 
   return res.json();
 }
 
-export async function createCategory(name: string, spaceId?: number) {
+export async function createCategory(name: string, spaceId?: number, apiVisible?: boolean) {
   const res = await fetchApi('/categories', {
     method: 'POST',
-    body: JSON.stringify({ name, space_id: spaceId }),
+    body: JSON.stringify({ name, space_id: spaceId, api_visible: apiVisible }),
   });
   return res.json();
 }
 
-export async function updateCategory(id: number, data: { name?: string; display_order?: number }) {
+export async function updateCategory(id: number, data: { name?: string; display_order?: number; api_visible?: boolean }) {
   const res = await fetchApi(`/categories/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -632,6 +632,7 @@ export async function createTask(data: {
   end_date: string;
   due_date?: string;
   base_priority?: number;
+  api_visible?: boolean;
 }) {
   const res = await fetchApi('/tasks', {
     method: 'POST',
@@ -650,6 +651,7 @@ export async function updateTask(id: number, data: Partial<{
   completed: boolean;
   base_priority: number;
   display_order: number;
+  api_visible: boolean;
 }>) {
   const res = await fetchApi(`/tasks/${id}`, {
     method: 'PATCH',

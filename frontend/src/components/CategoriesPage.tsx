@@ -8,9 +8,9 @@ interface Props {
   projects: Project[];
   editCategory: Category | null;
   editProject: Project | null;
-  onAddCategory: (name: string) => void;
+  onAddCategory: (name: string, apiVisible?: boolean) => void;
   onAddProject: (name: string, categoryId: number, dueDate?: string, startDate?: string, apiVisible?: boolean) => void;
-  onUpdateCategory: (id: number, name: string) => void;
+  onUpdateCategory: (id: number, name: string, apiVisible?: boolean) => void;
   onUpdateProject: (id: number, name: string, categoryId: number, dueDate?: string | null, startDate?: string | null, apiVisible?: boolean) => void;
   onRequestDeleteCategory: (cat: Category) => void;
   onRequestDeleteProject: (proj: Project) => void;

@@ -150,7 +150,7 @@ router.post('/', (req, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
-    const { project_id, parent_id, name, start_date, end_date, due_date, progress = 0, base_priority = 5 } = req.body;
+    const { project_id, parent_id, name, start_date, end_date, due_date, progress = 0, base_priority = 5, api_visible } = req.body;
     if (!project_id || !name || !start_date || !end_date) {
       return res.status(400).json({ error: 'project_id, name, start_date, end_date required' });
     }
@@ -165,10 +165,11 @@ router.post('/', (req, res) => {
     if (projAccess.permission !== 'edit') return res.status(403).json({ error: 'View-only access to project' });
     const maxOrder = db.prepare('SELECT COALESCE(MAX(display_order), -1) + 1 as next_order FROM tasks WHERE project_id = ? AND COALESCE(parent_id, 0) = COALESCE(?, 0)').get(project_id, parent_id ?? null);
     const displayOrder = maxOrder?.next_order ?? 0;
+    const apiVisible = api_visible === false || api_visible === 0 ? 0 : 1;
     const result = db.prepare(`
-      INSERT INTO tasks (user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, base_priority, display_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(userId, project_id, parent_id || null, nameVal.value, start_date, end_date, due_date || null, progress, priVal.value, displayOrder);
+      INSERT INTO tasks (user_id, project_id, parent_id, name, start_date, end_date, due_date, progress, base_priority, display_order, api_visible)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, project_id, parent_id || null, nameVal.value, start_date, end_date, due_date || null, progress, priVal.value, displayOrder, apiVisible);
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
     const task = taskFromRow(row);
     sendWebhook(userId, 'task.created', task);
@@ -248,7 +249,7 @@ router.patch('/:id', (req, res) => {
     const access = canAccess(userId, 'task', id, shareToken);
     if (!access.allowed) return res.status(404).json({ error: 'Task not found' });
     if (access.permission !== 'edit') return res.status(403).json({ error: 'View-only access' });
-    const { project_id, name, start_date, end_date, due_date, progress, completed, base_priority, display_order } = req.body;
+    const { project_id, name, start_date, end_date, due_date, progress, completed, base_priority, display_order, api_visible } = req.body;
     if (name !== undefined) {
       const nameVal = validateName(name);
       if (!nameVal.ok) return res.status(400).json({ error: nameVal.error });
@@ -281,6 +282,7 @@ router.patch('/:id', (req, res) => {
       updates.push('completed = ?', "completed_at = CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END");
       params.push(completed ? 1 : 0, completed ? 1 : 0);
     }
+    if (api_visible !== undefined) { updates.push('api_visible = ?'); params.push(api_visible === false || api_visible === 0 ? 0 : 1); }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
     const wasCompleted = completed !== undefined
       ? db.prepare('SELECT completed FROM tasks WHERE id = ?').get(id)?.completed === 1

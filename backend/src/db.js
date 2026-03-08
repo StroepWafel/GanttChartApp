@@ -146,6 +146,16 @@ try {
     db.exec('ALTER TABLE projects ADD COLUMN api_visible INTEGER DEFAULT 1');
   }
 
+  const catColsApi = db.prepare('PRAGMA table_info(categories)').all();
+  if (!catColsApi.some((c) => c.name === 'api_visible')) {
+    db.exec('ALTER TABLE categories ADD COLUMN api_visible INTEGER DEFAULT 1');
+  }
+
+  const taskColsApi = db.prepare('PRAGMA table_info(tasks)').all();
+  if (!taskColsApi.some((c) => c.name === 'api_visible')) {
+    db.exec('ALTER TABLE tasks ADD COLUMN api_visible INTEGER DEFAULT 1');
+  }
+
   migrateAddUserId('categories');
   migrateAddUserId('projects');
   migrateAddUserId('tasks');

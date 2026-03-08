@@ -5,6 +5,7 @@ export interface Category {
   created_at?: string;
   space_id?: number | null;
   space_name?: string | null;
+  api_visible?: boolean | number;
 }
 
 export interface Project {
@@ -36,6 +37,7 @@ export interface Task {
   urgency?: number;
   project_name?: string;
   category_name?: string;
+  api_visible?: boolean | number;
 }
 
 export interface Space {

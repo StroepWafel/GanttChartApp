@@ -21,6 +21,10 @@ import './GanttChart.css';
 
 type ViewMode = 'Day' | 'Week' | 'Month';
 
+const LIST_WIDTH_KEY = 'gantt-list-width';
+const LIST_WIDTH_MIN = 200;
+const LIST_WIDTH_MAX = 800;
+
 import { DEFAULT_PRIORITY_COLORS } from '../priorityColors';
 
 interface Props {
@@ -235,6 +239,16 @@ export default function GanttChart({
   );
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   const [mobileViewMode, setMobileViewMode] = useState<'list' | 'chart'>('list');
+  const [listWidth, setListWidth] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem(LIST_WIDTH_KEY);
+      if (stored != null) {
+        const n = parseInt(stored, 10);
+        if (!isNaN(n) && n >= LIST_WIDTH_MIN && n <= LIST_WIDTH_MAX) return n;
+      }
+    } catch {}
+    return 420;
+  });
   const effectiveViewMode = forceViewMode ?? (isMobile ? mobileViewMode : 'chart');
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
@@ -441,6 +455,33 @@ export default function GanttChart({
     setScrollState({ scrollLeft: el.scrollLeft, width: el.clientWidth });
   }, []);
 
+  const listWidthRef = useRef(listWidth);
+  listWidthRef.current = listWidth;
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = listWidthRef.current;
+      let lastWidth = startWidth;
+      const onMove = (moveEvent: MouseEvent) => {
+        const delta = moveEvent.clientX - startX;
+        lastWidth = Math.max(LIST_WIDTH_MIN, Math.min(LIST_WIDTH_MAX, startWidth + delta));
+        setListWidth(lastWidth);
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        try {
+          localStorage.setItem(LIST_WIDTH_KEY, String(lastWidth));
+        } catch {}
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    []
+  );
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -591,7 +632,8 @@ export default function GanttChart({
 
   const rowHeight = isSmallMobile ? 34 : isMobile ? 34 : 36;
   const isMobileChartSlim = isMobile && effectiveViewMode === 'chart';
-  const listWidth = isMobileChartSlim ? 100 : isSmallMobile ? 260 : isMobile ? 300 : 420;
+  const effectiveListWidth =
+    isMobileChartSlim ? 100 : isSmallMobile ? 260 : isMobile ? 300 : listWidth;
 
   if (isMobile && effectiveViewMode === 'list') {
     return (
@@ -846,14 +888,15 @@ export default function GanttChart({
       <div ref={scrollRef} className="gantt-main" onScroll={handleScroll}>
         <div
           className="gantt-inner"
-          style={{ minWidth: listWidth + totalWidth, minHeight: 32 + hierarchicalRows.length * rowHeight }}
+          style={{ minWidth: effectiveListWidth + totalWidth, minHeight: 32 + hierarchicalRows.length * rowHeight }}
         >
-        <div className={`gantt-list ${isMobileChartSlim ? 'gantt-list-slim' : ''}`} style={{ width: listWidth }}>
-          <div className="gantt-list-header">
+        <div className={`gantt-list ${isMobileChartSlim ? 'gantt-list-slim' : ''}`} style={{ width: effectiveListWidth }}>
+          <div className={`gantt-list-header ${onTaskReorder ? 'gantt-list-header-sortable' : ''}`}>
             <span />
             <span className="gantt-hdr-task">Task</span>
             {!isMobileChartSlim && <span className="gantt-hdr-from">From</span>}
             {!isMobileChartSlim && <span className="gantt-hdr-to">To</span>}
+            {onTaskReorder && <span />}
           </div>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={topLevelTaskIds} strategy={verticalListSortingStrategy}>
@@ -988,6 +1031,18 @@ export default function GanttChart({
           })}
           </SortableContext>
           </DndContext>
+          {!isMobile && !isMobileChartSlim && (
+            <div
+              className="gantt-list-resizer"
+              onMouseDown={handleResizeStart}
+              role="separator"
+              aria-orientation="vertical"
+              aria-valuenow={effectiveListWidth}
+              aria-valuemin={LIST_WIDTH_MIN}
+              aria-valuemax={LIST_WIDTH_MAX}
+              title="Drag to resize task list"
+            />
+          )}
         </div>
 
         <div className="gantt-timeline-wrap" style={{ minWidth: totalWidth }}>

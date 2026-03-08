@@ -19,6 +19,7 @@ interface Props {
     end_date: string;
     due_date?: string;
     base_priority?: number;
+    api_visible?: boolean;
   }) => void | Promise<{ id: number } | undefined>;
   onUpdate?: (id: number, data: Parameters<typeof updateTask>[1]) => void;
 }
@@ -36,6 +37,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
   const [dueDate, setDueDate] = useState('');
   const [basePriority, setBasePriority] = useState(5);
   const [progress, setProgress] = useState(0);
+  const [taskVisibleToApi, setTaskVisibleToApi] = useState(true);
   const [reminderOption, setReminderOption] = useState<ReminderOffset>('off');
 
   useEffect(() => {
@@ -49,8 +51,10 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
       setDueDate(task.due_date?.slice(0, 10) ?? '');
       setBasePriority(task.base_priority ?? 5);
       setProgress(task.progress ?? 0);
+      setTaskVisibleToApi((task.api_visible ?? 1) !== 0);
       setReminderOption(getStoredReminder(task.id));
     } else {
+      setTaskVisibleToApi(true);
       setReminderOption('off');
     }
   }, [task, projects]);
@@ -84,6 +88,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
         due_date: dueDate || undefined,
         base_priority: basePriority,
         progress,
+        api_visible: taskVisibleToApi,
       });
       if (dueDate && reminderOption !== 'off') {
         scheduleReminder(task.id, name, dueDate, reminderOption);
@@ -96,6 +101,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
         end_date: endDate,
         due_date: dueDate || undefined,
         base_priority: basePriority,
+        api_visible: taskVisibleToApi,
       });
       const created = result && typeof result === 'object' && 'id' in result ? result as { id: number } : null;
       if (created && dueDate && reminderOption !== 'off') {
@@ -257,6 +263,15 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
               </div>
             </div>
           )}
+          <div className="form-row settings-checkbox-row">
+            <input
+              type="checkbox"
+              id="task-visible-to-api"
+              checked={taskVisibleToApi}
+              onChange={(e) => setTaskVisibleToApi(e.target.checked)}
+            />
+            <label htmlFor="task-visible-to-api">Visible to API</label>
+          </div>
           <div className="form-actions">
             <button type="submit">{isEdit ? 'Update' : 'Create'}</button>
             <button type="button" onClick={onClose}>Cancel</button>

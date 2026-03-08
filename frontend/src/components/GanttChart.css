@@ -184,6 +184,22 @@
   box-shadow: 4px 0 8px rgba(0, 0, 0, 0.2);
 }
 
+.gantt-list-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 12;
+  transition: background 0.15s;
+}
+
+.gantt-list-resizer:hover {
+  background: var(--accent);
+}
+
 @media (max-width: 768px) {
   .gantt-list {
     position: relative;
@@ -292,6 +308,10 @@
     height: 30px;
     min-height: 30px;
   }
+
+  .gantt-list-header.gantt-list-header-sortable {
+    grid-template-columns: 32px minmax(80px, 1fr) 48px 48px 24px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -303,11 +323,19 @@
     height: 28px;
     min-height: 28px;
   }
+
+  .gantt-list-header.gantt-list-header-sortable {
+    grid-template-columns: 28px minmax(60px, 1fr) 44px 44px 20px;
+  }
 }
 
 .gantt-list-header .gantt-hdr-task { text-align: left; }
 .gantt-list-header .gantt-hdr-from,
 .gantt-list-header .gantt-hdr-to { text-align: right; }
+
+.gantt-list-header.gantt-list-header-sortable {
+  grid-template-columns: 36px minmax(180px, 1fr) 70px 70px 24px;
+}
 
 .gantt-list-row {
   display: grid;

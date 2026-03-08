@@ -37,8 +37,12 @@ function getSpaceFilterClause(userId, spaceCol = 'COALESCE(p.space_id, c.space_i
   return { sql: ` AND (${parts.join(' OR ')})`, params };
 }
 
-/** SQL fragment to exclude projects hidden from API. Use with queries that join projects as p. */
-const API_VISIBLE_SQL = ' AND (p.api_visible IS NULL OR p.api_visible = 1)';
+/** SQL fragments to exclude hidden-from-API items. */
+const API_VISIBLE_PROJECT_SQL = ' AND (p.api_visible IS NULL OR p.api_visible = 1)';
+const API_VISIBLE_CAT_SQL = ' AND (c.api_visible IS NULL OR c.api_visible = 1)';
+const API_VISIBLE_TASK_SQL = ' AND (t.api_visible IS NULL OR t.api_visible = 1)';
+/** Combined for task queries (t, p, c). */
+const API_VISIBLE_SQL = API_VISIBLE_PROJECT_SQL + API_VISIBLE_CAT_SQL + API_VISIBLE_TASK_SQL;
 
 function servertime() {
   return new Date().toISOString();
@@ -214,7 +218,7 @@ router.get('/projects', (req, res) => {
         (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ? AND completed = 1) as completed_count
       FROM projects p
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE p.user_id = ?${spaceSql} AND (p.api_visible IS NULL OR p.api_visible = 1)
+      WHERE p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}
       ORDER BY c.display_order, p.name
     `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
@@ -228,9 +232,9 @@ router.get('/categories', (req, res) => {
     const userId = req.user.userId;
     const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId, 'c.space_id');
     const rows = db.prepare(`
-      SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1)) as task_count
+      SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1) AND (t.api_visible IS NULL OR t.api_visible = 1)) as task_count
       FROM categories c
-      WHERE c.user_id = ?${spaceSql}
+      WHERE c.user_id = ?${spaceSql}${API_VISIBLE_CAT_SQL}
       ORDER BY c.display_order, c.name
     `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
@@ -299,7 +303,7 @@ router.get('/batch', (req, res) => {
           FROM categories c
           LEFT JOIN projects p ON p.category_id = c.id AND p.user_id = ?
           LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = ?
-          WHERE c.user_id = ?${spaceSql} AND (p.api_visible IS NULL OR p.api_visible = 1)
+          WHERE c.user_id = ?${spaceSql}${API_VISIBLE_CAT_SQL} AND (p.api_visible IS NULL OR p.api_visible = 1) AND (t.api_visible IS NULL OR t.api_visible = 1)
           GROUP BY c.id
           ORDER BY c.display_order, c.name
         `).all(userId, userId, userId, ...spaceParams);
@@ -311,15 +315,15 @@ router.get('/batch', (req, res) => {
             (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ? AND completed = 1) as completed_count
           FROM projects p
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-          WHERE p.user_id = ?${spaceSql} AND (p.api_visible IS NULL OR p.api_visible = 1)
+          WHERE p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}
           ORDER BY c.display_order, p.name
         `).all(userId, userId, userId, ...spaceParams);
         out.projects = { data: rows };
       } else if (ep === 'categories') {
         const rows = db.prepare(`
-          SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1)) as task_count
+          SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1) AND (t.api_visible IS NULL OR t.api_visible = 1)) as task_count
           FROM categories c
-          WHERE c.user_id = ?${spaceSqlCat.sql}
+          WHERE c.user_id = ?${spaceSqlCat.sql}${API_VISIBLE_CAT_SQL}
           ORDER BY c.display_order, c.name
         `).all(userId, userId, userId, ...spaceSqlCat.params);
         out.categories = { data: rows };

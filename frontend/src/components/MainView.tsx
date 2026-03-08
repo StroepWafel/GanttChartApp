@@ -590,8 +590,8 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     }
   }, [load, authEnabled, currentUser?.isAdmin, normalizeUpdateCheck, isPageReload]);
 
-  async function handleCreateCategory(name: string) {
-    await api.createCategory(name, selectedSpaceId ?? undefined);
+  async function handleCreateCategory(name: string, apiVisible?: boolean) {
+    await api.createCategory(name, selectedSpaceId ?? undefined, apiVisible);
     await load();
     if (authEnabled) {
       api.getSpaces().then(setSpaces).catch(() => {});
@@ -613,9 +613,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     await load();
   }
 
-  async function handleUpdateCategory(id: number, name: string) {
-    await api.updateCategory(id, { name });
-    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
+  async function handleUpdateCategory(id: number, name: string, apiVisible?: boolean) {
+    await api.updateCategory(id, { name, api_visible: apiVisible });
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name, api_visible: apiVisible ?? c.api_visible } : c)));
     await load();
   }
 

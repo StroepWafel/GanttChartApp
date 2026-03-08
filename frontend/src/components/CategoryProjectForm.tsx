@@ -6,9 +6,9 @@ interface Props {
   categories: Category[];
   editingCategory?: Category | null;
   editingProject?: Project | null;
-  onAddCategory: (name: string) => void;
+  onAddCategory: (name: string, apiVisible?: boolean) => void;
   onAddProject: (name: string, categoryId: number, dueDate?: string, startDate?: string, apiVisible?: boolean) => void;
-  onUpdateCategory: (id: number, name: string) => void;
+  onUpdateCategory: (id: number, name: string, apiVisible?: boolean) => void;
   onUpdateProject: (id: number, name: string, categoryId: number, dueDate?: string | null, startDate?: string | null, apiVisible?: boolean) => void;
   onRequestDeleteCategory: (cat: Category) => void;
   onRequestDeleteProject: (proj: Project) => void;
@@ -37,6 +37,7 @@ export default function CategoryProjectForm({
   const [projStartDate, setProjStartDate] = useState('');
   const [projDueDate, setProjDueDate] = useState('');
   const [projVisibleToApi, setProjVisibleToApi] = useState(true);
+  const [catVisibleToApi, setCatVisibleToApi] = useState(true);
   const [catId, setCatId] = useState(categories[0]?.id || 0);
 
   const isEditCat = !!editingCategory;
@@ -46,6 +47,7 @@ export default function CategoryProjectForm({
     if (editingCategory) {
       setMode('category');
       setCatName(editingCategory.name);
+      setCatVisibleToApi((editingCategory.api_visible ?? 1) !== 0);
     }
   }, [editingCategory]);
 
@@ -66,6 +68,7 @@ export default function CategoryProjectForm({
     setProjStartDate('');
     setProjDueDate('');
     setProjVisibleToApi(true);
+    setCatVisibleToApi(true);
     setCatId(categories[0]?.id || 0);
   }
 
@@ -74,9 +77,9 @@ export default function CategoryProjectForm({
     if (!catName.trim()) return;
     try {
       if (isEditCat && editingCategory) {
-        await onUpdateCategory(editingCategory.id, catName.trim());
+        await onUpdateCategory(editingCategory.id, catName.trim(), catVisibleToApi);
       } else {
-        await onAddCategory(catName.trim());
+        await onAddCategory(catName.trim(), catVisibleToApi);
       }
       reset();
       onClose();
@@ -143,6 +146,15 @@ export default function CategoryProjectForm({
                 autoFocus
               />
             </div>
+            <div className="form-row settings-checkbox-row">
+              <input
+                type="checkbox"
+                id="cat-visible-to-api"
+                checked={catVisibleToApi}
+                onChange={(e) => setCatVisibleToApi(e.target.checked)}
+              />
+              <label htmlFor="cat-visible-to-api">Visible to API</label>
+            </div>
             <div className="form-actions">
               <button type="submit">{isEditCat ? 'Update' : 'Add'}</button>
               {isEditCat && (
@@ -177,15 +189,6 @@ export default function CategoryProjectForm({
                 ))}
               </select>
             </div>
-            <div className="form-row settings-checkbox-row">
-              <input
-                type="checkbox"
-                id="proj-visible-to-api"
-                checked={projVisibleToApi}
-                onChange={(e) => setProjVisibleToApi(e.target.checked)}
-              />
-              <label htmlFor="proj-visible-to-api">Visible to API</label>
-            </div>
             <div className="form-row">
               <label>Start date (optional)</label>
               <input
@@ -201,6 +204,15 @@ export default function CategoryProjectForm({
                 value={projDueDate}
                 onChange={(e) => setProjDueDate(e.target.value)}
               />
+            </div>
+            <div className="form-row settings-checkbox-row">
+              <input
+                type="checkbox"
+                id="proj-visible-to-api"
+                checked={projVisibleToApi}
+                onChange={(e) => setProjVisibleToApi(e.target.checked)}
+              />
+              <label htmlFor="proj-visible-to-api">Visible to API</label>
             </div>
             <div className="form-actions">
               <button type="submit">{isEditProj ? 'Update' : 'Add'}</button>

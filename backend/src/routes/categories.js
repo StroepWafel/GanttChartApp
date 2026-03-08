@@ -83,7 +83,7 @@ router.post('/', (req, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
-    const { name, display_order = 0, space_id } = req.body;
+    const { name, display_order = 0, space_id, api_visible } = req.body;
     const finalName = name || 'Uncategorized';
     const nameVal = validateName(finalName);
     if (!nameVal.ok) return res.status(400).json({ error: nameVal.error });
@@ -93,9 +93,10 @@ router.post('/', (req, res) => {
       if (!member) return res.status(403).json({ error: 'Not a member of this space' });
       spaceId = space_id;
     }
+    const apiVisible = api_visible === false || api_visible === 0 ? 0 : 1;
     const result = db.prepare(`
-      INSERT INTO categories (user_id, space_id, name, display_order) VALUES (?, ?, ?, ?)
-    `).run(userId, spaceId, nameVal.value, display_order);
+      INSERT INTO categories (user_id, space_id, name, display_order, api_visible) VALUES (?, ?, ?, ?, ?)
+    `).run(userId, spaceId, nameVal.value, display_order, apiVisible);
     const row = db.prepare('SELECT c.*, s.name as space_name FROM categories c LEFT JOIN spaces s ON s.id = c.space_id WHERE c.id = ?').get(result.lastInsertRowid);
     res.status(201).json(row);
   } catch (err) {
@@ -108,7 +109,7 @@ router.patch('/:id', (req, res) => {
     const userId = req.user?.userId;
     const shareToken = getShareToken(req);
     const { id } = req.params;
-    const { name, display_order } = req.body;
+    const { name, display_order, api_visible } = req.body;
     const access = canAccess(userId, 'category', id, shareToken);
     if (!access.allowed) return res.status(404).json({ error: 'Category not found' });
     if (access.permission !== 'edit') return res.status(403).json({ error: 'View-only access' });
@@ -121,6 +122,7 @@ router.patch('/:id', (req, res) => {
       params.push(nameVal.value);
     }
     if (display_order !== undefined) { updates.push('display_order = ?'); params.push(display_order); }
+    if (api_visible !== undefined) { updates.push('api_visible = ?'); params.push(api_visible === false || api_visible === 0 ? 0 : 1); }
     if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
     params.push(id);
     db.prepare(`UPDATE categories SET ${updates.join(', ')} WHERE id = ?`).run(...params);
