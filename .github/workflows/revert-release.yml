@@ -1,0 +1,68 @@
+name: Revert Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      revert_to_tag:
+        description: 'Tag to revert to (e.g. v2.6.1). Package.json files will be restored to this version.'
+        required: true
+        type: string
+      tag_to_delete:
+        description: 'Tag to delete from remote (e.g. v2.6.2). The mistaken release tag. Leave empty to skip tag/release deletion.'
+        required: false
+        type: string
+
+jobs:
+  revert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate revert tag exists
+        run: |
+          TAG="${{ github.event.inputs.revert_to_tag }}"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Error: Tag $TAG does not exist"
+            exit 1
+          fi
+
+      - name: Restore package.json from tag
+        run: |
+          TAG="${{ github.event.inputs.revert_to_tag }}"
+          VER="${TAG#v}"
+          echo "Restoring package.json files to version $VER from $TAG"
+          for f in package.json backend/package.json frontend/package.json; do
+            if [ -f "$f" ]; then
+              git show "$TAG:$f" > "$f"
+              echo "Restored $f"
+            fi
+          done
+
+      - name: Commit and push revert
+        run: |
+          TAG="${{ github.event.inputs.revert_to_tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json backend/package.json frontend/package.json
+          git status
+          if git diff --staged --quiet; then
+            echo "No changes to commit - already at $TAG version"
+            exit 0
+          fi
+          git commit -m "Revert release: restore to $TAG"
+          git push origin HEAD
+
+      - name: Delete tag and release (if specified)
+        if: github.event.inputs.tag_to_delete != ''
+        run: |
+          TAG="${{ github.event.inputs.tag_to_delete }}"
+          echo "Deleting tag and release: $TAG"
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git push origin --delete "$TAG" 2>/dev/null || true
+          echo "Done. Tag and release $TAG removed."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
