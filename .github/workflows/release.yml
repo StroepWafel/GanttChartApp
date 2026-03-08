@@ -39,7 +39,7 @@ on:
       notes_style:
         description: 'Release notes format: github or desqta (emoji headers)'
         required: false
-        default: 'github'
+        default: 'desqta'
         type: choice
         options:
           - github
@@ -51,7 +51,7 @@ on:
       plain_language:
         description: 'Use simple, jargon-free language for non-technical readers'
         required: false
-        default: false
+        default: true
         type: boolean
       model:
         description: 'Groq model (e.g. openai/gpt-oss-120b, llama-3.3-70b-versatile)'
