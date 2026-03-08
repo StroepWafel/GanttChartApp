@@ -142,6 +142,9 @@ try {
   if (!projCols.some((c) => c.name === 'start_date')) {
     db.exec('ALTER TABLE projects ADD COLUMN start_date TEXT');
   }
+  if (!projCols.some((c) => c.name === 'api_visible')) {
+    db.exec('ALTER TABLE projects ADD COLUMN api_visible INTEGER DEFAULT 1');
+  }
 
   migrateAddUserId('categories');
   migrateAddUserId('projects');

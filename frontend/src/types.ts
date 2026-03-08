@@ -17,6 +17,7 @@ export interface Project {
   created_at?: string;
   space_id?: number | null;
   space_name?: string | null;
+  api_visible?: boolean | number;
 }
 
 export interface Task {

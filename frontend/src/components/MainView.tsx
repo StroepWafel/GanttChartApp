@@ -598,8 +598,8 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     }
   }
 
-  async function handleCreateProject(name: string, categoryId: number, dueDate?: string, startDate?: string) {
-    await api.createProject(name, categoryId, dueDate, startDate);
+  async function handleCreateProject(name: string, categoryId: number, dueDate?: string, startDate?: string, apiVisible?: boolean) {
+    await api.createProject(name, categoryId, dueDate, startDate, apiVisible);
     await load();
   }
 
@@ -624,17 +624,19 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     name: string,
     categoryId: number,
     dueDate?: string | null,
-    startDate?: string | null
+    startDate?: string | null,
+    apiVisible?: boolean
   ) {
     await api.updateProject(id, {
       name,
       category_id: categoryId,
       due_date: dueDate ?? undefined,
       start_date: startDate ?? undefined,
+      api_visible: apiVisible,
     });
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === id ? { ...p, name, category_id: categoryId, due_date: dueDate ?? p.due_date, start_date: startDate ?? p.start_date } : p
+        p.id === id ? { ...p, name, category_id: categoryId, due_date: dueDate ?? p.due_date, start_date: startDate ?? p.start_date, api_visible: apiVisible ?? p.api_visible } : p
       )
     );
     await load();

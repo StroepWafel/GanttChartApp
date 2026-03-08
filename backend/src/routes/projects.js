@@ -98,9 +98,10 @@ router.post('/', (req, res) => {
     if (!catAccess.allowed) return res.status(403).json({ error: 'Category not found' });
     if (catAccess.permission !== 'edit') return res.status(403).json({ error: 'View-only access to category' });
     const spaceId = req.body.space_id || cat.space_id || null;
+    const apiVisible = api_visible === false || api_visible === 0 ? 0 : 1;
     const result = db.prepare(`
-      INSERT INTO projects (user_id, space_id, name, category_id, due_date, start_date) VALUES (?, ?, ?, ?, ?, ?)
-    `).run(userId, spaceId, name || 'New Project', category_id, due_date || null, start_date || null);
+      INSERT INTO projects (user_id, space_id, name, category_id, due_date, start_date, api_visible) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, spaceId, name || 'New Project', category_id, due_date || null, start_date || null, apiVisible);
     const row = db.prepare('SELECT p.*, c.name as category_name FROM projects p JOIN categories c ON p.category_id = c.id WHERE p.id = ?').get(result.lastInsertRowid);
     res.status(201).json(row);
   } catch (err) {
@@ -113,7 +114,7 @@ router.patch('/:id', (req, res) => {
     const userId = req.user?.userId;
     const shareToken = getShareToken(req);
     const { id } = req.params;
-    const { name, category_id, due_date, start_date } = req.body;
+    const { name, category_id, due_date, start_date, api_visible } = req.body;
     const access = canAccess(userId, 'project', id, shareToken);
     if (!access.allowed) return res.status(404).json({ error: 'Project not found' });
     if (access.permission !== 'edit') return res.status(403).json({ error: 'View-only access' });
@@ -128,6 +129,7 @@ router.patch('/:id', (req, res) => {
     if (category_id !== undefined) { updates.push('category_id = ?'); params.push(category_id); }
     if (due_date !== undefined) { updates.push('due_date = ?'); params.push(due_date || null); }
     if (start_date !== undefined) { updates.push('start_date = ?'); params.push(start_date || null); }
+    if (api_visible !== undefined) { updates.push('api_visible = ?'); params.push(api_visible === false || api_visible === 0 ? 0 : 1); }
     if (start_date !== undefined && due_date !== undefined) {
       const dateVal = validateDateRange(start_date, due_date);
       if (!dateVal.ok) return res.status(400).json({ error: dateVal.error });

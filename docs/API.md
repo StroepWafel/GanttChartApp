@@ -39,7 +39,7 @@ curl -H "X-API-Username: admin" -H "X-API-Key: your_api_key" https://your-domain
 curl "https://your-domain.com/api/readonly/stats?username=admin&api_key=your_api_key"
 ```
 
-**Data scope:** All endpoints return only data belonging to the authenticated user. Each user’s categories, projects, and tasks are isolated. You can restrict API data to specific spaces in **Settings → API** (API data scope). By default, all spaces the user has access to are included.
+**Data scope:** All endpoints return only data belonging to the authenticated user. Each user’s categories, projects, and tasks are isolated. You can restrict API data to specific spaces in **Settings → API** (API data scope). By default, all spaces the user has access to are included. Projects can be marked as hidden from the API in the project config (Visible to API). Hidden projects and their tasks are excluded from all API responses.
 
 **401 responses** when credentials are invalid or missing:
 ```json

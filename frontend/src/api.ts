@@ -584,15 +584,15 @@ export async function getProjects(opts?: { categoryId?: number; shareToken?: str
   return res.json();
 }
 
-export async function createProject(name: string, categoryId: number, dueDate?: string, startDate?: string) {
+export async function createProject(name: string, categoryId: number, dueDate?: string, startDate?: string, apiVisible?: boolean) {
   const res = await fetchApi('/projects', {
     method: 'POST',
-    body: JSON.stringify({ name, category_id: categoryId, due_date: dueDate || null, start_date: startDate || null }),
+    body: JSON.stringify({ name, category_id: categoryId, due_date: dueDate || null, start_date: startDate || null, api_visible: apiVisible }),
   });
   return res.json();
 }
 
-export async function updateProject(id: number, data: { name?: string; category_id?: number; due_date?: string | null; start_date?: string | null }) {
+export async function updateProject(id: number, data: { name?: string; category_id?: number; due_date?: string | null; start_date?: string | null; api_visible?: boolean }) {
   const res = await fetchApi(`/projects/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),

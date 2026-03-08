@@ -7,9 +7,9 @@ interface Props {
   editingCategory?: Category | null;
   editingProject?: Project | null;
   onAddCategory: (name: string) => void;
-  onAddProject: (name: string, categoryId: number, dueDate?: string, startDate?: string) => void;
+  onAddProject: (name: string, categoryId: number, dueDate?: string, startDate?: string, apiVisible?: boolean) => void;
   onUpdateCategory: (id: number, name: string) => void;
-  onUpdateProject: (id: number, name: string, categoryId: number, dueDate?: string | null, startDate?: string | null) => void;
+  onUpdateProject: (id: number, name: string, categoryId: number, dueDate?: string | null, startDate?: string | null, apiVisible?: boolean) => void;
   onRequestDeleteCategory: (cat: Category) => void;
   onRequestDeleteProject: (proj: Project) => void;
   onClose: () => void;
@@ -36,6 +36,7 @@ export default function CategoryProjectForm({
   const [projName, setProjName] = useState('');
   const [projStartDate, setProjStartDate] = useState('');
   const [projDueDate, setProjDueDate] = useState('');
+  const [projVisibleToApi, setProjVisibleToApi] = useState(true);
   const [catId, setCatId] = useState(categories[0]?.id || 0);
 
   const isEditCat = !!editingCategory;
@@ -55,6 +56,7 @@ export default function CategoryProjectForm({
       setCatId(editingProject.category_id);
       setProjStartDate(editingProject.start_date?.slice(0, 10) ?? '');
       setProjDueDate(editingProject.due_date?.slice(0, 10) ?? '');
+      setProjVisibleToApi((editingProject.api_visible ?? 1) !== 0);
     }
   }, [editingProject]);
 
@@ -63,6 +65,7 @@ export default function CategoryProjectForm({
     setProjName('');
     setProjStartDate('');
     setProjDueDate('');
+    setProjVisibleToApi(true);
     setCatId(categories[0]?.id || 0);
   }
 
@@ -90,9 +93,9 @@ export default function CategoryProjectForm({
     const due = projDueDate.trim() || undefined;
     try {
       if (isEditProj && editingProject) {
-        await onUpdateProject(editingProject.id, projName.trim(), catId, due ?? null, start ?? null);
+        await onUpdateProject(editingProject.id, projName.trim(), catId, due ?? null, start ?? null, projVisibleToApi);
       } else {
-        await onAddProject(projName.trim(), catId, due, start);
+        await onAddProject(projName.trim(), catId, due, start, projVisibleToApi);
       }
       reset();
       onClose();
@@ -173,6 +176,15 @@ export default function CategoryProjectForm({
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
+            </div>
+            <div className="form-row settings-checkbox-row">
+              <input
+                type="checkbox"
+                id="proj-visible-to-api"
+                checked={projVisibleToApi}
+                onChange={(e) => setProjVisibleToApi(e.target.checked)}
+              />
+              <label htmlFor="proj-visible-to-api">Visible to API</label>
             </div>
             <div className="form-row">
               <label>Start date (optional)</label>
