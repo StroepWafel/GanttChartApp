@@ -16,7 +16,7 @@ http://localhost:3001/api/readonly
 
 ## Authentication
 
-The read-only API uses **per-user** authentication. Each user has their own username and API key (visible in the app under **Settings → Account** when logged in). All requests must include both:
+The read-only API uses **per-user** authentication. Each user has their own username and API key (visible in the app under **Settings → API** when logged in). All requests must include both:
 
 **Headers:**
 ```
@@ -39,7 +39,7 @@ curl -H "X-API-Username: admin" -H "X-API-Key: your_api_key" https://your-domain
 curl "https://your-domain.com/api/readonly/stats?username=admin&api_key=your_api_key"
 ```
 
-**Data scope:** All endpoints return only data belonging to the authenticated user. Each user’s categories, projects, and tasks are isolated.
+**Data scope:** All endpoints return only data belonging to the authenticated user. Each user’s categories, projects, and tasks are isolated. You can restrict API data to specific spaces in **Settings → API** (API data scope). By default, all spaces the user has access to are included.
 
 **401 responses** when credentials are invalid or missing:
 ```json

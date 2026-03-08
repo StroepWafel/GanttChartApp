@@ -79,6 +79,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [priorityColors, setPriorityColors] = useState<PriorityColors>(() => loadPriorityColors());
   const [showPriorityColors, setShowPriorityColors] = useState(false);
   const [showWebhooks, setShowWebhooks] = useState(false);
+  const [apiSpaceFilter, setApiSpaceFilter] = useState<(string | number)[] | null>(null);
   const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean; apiKey: string | null } | null>(null);
   const [users, setUsers] = useState<{ id: number; username: string; isAdmin: boolean; isActive: boolean; apiKey: string | null; email?: string | null }[]>([]);
   const [showUserManagement, setShowUserManagement] = useState(false);
@@ -115,7 +116,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [githubTokenSet, setGithubTokenSet] = useState(false);
   const [githubTokenInput, setGithubTokenInput] = useState('');
   const [githubTokenSaving, setGithubTokenSaving] = useState(false);
-  type SettingsTab = 'personal' | 'app' | 'spaces' | 'admin' | 'status' | 'emailOnboarding' | 'updates' | 'danger';
+  type SettingsTab = 'personal' | 'api' | 'app' | 'spaces' | 'admin' | 'status' | 'emailOnboarding' | 'updates' | 'danger';
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personal');
   const settingsOpenToTabRef = useRef<SettingsTab | null>(null);
   const [spacesMenuOpen, setSpacesMenuOpen] = useState<number | null>(null);
@@ -491,6 +492,12 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
               setWebhooks([]);
             }
           }
+          const asf = prefs.api_space_filter;
+          if (Array.isArray(asf) && asf.length > 0) {
+            setApiSpaceFilter(asf as (string | number)[]);
+          } else {
+            setApiSpaceFilter(null);
+          }
         })
         .catch(() => {});
     }
@@ -541,6 +548,12 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
             } else {
               setWebhooks([]);
             }
+          }
+          const asf = prefs.api_space_filter;
+          if (Array.isArray(asf) && asf.length > 0) {
+            setApiSpaceFilter(asf as (string | number)[]);
+          } else {
+            setApiSpaceFilter(null);
           }
         })
         .catch(() => {});
@@ -879,176 +892,6 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     }}>Change password</button>
                   </div>
                 </div>
-                <div className="settings-section">
-                  <h5>API key</h5>
-                  <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API. <button type="button" className="btn-sm" title="Open API docs in new tab" onClick={() => window.open('https://github.com/StroepWafel/GanttChartApp/blob/main/docs/API.md', '_blank', 'noopener,noreferrer')}>API docs</button></p>
-                  {currentUser.apiKey ? (
-                    <div className="api-key-row">
-                      <code className="api-key-value">{currentUser.apiKey}</code>
-                      <button type="button" className="btn-sm" title="Copy API key" aria-label="Copy API key" onClick={() => navigator.clipboard.writeText(currentUser.apiKey!)}><Copy size={16} /></button>
-                    </div>
-                  ) : <p className="muted">No API key</p>}
-                </div>
-                <div className="settings-section settings-dropdown">
-                  <button
-                    type="button"
-                    className={`settings-dropdown-trigger ${showWebhooks ? 'expanded' : ''}`}
-                    onClick={() => setShowWebhooks((v) => !v)}
-                    aria-expanded={showWebhooks}
-                  >
-                    <span>Webhooks</span>
-                    <ChevronDown size={16} className={showWebhooks ? 'rotated' : ''} />
-                  </button>
-                  {showWebhooks && (
-                  <div className="settings-dropdown-content">
-                  <p className="settings-desc">POST task events (create, update, delete, complete) to URLs. Toggle C/U/D/✓ per webhook. Choose type for Discord or generic format.</p>
-                  <div className="webhooks-table-wrap">
-                    <table className="webhooks-table">
-                      <thead>
-                        <tr>
-                          <th>URL</th>
-                          <th>Type</th>
-                          <th className="webhooks-events-th">Events</th>
-                          <th aria-label="Actions" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {webhooks.map((w) => (
-                          <tr key={w.id}>
-                            <td>
-                              <input
-                                type="url"
-                                placeholder="https://example.com/webhook"
-                                value={w.url}
-                                onChange={(e) => setWebhooks((prev) => prev.map((x) => (x.id === w.id ? { ...x, url: e.target.value } : x)))}
-                                onBlur={async (e) => {
-                                  const newUrl = e.target.value.trim();
-                                  const next = webhooks.map((x) => (x.id === w.id ? { ...x, url: newUrl } : x));
-                                  const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
-                                  setWebhooks(newUrl ? next : next.filter((x) => x.id !== w.id));
-                                  try {
-                                    await api.patchUserPreferences('webhooks', toSave);
-                                  } catch { /* ignore */ }
-                                }}
-                                className="settings-input"
-                              />
-                            </td>
-                            <td>
-                              <select
-                                value={w.type}
-                                onChange={async (e) => {
-                                  const type = e.target.value as 'generic' | 'discord';
-                                  const next = webhooks.map((x) => (x.id === w.id ? { ...x, type } : x));
-                                  setWebhooks(next);
-                                  const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
-                                  try {
-                                    await api.patchUserPreferences('webhooks', toSave);
-                                  } catch { /* ignore */ }
-                                }}
-                                className="settings-select"
-                              >
-                                <option value="generic">Generic JSON</option>
-                                <option value="discord">Discord</option>
-                              </select>
-                            </td>
-                            <td className="webhooks-events-cell">
-                              <div className="webhook-events-group">
-                              <label className="webhook-event-label" title="Send on task create">
-                                <input
-                                  type="checkbox"
-                                  checked={w.events.created}
-                                  onChange={async () => {
-                                    const nextEv = { ...w.events, created: !w.events.created };
-                                    const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
-                                    setWebhooks(next);
-                                    const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
-                                    try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
-                                  }}
-                                />
-                                <span>C</span>
-                              </label>
-                              <label className="webhook-event-label" title="Send on task update">
-                                <input
-                                  type="checkbox"
-                                  checked={w.events.updated}
-                                  onChange={async () => {
-                                    const nextEv = { ...w.events, updated: !w.events.updated };
-                                    const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
-                                    setWebhooks(next);
-                                    const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
-                                    try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
-                                  }}
-                                />
-                                <span>U</span>
-                              </label>
-                              <label className="webhook-event-label" title="Send on task delete">
-                                <input
-                                  type="checkbox"
-                                  checked={w.events.deleted}
-                                  onChange={async () => {
-                                    const nextEv = { ...w.events, deleted: !w.events.deleted };
-                                    const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
-                                    setWebhooks(next);
-                                    const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
-                                    try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
-                                  }}
-                                />
-                                <span>D</span>
-                              </label>
-                              <label className="webhook-event-label" title="Send on task complete">
-                                <input
-                                  type="checkbox"
-                                  checked={w.events.completed}
-                                  onChange={async () => {
-                                    const nextEv = { ...w.events, completed: !w.events.completed };
-                                    const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
-                                    setWebhooks(next);
-                                    const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
-                                    try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
-                                  }}
-                                />
-                                <span>✓</span>
-                              </label>
-                              </div>
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                className="btn-sm btn-sm-danger-outline"
-                                title="Remove webhook"
-                                aria-label="Remove webhook"
-                                onClick={async () => {
-                                  const next = webhooks.filter((x) => x.id !== w.id);
-                                  setWebhooks(next);
-                                  const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
-                                  try {
-                                    await api.patchUserPreferences('webhooks', toSave);
-                                  } catch { /* ignore */ }
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="webhooks-add-btn-wrap">
-                    <button
-                      type="button"
-                      className="btn-sm webhooks-add-btn"
-                      onClick={() => {
-                        const id = `wh_${Math.random().toString(36).slice(2)}`;
-                        setWebhooks((prev) => [...prev, { id, url: '', type: 'generic' as const, events: { created: true, updated: true, deleted: true, completed: true } }]);
-                      }}
-                    >
-                      <Plus size={14} /> Add webhook
-                    </button>
-                    </div>
-                  </div>
-                  </div>
-                  )}
-                </div>
               </div>
             )}
             <div className="settings-section settings-dropdown">
@@ -1117,6 +960,218 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
               </div>
             )}
             <a href="https://github.com/StroepWafel/GanttChartApp" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub" style={{ display: 'inline-block', color: 'var(--muted)', marginTop: 8 }}><Github size={20} /></a>
+          </div>
+        )}
+        {settingsTab === 'api' && authEnabled && currentUser && (
+          <div className="settings-tab-content" role="tabpanel">
+            <div className="settings-section">
+              <h5>API key</h5>
+              <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API. <button type="button" className="btn-sm" title="Open API docs in new tab" onClick={() => window.open('https://github.com/StroepWafel/GanttChartApp/blob/main/docs/API.md', '_blank', 'noopener,noreferrer')}>API docs</button></p>
+              {currentUser.apiKey ? (
+                <div className="api-key-row">
+                  <code className="api-key-value">{currentUser.apiKey}</code>
+                  <button type="button" className="btn-sm" title="Copy API key" aria-label="Copy API key" onClick={() => navigator.clipboard.writeText(currentUser.apiKey!)}><Copy size={16} /></button>
+                </div>
+              ) : <p className="muted">No API key</p>}
+            </div>
+            <div className="settings-section">
+              <h5>API data scope</h5>
+              <p className="settings-desc">Choose which spaces the read-only API returns data from. Leave all unchecked for all spaces.</p>
+              <div className="api-space-filter-list">
+                <label className="settings-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={apiSpaceFilter?.includes('personal') ?? false}
+                    onChange={async (e) => {
+                      const checked = e.target.checked;
+                      const prev = apiSpaceFilter ?? [];
+                      const next = checked ? [...prev.filter((x) => x !== 'personal'), 'personal'] : prev.filter((x) => x !== 'personal');
+                      const toSave = next.length > 0 ? next : null;
+                      setApiSpaceFilter(toSave);
+                      try { await api.patchUserPreferences('api_space_filter', toSave); } catch { /* ignore */ }
+                    }}
+                  />
+                  <span>My space</span>
+                </label>
+                {spaces.map((s) => (
+                  <label key={s.id} className="settings-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={apiSpaceFilter?.includes(s.id) ?? false}
+                      onChange={async (e) => {
+                        const checked = e.target.checked;
+                        const prev = apiSpaceFilter ?? [];
+                        const next = checked ? [...prev.filter((x) => x !== s.id), s.id] : prev.filter((x) => x !== s.id);
+                        const toSave = next.length > 0 ? next : null;
+                        setApiSpaceFilter(toSave);
+                        try { await api.patchUserPreferences('api_space_filter', toSave); } catch { /* ignore */ }
+                      }}
+                    />
+                    <span>{s.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="settings-section settings-dropdown">
+              <button
+                type="button"
+                className={`settings-dropdown-trigger ${showWebhooks ? 'expanded' : ''}`}
+                onClick={() => setShowWebhooks((v) => !v)}
+                aria-expanded={showWebhooks}
+              >
+                <span>Webhooks</span>
+                <ChevronDown size={16} className={showWebhooks ? 'rotated' : ''} />
+              </button>
+              {showWebhooks && (
+              <div className="settings-dropdown-content">
+              <p className="settings-desc">POST task events (create, update, delete, complete) to URLs. Toggle C/U/D/✓ per webhook. Choose type for Discord or generic format.</p>
+              <div className="webhooks-table-wrap">
+                <table className="webhooks-table">
+                  <thead>
+                    <tr>
+                      <th>URL</th>
+                      <th>Type</th>
+                      <th className="webhooks-events-th">Events</th>
+                      <th aria-label="Actions" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {webhooks.map((w) => (
+                      <tr key={w.id}>
+                        <td>
+                          <input
+                            type="url"
+                            placeholder="https://example.com/webhook"
+                            value={w.url}
+                            onChange={(e) => setWebhooks((prev) => prev.map((x) => (x.id === w.id ? { ...x, url: e.target.value } : x)))}
+                            onBlur={async (e) => {
+                              const newUrl = e.target.value.trim();
+                              const next = webhooks.map((x) => (x.id === w.id ? { ...x, url: newUrl } : x));
+                              const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                              setWebhooks(newUrl ? next : next.filter((x) => x.id !== w.id));
+                              try {
+                                await api.patchUserPreferences('webhooks', toSave);
+                              } catch { /* ignore */ }
+                            }}
+                            className="settings-input"
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={w.type}
+                            onChange={async (e) => {
+                              const type = e.target.value as 'generic' | 'discord';
+                              const next = webhooks.map((x) => (x.id === w.id ? { ...x, type } : x));
+                              setWebhooks(next);
+                              const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                              try {
+                                await api.patchUserPreferences('webhooks', toSave);
+                              } catch { /* ignore */ }
+                            }}
+                            className="settings-select"
+                          >
+                            <option value="generic">Generic JSON</option>
+                            <option value="discord">Discord</option>
+                          </select>
+                        </td>
+                        <td className="webhooks-events-cell">
+                          <div className="webhook-events-group">
+                          <label className="webhook-event-label" title="Send on task create">
+                            <input
+                              type="checkbox"
+                              checked={w.events.created}
+                              onChange={async () => {
+                                const nextEv = { ...w.events, created: !w.events.created };
+                                const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
+                                setWebhooks(next);
+                                const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
+                              }}
+                            />
+                            <span>C</span>
+                          </label>
+                          <label className="webhook-event-label" title="Send on task update">
+                            <input
+                              type="checkbox"
+                              checked={w.events.updated}
+                              onChange={async () => {
+                                const nextEv = { ...w.events, updated: !w.events.updated };
+                                const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
+                                setWebhooks(next);
+                                const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
+                              }}
+                            />
+                            <span>U</span>
+                          </label>
+                          <label className="webhook-event-label" title="Send on task delete">
+                            <input
+                              type="checkbox"
+                              checked={w.events.deleted}
+                              onChange={async () => {
+                                const nextEv = { ...w.events, deleted: !w.events.deleted };
+                                const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
+                                setWebhooks(next);
+                                const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
+                              }}
+                            />
+                            <span>D</span>
+                          </label>
+                          <label className="webhook-event-label" title="Send on task complete">
+                            <input
+                              type="checkbox"
+                              checked={w.events.completed}
+                              onChange={async () => {
+                                const nextEv = { ...w.events, completed: !w.events.completed };
+                                const next = webhooks.map((x) => (x.id === w.id ? { ...x, events: nextEv } : x));
+                                setWebhooks(next);
+                                const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                                try { await api.patchUserPreferences('webhooks', toSave); } catch { /* ignore */ }
+                              }}
+                            />
+                            <span>✓</span>
+                          </label>
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn-sm btn-sm-danger-outline"
+                            title="Remove webhook"
+                            aria-label="Remove webhook"
+                            onClick={async () => {
+                              const next = webhooks.filter((x) => x.id !== w.id);
+                              setWebhooks(next);
+                              const toSave = next.filter((x) => x.url.trim()).map((x) => ({ id: x.id, url: x.url.trim(), type: x.type, events: x.events }));
+                              try {
+                                await api.patchUserPreferences('webhooks', toSave);
+                              } catch { /* ignore */ }
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="webhooks-add-btn-wrap">
+                <button
+                  type="button"
+                  className="btn-sm webhooks-add-btn"
+                  onClick={() => {
+                    const id = `wh_${Math.random().toString(36).slice(2)}`;
+                    setWebhooks((prev) => [...prev, { id, url: '', type: 'generic' as const, events: { created: true, updated: true, deleted: true, completed: true } }]);
+                  }}
+                >
+                  <Plus size={14} /> Add webhook
+                </button>
+                </div>
+              </div>
+              </div>
+              )}
+            </div>
           </div>
         )}
         {settingsTab === 'spaces' && authEnabled && currentUser && (
@@ -2043,6 +2098,7 @@ onTaskDelete={handleDeleteTask}
                 onTabChange={(t) => { setSettingsTab(t); settingsOpenToTabRef.current = t; }}
                 sections={[
                   { id: 'personal', label: 'Personal' },
+                  { id: 'api', label: 'API', show: !!(authEnabled && currentUser) },
                   { id: 'app', label: 'App', show: !!(mobileAppEnabled || currentUser?.isAdmin || !authEnabled) },
                   { id: 'spaces', label: 'Spaces', show: !!(authEnabled && currentUser) },
                   { id: 'status', label: 'Status', show: !!(currentUser?.isAdmin || !authEnabled) },
@@ -2432,6 +2488,17 @@ onTaskDelete={handleDeleteTask}
                 >
                   Personal
                 </button>
+                {authEnabled && currentUser && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === 'api'}
+                    className={`settings-tab ${settingsTab === 'api' ? 'active' : ''}`}
+                    onClick={() => setSettingsTab('api')}
+                  >
+                    API
+                  </button>
+                )}
                 {(mobileAppEnabled || currentUser?.isAdmin || !authEnabled) && (
                   <button
                     type="button"

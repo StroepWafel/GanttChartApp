@@ -66,7 +66,7 @@ Edit `.env`:
 
 - **AUTH_USERNAME**: Use a username instead of email (the app login is now username-based). If you had `AUTH_EMAIL=admin@example.com`, you can use `AUTH_USERNAME=admin` or keep the email as the username.
 - **AUTH_EMAIL**: Still supported as a fallback for compatibility; `AUTH_USERNAME` takes precedence.
-- **API_KEY**: No longer used. Remove it. Each user gets their own API key from the app (Settings → Account).
+- **API_KEY**: No longer used. Remove it. Each user gets their own API key from the app (Settings → API).
 - **JWT_SECRET**: Required for auth. Generate a random string for production (e.g. `openssl rand -hex 32`).
 
 ### 3. Update Dependencies and Build
@@ -95,7 +95,7 @@ Use your **username** (not email) and password. If you used `AUTH_USERNAME=admin
 ### 6. Get Your New API Key
 
 1. Open **Settings**
-2. In the **Account** section, view your **API key**
+2. In the **API** section (Settings → API), view your **API key**
 3. Use this with `X-API-Username` and `X-API-Key` for the read-only IoT API
 
 Your old `API_KEY` from `.env` will no longer work. Update any scripts or IoT devices to use:

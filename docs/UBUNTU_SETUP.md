@@ -122,7 +122,7 @@ DB_PATH=./data/gantt.db
 - **AUTH_USERNAME**: Admin username (used when seeding the first user).
 - **AUTH_PASSWORD**: Plain password (hashed at startup). For production, consider using `AUTH_PASSWORD_HASH` with a pre-computed bcrypt hash.
 - **JWT_SECRET**: Secret for signing JWTs—change in production!
-- **API keys**: Each user has their own API key (visible in the app under Settings → Account). The read-only API at `/api/readonly/*` requires `X-API-Username` and `X-API-Key` headers. See [docs/API.md](API.md).
+- **API keys**: Each user has their own API key (visible in the app under Settings → API). The read-only API at `/api/readonly/*` requires `X-API-Username` and `X-API-Key` headers. See [docs/API.md](API.md).
 
 Ensure the data directory exists:
 
@@ -270,7 +270,7 @@ sudo cloudflared service install
 
 ### Read-Only API (for IoT)
 
-Each user has their own API key in **Settings → Account**. Include both headers:
+Each user has their own API key in **Settings → API**. Include both headers:
 
 ```
 X-API-Username: your_username
@@ -336,7 +336,7 @@ pm2 restart gantt-tunnel
 - Ensure `AUTH_USERNAME` (or `AUTH_EMAIL` for legacy) and `AUTH_PASSWORD` are set.
 
 **API returns 401 or blank**
-- If auth is enabled, log in to the app and get your API key from **Settings → Account**.
+- If auth is enabled, log in to the app and get your API key from **Settings → API**.
 - Use both `X-API-Username` and `X-API-Key` headers (the old single `X-API-Key` is no longer used).
 
 **Upgrading from an older version?**

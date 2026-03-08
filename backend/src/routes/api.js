@@ -6,6 +6,37 @@ import { requireApiKey } from '../auth.js';
 const router = express.Router();
 router.use(requireApiKey);
 
+/** Load api_space_filter from user_preferences. Returns array like ['personal', 1, 2] or null/[] for no filter. */
+function getApiSpaceFilter(userId) {
+  const row = db.prepare('SELECT value FROM user_preferences WHERE user_id = ? AND key = ?').get(userId, 'api_space_filter');
+  if (!row?.value) return null;
+  try {
+    const arr = JSON.parse(row.value);
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    return arr;
+  } catch {
+    return null;
+  }
+}
+
+/** Returns { sql, params } for space filter. Use with tasks/projects/categories queries. spaceCol = 'COALESCE(p.space_id, c.space_id)' or 'c.space_id' for category-only. */
+function getSpaceFilterClause(userId, spaceCol = 'COALESCE(p.space_id, c.space_id)') {
+  const filter = getApiSpaceFilter(userId);
+  if (!filter || filter.length === 0) return { sql: '', params: [] };
+  const hasPersonal = filter.includes('personal');
+  const spaceIds = filter.filter((x) => typeof x === 'number');
+  const parts = [];
+  const params = [];
+  if (hasPersonal) parts.push(`(${spaceCol} IS NULL)`);
+  if (spaceIds.length > 0) {
+    const placeholders = spaceIds.map(() => '?').join(', ');
+    parts.push(`(${spaceCol} IN (${placeholders}))`);
+    params.push(...spaceIds);
+  }
+  if (parts.length === 0) return { sql: '', params: [] };
+  return { sql: ` AND (${parts.join(' OR ')})`, params };
+}
+
 function servertime() {
   return new Date().toISOString();
 }
@@ -42,14 +73,15 @@ function taskFromRow(row) {
 router.get('/tasks', (req, res) => {
   try {
     const userId = req.user.userId;
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
     const rows = db.prepare(`
       SELECT t.*, p.name as project_name, c.name as category_name
       FROM tasks t
       JOIN projects p ON t.project_id = p.id AND p.user_id = ?
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE t.user_id = ?
+      WHERE t.user_id = ?${spaceSql}
       ORDER BY t.start_date
-    `).all(userId, userId, userId);
+    `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows.map(taskFromRow) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -60,13 +92,14 @@ router.get('/most-important-task', (req, res) => {
   try {
     const userId = req.user.userId;
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 1));
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
     const rows = db.prepare(`
       SELECT t.*, p.name as project_name, c.name as category_name
       FROM tasks t
       JOIN projects p ON t.project_id = p.id AND p.user_id = ?
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE t.user_id = ? AND t.completed = 0 AND (t.base_priority IS NULL OR t.base_priority > 1)
-    `).all(userId, userId, userId);
+      WHERE t.user_id = ? AND t.completed = 0 AND (t.base_priority IS NULL OR t.base_priority > 1)${spaceSql}
+    `).all(userId, userId, userId, ...spaceParams);
     const withUrgency = rows.map(r => ({ ...taskFromRow(r) }));
     const sorted = withUrgency.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
     const tasks = sorted.slice(0, limit);
@@ -84,8 +117,10 @@ router.get('/most-important-task', (req, res) => {
 router.get('/stats', (req, res) => {
   try {
     const userId = req.user.userId;
-    const total = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ?').get(userId).c;
-    const completed = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ? AND completed = 1').get(userId).c;
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
+    const baseFrom = `FROM tasks t JOIN projects p ON t.project_id = p.id AND p.user_id = ? JOIN categories c ON p.category_id = c.id AND c.user_id = ? WHERE t.user_id = ?${spaceSql}`;
+    const total = db.prepare(`SELECT COUNT(*) as c ${baseFrom}`).get(userId, userId, userId, ...spaceParams).c;
+    const completed = db.prepare(`SELECT COUNT(*) as c ${baseFrom} AND t.completed = 1`).get(userId, userId, userId, ...spaceParams).c;
     const todo = total - completed;
     const efficiency = total > 0 ? Math.round((completed / total) * 100) : 0;
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), total, completed, todo, efficiency });
@@ -97,8 +132,10 @@ router.get('/stats', (req, res) => {
 router.get('/efficiency', (req, res) => {
   try {
     const userId = req.user.userId;
-    const total = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ?').get(userId).c;
-    const completed = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ? AND completed = 1').get(userId).c;
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
+    const baseFrom = `FROM tasks t JOIN projects p ON t.project_id = p.id AND p.user_id = ? JOIN categories c ON p.category_id = c.id AND c.user_id = ? WHERE t.user_id = ?${spaceSql}`;
+    const total = db.prepare(`SELECT COUNT(*) as c ${baseFrom}`).get(userId, userId, userId, ...spaceParams).c;
+    const completed = db.prepare(`SELECT COUNT(*) as c ${baseFrom} AND t.completed = 1`).get(userId, userId, userId, ...spaceParams).c;
     const ratio = total > 0 ? completed / total : 0;
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), efficiency: Math.round(ratio * 100), ratio, completed, total });
   } catch (err) {
@@ -109,15 +146,16 @@ router.get('/efficiency', (req, res) => {
 router.get('/by-category', (req, res) => {
   try {
     const userId = req.user.userId;
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
     const rows = db.prepare(`
       SELECT c.id, c.name, COUNT(t.id) as task_count
       FROM categories c
       LEFT JOIN projects p ON p.category_id = c.id AND p.user_id = ?
       LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = ?
-      WHERE c.user_id = ?
+      WHERE c.user_id = ?${spaceSql}
       GROUP BY c.id
       ORDER BY c.display_order, c.name
-    `).all(userId, userId, userId);
+    `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -127,14 +165,15 @@ router.get('/by-category', (req, res) => {
 router.get('/overdue', (req, res) => {
   try {
     const userId = req.user.userId;
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
     const rows = db.prepare(`
       SELECT t.*, p.name as project_name, c.name as category_name
       FROM tasks t
       JOIN projects p ON t.project_id = p.id AND p.user_id = ?
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE t.user_id = ? AND t.completed = 0 AND t.due_date IS NOT NULL AND date(t.due_date) < date('now')
+      WHERE t.user_id = ? AND t.completed = 0 AND t.due_date IS NOT NULL AND date(t.due_date) < date('now')${spaceSql}
       ORDER BY t.due_date
-    `).all(userId, userId, userId);
+    `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows.map(taskFromRow) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -145,6 +184,7 @@ router.get('/upcoming', (req, res) => {
   try {
     const userId = req.user.userId;
     const days = parseInt(req.query.days, 10) || 7;
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
     const rows = db.prepare(`
       SELECT t.*, p.name as project_name, c.name as category_name
       FROM tasks t
@@ -152,9 +192,9 @@ router.get('/upcoming', (req, res) => {
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
       WHERE t.user_id = ? AND t.completed = 0 AND t.due_date IS NOT NULL
         AND date(t.due_date) >= date('now')
-        AND date(t.due_date) <= date('now', ? || ' days')
+        AND date(t.due_date) <= date('now', ? || ' days')${spaceSql}
       ORDER BY t.due_date
-    `).all(userId, userId, userId, days);
+    `).all(userId, userId, userId, days, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows.map(taskFromRow) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -164,15 +204,16 @@ router.get('/upcoming', (req, res) => {
 router.get('/projects', (req, res) => {
   try {
     const userId = req.user.userId;
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
     const rows = db.prepare(`
       SELECT p.*, c.name as category_name,
         (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ?) as task_count,
         (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ? AND completed = 1) as completed_count
       FROM projects p
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE p.user_id = ?
+      WHERE p.user_id = ?${spaceSql}
       ORDER BY c.display_order, p.name
-    `).all(userId, userId, userId, userId);
+    `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -182,12 +223,13 @@ router.get('/projects', (req, res) => {
 router.get('/categories', (req, res) => {
   try {
     const userId = req.user.userId;
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId, 'c.space_id');
     const rows = db.prepare(`
       SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ?) as task_count
       FROM categories c
-      WHERE c.user_id = ?
+      WHERE c.user_id = ?${spaceSql}
       ORDER BY c.display_order, c.name
-    `).all(userId, userId, userId);
+    `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -206,6 +248,9 @@ router.get('/batch', (req, res) => {
     const stLocal = servertimeLocal();
     const out = { servertime: st, servertime_local: stLocal };
 
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
+    const spaceSqlCat = getSpaceFilterClause(userId, 'c.space_id');
+
     for (const ep of endpoints) {
       if (ep === 'tasks') {
         const rows = db.prepare(`
@@ -213,13 +258,14 @@ router.get('/batch', (req, res) => {
           FROM tasks t
           JOIN projects p ON t.project_id = p.id AND p.user_id = ?
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-          WHERE t.user_id = ?
+          WHERE t.user_id = ?${spaceSql}
           ORDER BY t.start_date
-        `).all(userId, userId, userId);
+        `).all(userId, userId, userId, ...spaceParams);
         out.tasks = { data: rows.map(taskFromRow) };
       } else if (ep === 'stats') {
-        const total = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ?').get(userId).c;
-        const completed = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ? AND completed = 1').get(userId).c;
+        const baseFrom = `FROM tasks t JOIN projects p ON t.project_id = p.id AND p.user_id = ? JOIN categories c ON p.category_id = c.id AND c.user_id = ? WHERE t.user_id = ?${spaceSql}`;
+        const total = db.prepare(`SELECT COUNT(*) as c ${baseFrom}`).get(userId, userId, userId, ...spaceParams).c;
+        const completed = db.prepare(`SELECT COUNT(*) as c ${baseFrom} AND t.completed = 1`).get(userId, userId, userId, ...spaceParams).c;
         out.stats = { total, completed, todo: total - completed, efficiency: total > 0 ? Math.round((completed / total) * 100) : 0 };
       } else if (ep === 'overdue') {
         const rows = db.prepare(`
@@ -227,9 +273,9 @@ router.get('/batch', (req, res) => {
           FROM tasks t
           JOIN projects p ON t.project_id = p.id AND p.user_id = ?
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-          WHERE t.user_id = ? AND t.completed = 0 AND t.due_date IS NOT NULL AND date(t.due_date) < date('now')
+          WHERE t.user_id = ? AND t.completed = 0 AND t.due_date IS NOT NULL AND date(t.due_date) < date('now')${spaceSql}
           ORDER BY t.due_date
-        `).all(userId, userId, userId);
+        `).all(userId, userId, userId, ...spaceParams);
         out.overdue = { data: rows.map(taskFromRow) };
       } else if (ep === 'upcoming') {
         const days = parseInt(req.query.days, 10) || 7;
@@ -240,9 +286,9 @@ router.get('/batch', (req, res) => {
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
           WHERE t.user_id = ? AND t.completed = 0 AND t.due_date IS NOT NULL
             AND date(t.due_date) >= date('now')
-            AND date(t.due_date) <= date('now', ? || ' days')
+            AND date(t.due_date) <= date('now', ? || ' days')${spaceSql}
           ORDER BY t.due_date
-        `).all(userId, userId, userId, days);
+        `).all(userId, userId, userId, days, ...spaceParams);
         out.upcoming = { data: rows.map(taskFromRow) };
       } else if (ep === 'by-category') {
         const rows = db.prepare(`
@@ -250,10 +296,10 @@ router.get('/batch', (req, res) => {
           FROM categories c
           LEFT JOIN projects p ON p.category_id = c.id AND p.user_id = ?
           LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = ?
-          WHERE c.user_id = ?
+          WHERE c.user_id = ?${spaceSql}
           GROUP BY c.id
           ORDER BY c.display_order, c.name
-        `).all(userId, userId, userId);
+        `).all(userId, userId, userId, ...spaceParams);
         out['by-category'] = { data: rows };
       } else if (ep === 'projects') {
         const rows = db.prepare(`
@@ -262,21 +308,22 @@ router.get('/batch', (req, res) => {
             (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ? AND completed = 1) as completed_count
           FROM projects p
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-          WHERE p.user_id = ?
+          WHERE p.user_id = ?${spaceSql}
           ORDER BY c.display_order, p.name
-        `).all(userId, userId, userId, userId);
+        `).all(userId, userId, userId, ...spaceParams);
         out.projects = { data: rows };
       } else if (ep === 'categories') {
         const rows = db.prepare(`
           SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ?) as task_count
           FROM categories c
-          WHERE c.user_id = ?
+          WHERE c.user_id = ?${spaceSqlCat.sql}
           ORDER BY c.display_order, c.name
-        `).all(userId, userId, userId);
+        `).all(userId, userId, userId, ...spaceSqlCat.params);
         out.categories = { data: rows };
       } else if (ep === 'efficiency') {
-        const total = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ?').get(userId).c;
-        const completed = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ? AND completed = 1').get(userId).c;
+        const baseFrom = `FROM tasks t JOIN projects p ON t.project_id = p.id AND p.user_id = ? JOIN categories c ON p.category_id = c.id AND c.user_id = ? WHERE t.user_id = ?${spaceSql}`;
+        const total = db.prepare(`SELECT COUNT(*) as c ${baseFrom}`).get(userId, userId, userId, ...spaceParams).c;
+        const completed = db.prepare(`SELECT COUNT(*) as c ${baseFrom} AND t.completed = 1`).get(userId, userId, userId, ...spaceParams).c;
         out.efficiency = { efficiency: total > 0 ? Math.round((completed / total) * 100) : 0, ratio: total > 0 ? completed / total : 0, completed, total };
       } else if (ep === 'most-important-task') {
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 1));
@@ -285,8 +332,8 @@ router.get('/batch', (req, res) => {
           FROM tasks t
           JOIN projects p ON t.project_id = p.id AND p.user_id = ?
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-          WHERE t.user_id = ? AND t.completed = 0 AND (t.base_priority IS NULL OR t.base_priority > 1)
-        `).all(userId, userId, userId);
+          WHERE t.user_id = ? AND t.completed = 0 AND (t.base_priority IS NULL OR t.base_priority > 1)${spaceSql}
+        `).all(userId, userId, userId, ...spaceParams);
         const sorted = rows.map((r) => taskFromRow(r)).sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
         const tasks = sorted.slice(0, limit);
         out['most-important-task'] = limit === 1 ? (tasks[0] || null) : { data: tasks };

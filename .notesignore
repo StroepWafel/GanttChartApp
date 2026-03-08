@@ -1,0 +1,30 @@
+# AI Release Notes: exclude these files from summarization
+# Uses gitignore-style patterns. See https://github.com/StroepWafel/AI-Release-Notes#notesignore
+
+# Lock files (dependency resolution only; rarely meaningful in release notes)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.lock
+
+# Build output and generated files
+dist/
+dist-mobile/
+build/
+*.min.js
+*.min.css
+mobile/dist/
+mobile/android/
+mobile/ios/
+
+# Dependencies
+node_modules/
+
+# Plan and config files
+.cursor/
+*.plan.md
+.cursorignore
+
+# Changelog (often auto-updated; AI generates release notes separately)
+CHANGELOG*
+changelog*

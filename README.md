@@ -106,7 +106,7 @@ Copy `.env.example` to `.env` and configure:
 | `DB_PATH` | Path to SQLite database (default: `./data/gantt.db`) |
 | `GITHUB_TOKEN` | Optional: personal access token for update check (5,000 API requests/hr; can also be set in Settings → Updates) |
 
-When auth is enabled, the first user (admin) is created from `AUTH_USERNAME` and `AUTH_PASSWORD` if the users table is empty. Each user gets their own API key from **Settings → Account** for the read-only IoT API.
+When auth is enabled, the first user (admin) is created from `AUTH_USERNAME` and `AUTH_PASSWORD` if the users table is empty. Each user gets their own API key from **Settings → API** for the read-only IoT API.
 
 ## Statistics collection
 
@@ -144,14 +144,14 @@ See [docs/UBUNTU_SETUP.md](docs/UBUNTU_SETUP.md) for Ubuntu server deployment wi
 
 ## Read-Only IoT API
 
-Endpoints under `/api/readonly/*` require **per-user** authentication. Each user has their own API key (view in Settings → Account). Use both headers:
+Endpoints under `/api/readonly/*` require **per-user** authentication. Each user has their own API key (view in Settings → API). Use both headers:
 
 - `X-API-Username` - Your username
 - `X-API-Key` - Your API key
 
 Or as query params: `?username=...&api_key=...`
 
-Data returned is scoped to the authenticated user only.
+Data returned is scoped to the authenticated user only. You can restrict which spaces the API returns data from in Settings → API (API data scope).
 
 | Endpoint | Description |
 |----------|-------------|

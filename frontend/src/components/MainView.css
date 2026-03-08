@@ -1333,6 +1333,13 @@ label.input-label,
   margin-top: 8px;
 }
 
+.api-space-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .api-key-value {
   flex: 1;
   font-size: 11px;
