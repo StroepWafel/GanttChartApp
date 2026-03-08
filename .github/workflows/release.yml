@@ -171,7 +171,7 @@ jobs:
 
       - name: Generate and Create Release
         id: release
-        uses: StroepWafel/AI-Release-Notes@v1
+        uses: StroepWafel/AI-Release-Notes@v1.0.0
         with:
           groq_api_key: ${{ secrets.GROQ_API_KEY }}
           tag_name: ${{ steps.version.outputs.version }}
