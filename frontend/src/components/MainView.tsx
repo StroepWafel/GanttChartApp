@@ -36,6 +36,7 @@ import { getSettingsForBackup, applySettingsFromBackup, type BackupSettings } fr
 import { exportTasksToCsv, downloadCsv } from '../utils/exportCsv';
 import { cancelReminder } from '../reminders';
 import { applyTheme, getStoredTheme, setStoredTheme, type Theme } from '../theme';
+import { getCredentials, isMobileNative, saveCredentials } from '../credentialStorage';
 import './MainView.css';
 
 interface Props {
@@ -91,6 +92,8 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [changePasswordCurrent, setChangePasswordCurrent] = useState('');
   const [changePasswordNew, setChangePasswordNew] = useState('');
   const [changePasswordConfirm, setChangePasswordConfirm] = useState('');
+  const [changeUsernameNew, setChangeUsernameNew] = useState('');
+  const [changeUsernameCurrent, setChangeUsernameCurrent] = useState('');
   const [masqueradeUserId, setMasqueradeUserId] = useState<string>('');
   const [userMgmtError, setUserMgmtError] = useState('');
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
@@ -807,6 +810,36 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     You&apos;re acting as this user. <button type="button" className="btn-sm" onClick={() => api.stopMasquerade()}>Back to admin</button>
                   </p>
                 )}
+                {!isMasquerading && (
+                  <div className="settings-section">
+                    <h5>Change username</h5>
+                    <p className="settings-desc">Set a new username for your account.</p>
+                    <div className="change-password-form">
+                      <input type="text" placeholder="New username" value={changeUsernameNew} onChange={(e) => setChangeUsernameNew(e.target.value)} className="settings-input" />
+                      <input type="password" placeholder="Current password" value={changeUsernameCurrent} onChange={(e) => setChangeUsernameCurrent(e.target.value)} className="settings-input" />
+                      <button type="button" className="btn-sm" onClick={async () => {
+                        if (!changeUsernameNew || !changeUsernameCurrent) return;
+                        try {
+                          const out = await api.updateUser(currentUser.id, { username: changeUsernameNew.trim(), currentPassword: changeUsernameCurrent });
+                          if (out.token) {
+                            localStorage.setItem('gantt_token', out.token);
+                            setCurrentUser({ ...currentUser, username: out.username });
+                            if (isMobileNative()) {
+                              const creds = await getCredentials();
+                              if (creds) await saveCredentials(out.username, changeUsernameCurrent);
+                            }
+                          }
+                          setChangeUsernameNew('');
+                          setChangeUsernameCurrent('');
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : 'Failed to change username';
+                          adminAlerts.addAlert('User management', 'Error', msg);
+                          modal.showAlert({ title: 'Error', message: msg });
+                        }
+                      }}>Change username</button>
+                    </div>
+                  </div>
+                )}
                 <div className="settings-section">
                   <h5>Change password</h5>
                   <p className="settings-desc">Set a new password for your account.</p>
@@ -837,7 +870,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 </div>
                 <div className="settings-section">
                   <h5>API key</h5>
-                  <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API.</p>
+                  <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API. <a href="https://github.com/StroepWafel/GanttChartApp/blob/main/docs/API.md" target="_blank" rel="noopener noreferrer">API docs</a></p>
                   {currentUser.apiKey ? (
                     <div className="api-key-row">
                       <code className="api-key-value">{currentUser.apiKey}</code>

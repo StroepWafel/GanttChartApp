@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
-import { optionalAuth, requireAdmin } from '../auth.js';
+import { masqueradeToken, optionalAuth, requireAdmin } from '../auth.js';
 
 const router = express.Router();
 
@@ -122,7 +122,7 @@ router.post('/', optionalAuth, requireAdmin, async (req, res) => {
 router.patch('/:id', optionalAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { password, isActive, revokeApiKey, regenerateApiKey, email } = req.body;
+    const { password, isActive, revokeApiKey, regenerateApiKey, email, username, currentPassword } = req.body;
 
     const isSelf = req.user.userId === id;
     const isAdmin = req.user.isAdmin;
@@ -162,6 +162,28 @@ router.patch('/:id', optionalAuth, async (req, res) => {
       db.prepare('UPDATE users SET email = ? WHERE id = ?').run(emailNorm, id);
     }
 
+    let usernameChanged = false;
+    if (username !== undefined && isSelf) {
+      const usernameNorm = typeof username === 'string' ? username.trim().toLowerCase() : '';
+      if (!usernameNorm) {
+        return res.status(400).json({ error: 'Username cannot be empty' });
+      }
+      if (usernameNorm.length > 64) {
+        return res.status(400).json({ error: 'Username must be at most 64 characters' });
+      }
+      const existing = db.prepare('SELECT id FROM users WHERE LOWER(username) = ? AND id != ?').get(usernameNorm, id);
+      if (existing) {
+        return res.status(400).json({ error: 'Username already exists' });
+      }
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'currentPassword required to change your own username' });
+      }
+      const ok = await bcrypt.compare(currentPassword, target.password_hash);
+      if (!ok) return res.status(401).json({ error: 'Current password incorrect' });
+      db.prepare('UPDATE users SET username = ? WHERE id = ?').run(usernameNorm, id);
+      usernameChanged = true;
+    }
+
     if (isAdmin && !isSelf) {
       if (isActive !== undefined) {
         const val = isActive ? 1 : 0;
@@ -184,7 +206,7 @@ router.patch('/:id', optionalAuth, async (req, res) => {
 
     const user = db.prepare('SELECT id, username, is_admin, is_active, api_key, created_at, email FROM users WHERE id = ?').get(id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({
+    const payload = {
       id: user.id,
       username: user.username,
       isAdmin: !!user.is_admin,
@@ -192,7 +214,12 @@ router.patch('/:id', optionalAuth, async (req, res) => {
       apiKey: user.api_key,
       createdAt: user.created_at,
       email: user.email ?? undefined,
-    });
+    };
+    if (usernameChanged) {
+      const token = masqueradeToken(id);
+      if (token) payload.token = token;
+    }
+    res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
