@@ -156,7 +156,7 @@ Data returned is scoped to the authenticated user only.
 | Endpoint | Description |
 |----------|-------------|
 | `GET /tasks` | All tasks |
-| `GET /most-important-task` | Highest urgency incomplete task |
+| `GET /most-important-task` | Top N most urgent incomplete tasks (?limit=N, default 1) |
 | `GET /stats` | Total, completed, todo, efficiency |
 | `GET /efficiency` | Efficiency ratio |
 | `GET /by-category` | Task counts per category |

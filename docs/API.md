@@ -126,13 +126,25 @@ Returns all tasks (completed and incomplete).
 
 ### GET /most-important-task
 
-Returns the single most urgent incomplete task based on priority and due date proximity. Tasks with priority 1 (lowest) are excluded and never considered.
+Returns the top N most urgent incomplete tasks based on priority and due date proximity, ordered from most to least important. Tasks with priority 1 (lowest) are excluded and never considered.
 
-**Response:** Object with `servertime` and task fields (when a task exists), or `servertime` and `data: null` (when none)
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | number | 1 | Number of tasks to return (1–100) |
+
+**Response format:**
+
+- **When `limit=1` (default):** Object with `servertime`, `servertime_local`, and task fields spread at top level (when a task exists), or `servertime`, `servertime_local`, and `data: null` (when none).
+- **When `limit>1`:** Object with `servertime`, `servertime_local`, and `data` (array of task objects, ordered by urgency descending).
+
+**Example: `limit=1` (default) with a task:**
 
 ```json
 {
   "servertime": "2025-02-23T12:00:00.000Z",
+  "servertime_local": "2025-02-23T22:30:00.000+10:30",
   "id": 3,
   "project_id": 2,
   "parent_id": null,
@@ -148,12 +160,49 @@ Returns the single most urgent incomplete task based on priority and due date pr
 }
 ```
 
-**Empty state (no tasks):**
+**Example: `limit=1` with no tasks:**
 
 ```json
 {
   "servertime": "2025-02-23T12:00:00.000Z",
+  "servertime_local": "2025-02-23T22:30:00.000+10:30",
   "data": null
+}
+```
+
+**Example: `limit=3` with multiple tasks:**
+
+```
+GET /most-important-task?limit=3
+```
+
+```json
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "servertime_local": "2025-02-23T22:30:00.000+10:30",
+  "data": [
+    {
+      "id": 3,
+      "project_id": 2,
+      "parent_id": null,
+      "name": "Fix critical bug",
+      "urgency": 18.5
+    },
+    {
+      "id": 1,
+      "project_id": 1,
+      "parent_id": null,
+      "name": "Design mockups",
+      "urgency": 12.5
+    },
+    {
+      "id": 5,
+      "project_id": 2,
+      "parent_id": null,
+      "name": "Review PR",
+      "urgency": 8.2
+    }
+  ]
 }
 ```
 

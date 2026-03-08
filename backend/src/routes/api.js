@@ -59,6 +59,7 @@ router.get('/tasks', (req, res) => {
 router.get('/most-important-task', (req, res) => {
   try {
     const userId = req.user.userId;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 1));
     const rows = db.prepare(`
       SELECT t.*, p.name as project_name, c.name as category_name
       FROM tasks t
@@ -68,8 +69,13 @@ router.get('/most-important-task', (req, res) => {
     `).all(userId, userId, userId);
     const withUrgency = rows.map(r => ({ ...taskFromRow(r) }));
     const sorted = withUrgency.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
-    const task = sorted[0] || null;
-    res.json(task ? { servertime: servertime(), servertime_local: servertimeLocal(), ...task } : { servertime: servertime(), servertime_local: servertimeLocal(), data: null });
+    const tasks = sorted.slice(0, limit);
+    if (limit === 1) {
+      const task = tasks[0] || null;
+      res.json(task ? { servertime: servertime(), servertime_local: servertimeLocal(), ...task } : { servertime: servertime(), servertime_local: servertimeLocal(), data: null });
+    } else {
+      res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: tasks });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -273,6 +279,7 @@ router.get('/batch', (req, res) => {
         const completed = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ? AND completed = 1').get(userId).c;
         out.efficiency = { efficiency: total > 0 ? Math.round((completed / total) * 100) : 0, ratio: total > 0 ? completed / total : 0, completed, total };
       } else if (ep === 'most-important-task') {
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 1));
         const rows = db.prepare(`
           SELECT t.*, p.name as project_name, c.name as category_name
           FROM tasks t
@@ -281,7 +288,8 @@ router.get('/batch', (req, res) => {
           WHERE t.user_id = ? AND t.completed = 0 AND (t.base_priority IS NULL OR t.base_priority > 1)
         `).all(userId, userId, userId);
         const sorted = rows.map((r) => taskFromRow(r)).sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
-        out['most-important-task'] = sorted[0] || null;
+        const tasks = sorted.slice(0, limit);
+        out['most-important-task'] = limit === 1 ? (tasks[0] || null) : { data: tasks };
       }
     }
     res.json(out);
