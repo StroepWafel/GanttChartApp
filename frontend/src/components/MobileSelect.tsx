@@ -19,7 +19,7 @@ export default function MobileSelect<T extends number | string = number>({ value
 
   useEffect(() => {
     if (!open) return;
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: Event) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
