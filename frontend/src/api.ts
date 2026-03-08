@@ -297,6 +297,7 @@ export async function createUser(username: string, temporaryPassword: string, em
 export async function updateUser(id: number, data: {
   password?: string;
   currentPassword?: string;
+  username?: string;
   isActive?: boolean;
   revokeApiKey?: boolean;
   regenerateApiKey?: boolean;

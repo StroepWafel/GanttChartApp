@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus, MoreVertical } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus, MoreVertical, LogOut } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -37,6 +37,7 @@ import { getSettingsForBackup, applySettingsFromBackup, type BackupSettings } fr
 import { exportTasksToCsv, downloadCsv } from '../utils/exportCsv';
 import { cancelReminder } from '../reminders';
 import { applyTheme, getStoredTheme, setStoredTheme, type Theme } from '../theme';
+import { getCredentials, isMobileNative, saveCredentials } from '../credentialStorage';
 import './MainView.css';
 
 interface Props {
@@ -94,6 +95,8 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [changePasswordCurrent, setChangePasswordCurrent] = useState('');
   const [changePasswordNew, setChangePasswordNew] = useState('');
   const [changePasswordConfirm, setChangePasswordConfirm] = useState('');
+  const [changeUsernameNew, setChangeUsernameNew] = useState('');
+  const [changeUsernameCurrent, setChangeUsernameCurrent] = useState('');
   const [masqueradeUserId, setMasqueradeUserId] = useState<string>('');
   const [userMgmtError, setUserMgmtError] = useState('');
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
@@ -818,6 +821,36 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                     You&apos;re acting as this user. <button type="button" className="btn-sm" onClick={() => api.stopMasquerade()}>Back to admin</button>
                   </p>
                 )}
+                {!isMasquerading && (
+                  <div className="settings-section">
+                    <h5>Change username</h5>
+                    <p className="settings-desc">Set a new username for your account.</p>
+                    <div className="change-password-form">
+                      <input type="text" placeholder="New username" value={changeUsernameNew} onChange={(e) => setChangeUsernameNew(e.target.value)} className="settings-input" />
+                      <input type="password" placeholder="Current password" value={changeUsernameCurrent} onChange={(e) => setChangeUsernameCurrent(e.target.value)} className="settings-input" />
+                      <button type="button" className="btn-sm" onClick={async () => {
+                        if (!changeUsernameNew || !changeUsernameCurrent) return;
+                        try {
+                          const out = await api.updateUser(currentUser.id, { username: changeUsernameNew.trim(), currentPassword: changeUsernameCurrent });
+                          if (out.token) {
+                            localStorage.setItem('gantt_token', out.token);
+                            setCurrentUser({ ...currentUser, username: out.username });
+                            if (isMobileNative()) {
+                              const creds = await getCredentials();
+                              if (creds) await saveCredentials(out.username, changeUsernameCurrent);
+                            }
+                          }
+                          setChangeUsernameNew('');
+                          setChangeUsernameCurrent('');
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : 'Failed to change username';
+                          adminAlerts.addAlert('User management', 'Error', msg);
+                          modal.showAlert({ title: 'Error', message: msg });
+                        }
+                      }}>Change username</button>
+                    </div>
+                  </div>
+                )}
                 <div className="settings-section">
                   <h5>Change password</h5>
                   <p className="settings-desc">Set a new password for your account.</p>
@@ -848,7 +881,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 </div>
                 <div className="settings-section">
                   <h5>API key</h5>
-                  <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API.</p>
+                  <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API. <a href="https://github.com/StroepWafel/GanttChartApp/blob/main/docs/API.md" target="_blank" rel="noopener noreferrer">API docs</a></p>
                   {currentUser.apiKey ? (
                     <div className="api-key-row">
                       <code className="api-key-value">{currentUser.apiKey}</code>
@@ -1104,20 +1137,20 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                         <span className="settings-desc" style={{ margin: '0 0 0 6px' }}>({s.member_count} members)</span>
                       )}
                     </div>
-                    {s.role === 'admin' && (
-                      <div ref={spacesMenuOpen === s.id ? spacesMenuRef : undefined} className="spaces-settings-menu-wrap">
-                        <button
-                          type="button"
-                          className="btn-sm spaces-settings-menu-btn"
-                          onClick={() => setSpacesMenuOpen(spacesMenuOpen === s.id ? null : s.id)}
-                          title="Space options"
-                          aria-label="Space options"
-                          aria-expanded={spacesMenuOpen === s.id}
-                        >
-                          <MoreVertical size={16} />
-                        </button>
-                        {spacesMenuOpen === s.id && (
-                          <div className="spaces-settings-menu">
+                    <div ref={spacesMenuOpen === s.id ? spacesMenuRef : undefined} className="spaces-settings-menu-wrap">
+                      <button
+                        type="button"
+                        className="btn-sm spaces-settings-menu-btn"
+                        onClick={() => setSpacesMenuOpen(spacesMenuOpen === s.id ? null : s.id)}
+                        title="Space options"
+                        aria-label="Space options"
+                        aria-expanded={spacesMenuOpen === s.id}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      {spacesMenuOpen === s.id && (
+                        <div className="spaces-settings-menu">
+                          {s.role === 'admin' ? (
                             <button
                               type="button"
                               className="spaces-settings-menu-item"
@@ -1129,10 +1162,22 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                               <Settings size={14} />
                               Manage space (members & share)
                             </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          ) : (
+                            <button
+                              type="button"
+                              className="spaces-settings-menu-item"
+                              onClick={() => {
+                                setSpaceMembersTarget({ id: s.id, name: s.name, role: s.role });
+                                setSpacesMenuOpen(null);
+                              }}
+                            >
+                              <LogOut size={14} />
+                              Leave space
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

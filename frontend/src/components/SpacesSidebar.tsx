@@ -1,4 +1,4 @@
-import { Users, Plus, Settings } from 'lucide-react';
+import { Users, Plus, Settings, LogOut } from 'lucide-react';
 import type { Space } from '../types';
 import './SpacesSidebar.css';
 
@@ -53,7 +53,11 @@ export default function SpacesSidebar({
                 title={s.role === 'admin' ? 'Manage space (members & share)' : 'View members & leave space'}
                 aria-label="Manage space"
               >
-                <Settings size={14} />
+                {s.role === 'admin' ? (
+                  <Settings size={14} />
+                ) : (
+                  <LogOut size={14} />
+                )}
               </button>
             )}
           </li>
