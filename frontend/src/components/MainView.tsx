@@ -881,7 +881,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
                 </div>
                 <div className="settings-section">
                   <h5>API key</h5>
-                  <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API. <a href="https://github.com/StroepWafel/GanttChartApp/blob/main/docs/API.md" target="_blank" rel="noopener noreferrer">API docs</a></p>
+                  <p className="settings-desc">Use with X-API-Username and X-API-Key for read-only IoT API. <button type="button" className="btn-sm" title="Open API docs in new tab" onClick={() => window.open('https://github.com/StroepWafel/GanttChartApp/blob/main/docs/API.md', '_blank', 'noopener,noreferrer')}>API docs</button></p>
                   {currentUser.apiKey ? (
                     <div className="api-key-row">
                       <code className="api-key-value">{currentUser.apiKey}</code>
