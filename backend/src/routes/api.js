@@ -235,7 +235,7 @@ router.get('/projects', (req, res) => {
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
       WHERE p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}${uncompletedFilterSql}
       ORDER BY c.display_order, p.name
-    `).all(userId, userId, userId, ...spaceParams, ...uncompletedParams);
+    `).all(userId, userId, userId, userId, ...spaceParams, ...uncompletedParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -351,7 +351,7 @@ router.get('/batch', (req, res) => {
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
           WHERE p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}${uncompletedFilterSql}
           ORDER BY c.display_order, p.name
-        `).all(userId, userId, userId, ...spaceParams, ...uncompletedParams);
+        `).all(userId, userId, userId, userId, ...spaceParams, ...uncompletedParams);
         out.projects = { data: rows };
       } else if (ep === 'categories') {
         const rows = db.prepare(`
