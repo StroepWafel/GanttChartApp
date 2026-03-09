@@ -331,7 +331,7 @@
 
 .gantt-list-header .gantt-hdr-task { text-align: left; }
 .gantt-list-header .gantt-hdr-from,
-.gantt-list-header .gantt-hdr-to { text-align: right; }
+.gantt-list-header .gantt-hdr-to { text-align: center; }
 
 .gantt-list-header.gantt-list-header-sortable {
   grid-template-columns: 36px minmax(180px, 1fr) 70px 70px 24px;
@@ -395,7 +395,7 @@
 
 .gantt-list-row .gantt-list-name { text-align: left; flex: 1; min-width: 0; }
 .gantt-list-row .gantt-list-date {
-  text-align: right;
+  text-align: center;
   font-size: 10px;
   color: var(--text-muted);
   white-space: nowrap;

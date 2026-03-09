@@ -22,7 +22,7 @@ import './GanttChart.css';
 type ViewMode = 'Day' | 'Week' | 'Month';
 
 const LIST_WIDTH_KEY = 'gantt-list-width';
-const LIST_WIDTH_MIN = 280;
+const LIST_WIDTH_MIN = 415;
 const LIST_WIDTH_MAX = 800;
 
 import { DEFAULT_PRIORITY_COLORS } from '../priorityColors';
