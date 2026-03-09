@@ -58,6 +58,8 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [includeCompleted, setIncludeCompleted] = useState(false);
+  const [includeCompletedInSidebar, setIncludeCompletedInSidebar] = useState(false);
+  const [sidebarCategoryExpanded, setSidebarCategoryExpanded] = useState<Record<number, boolean>>({});
   const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(null);
   const [spaces, setSpaces] = useState<{ id: number; name: string; member_count?: number; role?: string }[]>([]);
   const [spaceMembersTarget, setSpaceMembersTarget] = useState<{ id: number; name: string; role?: string } | null>(null);
@@ -69,28 +71,49 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     f.filterScope = selectedSpaceId != null ? (`space:${selectedSpaceId}` as api.ShareFilterScope) : 'personal';
     return f;
   }, [selectedSpaceId]);
-  const { categories, projects, tasks, load, setCategories, setProjects } = useMainData(includeCompleted, mainDataFilters);
+  /** Fetch all tasks when sidebar filter is on, so we can detect "has tasks and all completed" */
+  const effectiveIncludeCompleted = includeCompleted || !includeCompletedInSidebar;
+  const { categories, projects, tasks, load, setCategories, setProjects } = useMainData(effectiveIncludeCompleted, mainDataFilters);
 
-  /** When includeCompleted is false, filter to match Gantt chart: only categories/projects with uncompleted tasks */
+  /** Tasks for Gantt chart: filter to uncompleted when chart's includeCompleted is false */
+  const tasksForGantt = useMemo(
+    () => (includeCompleted ? tasks : tasks.filter((t) => !t.completed)),
+    [includeCompleted, tasks]
+  );
+
+  /** Sidebar filter: only hide when (has tasks) AND (all tasks completed). Separate checkbox from chart. */
   const { sidebarCategories, sidebarProjects, sidebarProjectsByCategory } = useMemo(() => {
-    if (includeCompleted) {
+    if (includeCompletedInSidebar) {
       return {
         sidebarCategories: categories,
         sidebarProjects: projects,
         sidebarProjectsByCategory: (c: Category) => projects.filter((p) => p.category_id === c.id),
       };
     }
-    const projectsWithUncompleted = projects.filter((p) => tasks.some((t) => t.project_id === p.id));
-    const catsWithUncompleted = categories.filter((c) =>
-      projectsWithUncompleted.some((p) => p.category_id === c.id)
+    const projectTasks = new Map<number, Task[]>();
+    for (const t of tasks) {
+      if (!projectTasks.has(t.project_id)) projectTasks.set(t.project_id, []);
+      projectTasks.get(t.project_id)!.push(t);
+    }
+    const projectsToHide = projects.filter((p) => {
+      const projTasks = projectTasks.get(p.id) ?? [];
+      return projTasks.length > 0 && projTasks.every((t) => t.completed);
+    });
+    const projectsToShow = projects.filter((p) => !projectsToHide.includes(p));
+    const catsToShow = categories.filter((c) =>
+      projectsToShow.some((p) => p.category_id === c.id)
     );
     return {
-      sidebarCategories: catsWithUncompleted,
-      sidebarProjects: projectsWithUncompleted,
+      sidebarCategories: catsToShow,
+      sidebarProjects: projectsToShow,
       sidebarProjectsByCategory: (c: Category) =>
-        projectsWithUncompleted.filter((p) => p.category_id === c.id),
+        projectsToShow.filter((p) => p.category_id === c.id),
     };
-  }, [includeCompleted, categories, projects, tasks]);
+  }, [includeCompletedInSidebar, categories, projects, tasks]);
+
+  const isSidebarCategoryExpanded = (catId: number) => sidebarCategoryExpanded[catId] !== false;
+  const toggleSidebarCategory = (catId: number) =>
+    setSidebarCategoryExpanded((prev) => ({ ...prev, [catId]: prev[catId] === false }));
 
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [showClearEveryoneConfirm, setShowClearEveryoneConfirm] = useState(false);
@@ -250,14 +273,14 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   });
 
   const filteredTasks = useMemo(() => {
-    if (!searchQuery) return tasks;
-    return tasks.filter(
+    if (!searchQuery) return tasksForGantt;
+    return tasksForGantt.filter(
       (t) =>
         t.name.toLowerCase().includes(searchQuery) ||
         (t.project_name?.toLowerCase().includes(searchQuery)) ||
         (t.category_name?.toLowerCase().includes(searchQuery))
     );
-  }, [tasks, searchQuery]);
+  }, [tasksForGantt, searchQuery]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
@@ -2084,6 +2107,8 @@ onTaskDelete={handleDeleteTask}
                 categories={sidebarCategories}
                 projects={sidebarProjects}
                 allCategories={categories}
+                includeCompletedInSidebar={includeCompletedInSidebar}
+                onIncludeCompletedInSidebarChange={setIncludeCompletedInSidebar}
                 editCategory={editCategory}
                 editProject={editProject}
                 onAddCategory={handleCreateCategory}
@@ -2177,10 +2202,31 @@ onTaskDelete={handleDeleteTask}
                         )}
                         <section className={`sidebar-section ${!isMobile ? 'sidebar-section-flex' : ''}`}>
                           <h3>Categories</h3>
+                          <label className="sidebar-filter-row" style={{ fontSize: 11, marginBottom: 6 }}>
+                            <input
+                              type="checkbox"
+                              checked={includeCompletedInSidebar}
+                              onChange={(e) => setIncludeCompletedInSidebar(e.target.checked)}
+                            />
+                            Show completed
+                          </label>
                           {sidebarCategories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
-                          {sidebarCategories.map((c) => (
+                          {sidebarCategories.map((c) => {
+                            const projs = sidebarProjectsByCategory(c);
+                            const expanded = isSidebarCategoryExpanded(c.id);
+                            return (
                             <div key={c.id} className="cat-block">
                               <div className="cat-item">
+                                <button
+                                  type="button"
+                                  className="sidebar-expand-btn"
+                                  onClick={() => toggleSidebarCategory(c.id)}
+                                  title={expanded ? 'Collapse' : 'Expand'}
+                                  aria-label={expanded ? 'Collapse' : 'Expand'}
+                                  aria-expanded={expanded}
+                                >
+                                  {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                </button>
                                 <span className="cat-name">{c.name}</span>
                                 <button
                                   type="button"
@@ -2201,7 +2247,7 @@ onTaskDelete={handleDeleteTask}
                                   <Trash2 size={12} />
                                 </button>
                               </div>
-                              {sidebarProjectsByCategory(c).map((p) => (
+                              {expanded && projs.map((p) => (
                                 <div key={p.id} className="proj-item">
                                   <span>{p.name}</span>
                                   <button
@@ -2228,7 +2274,7 @@ onTaskDelete={handleDeleteTask}
                                 </div>
                               ))}
                             </div>
-                          ))}
+                          );})}
                           <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
                             + Category / Project
                           </button>
@@ -2237,10 +2283,31 @@ onTaskDelete={handleDeleteTask}
                     ) : (
                       <section className="sidebar-section">
                         <h3>Categories</h3>
+                        <label className="sidebar-filter-row" style={{ fontSize: 11, marginBottom: 6 }}>
+                          <input
+                            type="checkbox"
+                            checked={includeCompletedInSidebar}
+                            onChange={(e) => setIncludeCompletedInSidebar(e.target.checked)}
+                          />
+                          Show completed
+                        </label>
                         {sidebarCategories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
-                        {sidebarCategories.map((c) => (
+                        {sidebarCategories.map((c) => {
+                          const projs = sidebarProjectsByCategory(c);
+                          const expanded = isSidebarCategoryExpanded(c.id);
+                          return (
                           <div key={c.id} className="cat-block">
                             <div className="cat-item">
+                              <button
+                                type="button"
+                                className="sidebar-expand-btn"
+                                onClick={() => toggleSidebarCategory(c.id)}
+                                title={expanded ? 'Collapse' : 'Expand'}
+                                aria-label={expanded ? 'Collapse' : 'Expand'}
+                                aria-expanded={expanded}
+                              >
+                                {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                              </button>
                               <span className="cat-name">{c.name}</span>
                               <button
                                 type="button"
@@ -2261,7 +2328,7 @@ onTaskDelete={handleDeleteTask}
                                 <Trash2 size={12} />
                               </button>
                             </div>
-                            {sidebarProjectsByCategory(c).map((p) => (
+                            {expanded && projs.map((p) => (
                               <div key={p.id} className="proj-item">
                                 <span>{p.name}</span>
                                 <button
@@ -2288,7 +2355,7 @@ onTaskDelete={handleDeleteTask}
                               </div>
                             ))}
                           </div>
-                        ))}
+                        );})}
                         <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
                           + Category / Project
                         </button>

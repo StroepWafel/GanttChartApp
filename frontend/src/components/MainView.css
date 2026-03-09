@@ -428,8 +428,34 @@
 .sidebar-section h3 {
   margin: 0 0 8px;
   font-size: 11px;
-  text-transform: uppercase;
+}
+
+.sidebar-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sidebar-expand-btn {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.sidebar-expand-btn:hover {
+  color: var(--text);
+  background: var(--bg-elevated);
 }
 
 .cat-block {

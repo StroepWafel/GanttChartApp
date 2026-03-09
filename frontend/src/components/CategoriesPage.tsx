@@ -1,4 +1,5 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import type { Category, Project } from '../types';
 import CategoryProjectForm from './CategoryProjectForm';
 import './CategoriesPage.css';
@@ -8,6 +9,9 @@ interface Props {
   projects: Project[];
   /** Full categories for form dropdowns (e.g. when adding project); defaults to categories */
   allCategories?: Category[];
+  /** When false, hide categories/projects that have tasks and all are completed */
+  includeCompletedInSidebar?: boolean;
+  onIncludeCompletedInSidebarChange?: (v: boolean) => void;
   editCategory: Category | null;
   editProject: Project | null;
   onAddCategory: (name: string, apiVisible?: boolean) => void;
@@ -26,6 +30,8 @@ export default function CategoriesPage({
   categories,
   projects,
   allCategories,
+  includeCompletedInSidebar,
+  onIncludeCompletedInSidebarChange,
   editCategory,
   editProject,
   onAddCategory,
@@ -41,16 +47,43 @@ export default function CategoriesPage({
 }: Props) {
   const showForm = editCategory || editProject || showAddForm;
   const formCategories = allCategories ?? categories;
+  const [expandedCategories, setExpandedCategories] = useState<Record<number, boolean>>({});
+  const isExpanded = (catId: number) => expandedCategories[catId] !== false;
+  const toggleCategory = (catId: number) =>
+    setExpandedCategories((prev) => ({ ...prev, [catId]: prev[catId] === false }));
 
   return (
     <div className="mobile-page categories-page">
       <div className="categories-page-content">
+        {onIncludeCompletedInSidebarChange != null && (
+          <label className="sidebar-filter-row" style={{ fontSize: 11, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={includeCompletedInSidebar ?? true}
+              onChange={(e) => onIncludeCompletedInSidebarChange(e.target.checked)}
+            />
+            Show completed
+          </label>
+        )}
         {categories.length === 0 ? (
           <p className="muted">No categories yet. Click the button below to add a new category.</p>
         ) : (
-          categories.map((c) => (
+          categories.map((c) => {
+            const expanded = isExpanded(c.id);
+            const projs = projects.filter((p) => p.category_id === c.id);
+            return (
             <div key={c.id} className="cat-block-page">
               <div className="cat-item-page">
+                <button
+                  type="button"
+                  className="categories-expand-btn"
+                  onClick={() => toggleCategory(c.id)}
+                  title={expanded ? 'Collapse' : 'Expand'}
+                  aria-label={expanded ? 'Collapse' : 'Expand'}
+                  aria-expanded={expanded}
+                >
+                  {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
                 <span className="cat-name">{c.name}</span>
                 <div className="cat-item-actions">
                   <button
@@ -73,7 +106,7 @@ export default function CategoriesPage({
                   </button>
                 </div>
               </div>
-              {projects.filter((p) => p.category_id === c.id).map((p) => (
+              {expanded && projs.map((p) => (
                 <div key={p.id} className="proj-item-page">
                   <span>{p.name}</span>
                   <div className="proj-item-actions">
@@ -99,7 +132,7 @@ export default function CategoriesPage({
                 </div>
               ))}
             </div>
-          ))
+          );})
         )}
         <button
           type="button"

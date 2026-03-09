@@ -82,7 +82,7 @@ router.post('/', (req, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
-    const { name, category_id, due_date, start_date } = req.body;
+    const { name, category_id, due_date, start_date, api_visible } = req.body;
     if (!category_id) return res.status(400).json({ error: 'category_id required' });
     if (name !== undefined && name !== null) {
       const nameVal = validateName(name);
