@@ -44,6 +44,11 @@ const API_VISIBLE_TASK_SQL = ' AND (t.api_visible IS NULL OR t.api_visible = 1)'
 /** Combined for task queries (t, p, c). */
 const API_VISIBLE_SQL = API_VISIBLE_PROJECT_SQL + API_VISIBLE_CAT_SQL + API_VISIBLE_TASK_SQL;
 
+/** Parse include_completed from query. When false, exclude completed tasks and hide projects/categories with no uncompleted tasks. */
+function getIncludeCompleted(req) {
+  return req.query.include_completed === 'true';
+}
+
 function servertime() {
   return new Date().toISOString();
 }
@@ -80,13 +85,15 @@ function taskFromRow(row) {
 router.get('/tasks', (req, res) => {
   try {
     const userId = req.user.userId;
+    const includeCompleted = getIncludeCompleted(req);
     const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
+    const completedSql = includeCompleted ? '' : ' AND t.completed = 0';
     const rows = db.prepare(`
       SELECT t.*, p.name as project_name, c.name as category_name
       FROM tasks t
       JOIN projects p ON t.project_id = p.id AND p.user_id = ?
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE t.user_id = ?${spaceSql}${API_VISIBLE_SQL}
+      WHERE t.user_id = ?${spaceSql}${API_VISIBLE_SQL}${completedSql}
       ORDER BY t.start_date
     `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows.map(taskFromRow) });
@@ -153,14 +160,17 @@ router.get('/efficiency', (req, res) => {
 router.get('/by-category', (req, res) => {
   try {
     const userId = req.user.userId;
+    const includeCompleted = getIncludeCompleted(req);
     const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
+    const taskFilter = includeCompleted ? '' : ' AND t.completed = 0';
+    const havingClause = includeCompleted ? '' : ' HAVING COUNT(t.id) > 0';
     const rows = db.prepare(`
       SELECT c.id, c.name, COUNT(t.id) as task_count
       FROM categories c
-      LEFT JOIN projects p ON p.category_id = c.id AND p.user_id = ?
-      LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = ?
-      WHERE c.user_id = ?${spaceSql}
-      GROUP BY c.id
+      LEFT JOIN projects p ON p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1)
+      LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = ? AND (t.api_visible IS NULL OR t.api_visible = 1)${taskFilter}
+      WHERE c.user_id = ?${spaceSql}${API_VISIBLE_CAT_SQL}
+      GROUP BY c.id${havingClause}
       ORDER BY c.display_order, c.name
     `).all(userId, userId, userId, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
@@ -211,16 +221,21 @@ router.get('/upcoming', (req, res) => {
 router.get('/projects', (req, res) => {
   try {
     const userId = req.user.userId;
+    const includeCompleted = getIncludeCompleted(req);
     const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
+    const uncompletedFilterSql = includeCompleted
+      ? ''
+      : ` AND EXISTS (SELECT 1 FROM tasks t2 WHERE t2.project_id = p.id AND t2.user_id = ? AND t2.completed = 0 AND (t2.api_visible IS NULL OR t2.api_visible = 1))`;
+    const uncompletedParams = includeCompleted ? [] : [userId];
     const rows = db.prepare(`
       SELECT p.*, c.name as category_name,
         (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ?) as task_count,
         (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ? AND completed = 1) as completed_count
       FROM projects p
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}
+      WHERE p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}${uncompletedFilterSql}
       ORDER BY c.display_order, p.name
-    `).all(userId, userId, userId, ...spaceParams);
+    `).all(userId, userId, userId, ...spaceParams, ...uncompletedParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -230,13 +245,19 @@ router.get('/projects', (req, res) => {
 router.get('/categories', (req, res) => {
   try {
     const userId = req.user.userId;
+    const includeCompleted = getIncludeCompleted(req);
     const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId, 'c.space_id');
+    const taskCountFilter = includeCompleted ? '' : ' AND t.completed = 0';
+    const uncompletedFilterSql = includeCompleted
+      ? ''
+      : ` AND EXISTS (SELECT 1 FROM projects p2 JOIN tasks t2 ON t2.project_id = p2.id AND t2.user_id = ? WHERE p2.category_id = c.id AND p2.user_id = ? AND t2.completed = 0 AND (p2.api_visible IS NULL OR p2.api_visible = 1) AND (t2.api_visible IS NULL OR t2.api_visible = 1))`;
+    const uncompletedParams = includeCompleted ? [] : [userId, userId];
     const rows = db.prepare(`
-      SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1) AND (t.api_visible IS NULL OR t.api_visible = 1)) as task_count
+      SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1) AND (t.api_visible IS NULL OR t.api_visible = 1)${taskCountFilter}) as task_count
       FROM categories c
-      WHERE c.user_id = ?${spaceSql}${API_VISIBLE_CAT_SQL}
+      WHERE c.user_id = ?${spaceSql}${API_VISIBLE_CAT_SQL}${uncompletedFilterSql}
       ORDER BY c.display_order, c.name
-    `).all(userId, userId, userId, ...spaceParams);
+    `).all(userId, userId, userId, ...spaceParams, ...uncompletedParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -251,12 +272,25 @@ router.get('/batch', (req, res) => {
     const list = typeof raw === 'string' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [];
     const endpoints = [...new Set(list)].filter((e) => BATCH_ALLOWED.has(e));
     const userId = req.user.userId;
+    const includeCompleted = getIncludeCompleted(req);
     const st = servertime();
     const stLocal = servertimeLocal();
     const out = { servertime: st, servertime_local: stLocal };
 
     const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
     const spaceSqlCat = getSpaceFilterClause(userId, 'c.space_id');
+    const completedSql = includeCompleted ? '' : ' AND t.completed = 0';
+    const uncompletedFilterSql = includeCompleted
+      ? ''
+      : ` AND EXISTS (SELECT 1 FROM tasks t2 WHERE t2.project_id = p.id AND t2.user_id = ? AND t2.completed = 0 AND (t2.api_visible IS NULL OR t2.api_visible = 1))`;
+    const uncompletedFilterSqlCat = includeCompleted
+      ? ''
+      : ` AND EXISTS (SELECT 1 FROM projects p2 JOIN tasks t2 ON t2.project_id = p2.id AND t2.user_id = ? WHERE p2.category_id = c.id AND p2.user_id = ? AND t2.completed = 0 AND (p2.api_visible IS NULL OR p2.api_visible = 1) AND (t2.api_visible IS NULL OR t2.api_visible = 1))`;
+    const taskCountFilter = includeCompleted ? '' : ' AND t.completed = 0';
+    const uncompletedParams = includeCompleted ? [] : [userId];
+    const uncompletedParamsCat = includeCompleted ? [] : [userId, userId];
+    const byCategoryTaskFilter = includeCompleted ? '' : ' AND t.completed = 0';
+    const byCategoryHaving = includeCompleted ? '' : ' HAVING COUNT(t.id) > 0';
 
     for (const ep of endpoints) {
       if (ep === 'tasks') {
@@ -265,7 +299,7 @@ router.get('/batch', (req, res) => {
           FROM tasks t
           JOIN projects p ON t.project_id = p.id AND p.user_id = ?
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-          WHERE t.user_id = ?${spaceSql}${API_VISIBLE_SQL}
+          WHERE t.user_id = ?${spaceSql}${API_VISIBLE_SQL}${completedSql}
           ORDER BY t.start_date
         `).all(userId, userId, userId, ...spaceParams);
         out.tasks = { data: rows.map(taskFromRow) };
@@ -301,10 +335,10 @@ router.get('/batch', (req, res) => {
         const rows = db.prepare(`
           SELECT c.id, c.name, COUNT(t.id) as task_count
           FROM categories c
-          LEFT JOIN projects p ON p.category_id = c.id AND p.user_id = ?
-          LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = ?
-          WHERE c.user_id = ?${spaceSql}${API_VISIBLE_CAT_SQL} AND (p.api_visible IS NULL OR p.api_visible = 1) AND (t.api_visible IS NULL OR t.api_visible = 1)
-          GROUP BY c.id
+          LEFT JOIN projects p ON p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1)
+          LEFT JOIN tasks t ON t.project_id = p.id AND t.user_id = ? AND (t.api_visible IS NULL OR t.api_visible = 1)${byCategoryTaskFilter}
+          WHERE c.user_id = ?${spaceSql}${API_VISIBLE_CAT_SQL}
+          GROUP BY c.id${byCategoryHaving}
           ORDER BY c.display_order, c.name
         `).all(userId, userId, userId, ...spaceParams);
         out['by-category'] = { data: rows };
@@ -315,17 +349,17 @@ router.get('/batch', (req, res) => {
             (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ? AND completed = 1) as completed_count
           FROM projects p
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-          WHERE p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}
+          WHERE p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}${uncompletedFilterSql}
           ORDER BY c.display_order, p.name
-        `).all(userId, userId, userId, ...spaceParams);
+        `).all(userId, userId, userId, ...spaceParams, ...uncompletedParams);
         out.projects = { data: rows };
       } else if (ep === 'categories') {
         const rows = db.prepare(`
-          SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1) AND (t.api_visible IS NULL OR t.api_visible = 1)) as task_count
+          SELECT c.*, (SELECT COUNT(*) FROM projects p JOIN tasks t ON t.project_id = p.id AND t.user_id = ? WHERE p.category_id = c.id AND p.user_id = ? AND (p.api_visible IS NULL OR p.api_visible = 1) AND (t.api_visible IS NULL OR t.api_visible = 1)${taskCountFilter}) as task_count
           FROM categories c
-          WHERE c.user_id = ?${spaceSqlCat.sql}${API_VISIBLE_CAT_SQL}
+          WHERE c.user_id = ?${spaceSqlCat.sql}${API_VISIBLE_CAT_SQL}${uncompletedFilterSqlCat}
           ORDER BY c.display_order, c.name
-        `).all(userId, userId, userId, ...spaceSqlCat.params);
+        `).all(userId, userId, userId, ...spaceSqlCat.params, ...uncompletedParamsCat);
         out.categories = { data: rows };
       } else if (ep === 'efficiency') {
         const baseFrom = `FROM tasks t JOIN projects p ON t.project_id = p.id AND p.user_id = ? JOIN categories c ON p.category_id = c.id AND c.user_id = ? WHERE t.user_id = ?${spaceSql}${API_VISIBLE_SQL}`;

@@ -41,6 +41,8 @@ curl "https://your-domain.com/api/readonly/stats?username=admin&api_key=your_api
 
 **Data scope:** All endpoints return only data belonging to the authenticated user. Each user’s categories, projects, and tasks are isolated. You can restrict API data to specific spaces in **Settings → API** (API data scope). By default, all spaces the user has access to are included. Projects can be marked as hidden from the API in the project config (Visible to API). Hidden projects and their tasks are excluded from all API responses.
 
+**`include_completed`:** Many endpoints accept an optional query parameter `include_completed`. When omitted or set to `false`, the API excludes completed tasks and hides projects/categories that have no uncompleted tasks (matching the app when "Show completed" is unchecked). Set `include_completed=true` to include all tasks, projects, and categories.
+
 **401 responses** when credentials are invalid or missing:
 ```json
 {
@@ -63,7 +65,13 @@ All responses include `servertime` (ISO 8601 UTC) and `servertime_local` (ISO 86
 
 ### GET /tasks
 
-Returns all tasks (completed and incomplete).
+Returns tasks. By default excludes completed tasks; use `include_completed=true` to include them.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `include_completed` | boolean | false | When `true`, includes completed tasks. When `false` or omitted, returns only uncompleted tasks. |
 
 **Response:** Object with `servertime`, `servertime_local`, and `data` (array of task objects)
 
@@ -262,7 +270,9 @@ Returns efficiency metrics in more detail.
 
 ### GET /by-category
 
-Returns task counts grouped by category.
+Returns task counts grouped by category. When `include_completed` is false, only includes categories with uncompleted tasks and counts only uncompleted tasks.
+
+**Query parameters:** `include_completed` (see Data scope above)
 
 **Response:**
 
@@ -368,7 +378,9 @@ GET /api/readonly/upcoming?days=3
 
 ### GET /projects
 
-Returns all projects with task counts.
+Returns projects with task counts. When `include_completed` is false, only returns projects that have at least one uncompleted task.
+
+**Query parameters:** `include_completed` (see Data scope above)
 
 **Response:**
 
@@ -405,7 +417,9 @@ Returns all projects with task counts.
 
 ### GET /categories
 
-Returns all categories with task counts.
+Returns categories with task counts. When `include_completed` is false, only returns categories that have at least one project with an uncompleted task.
+
+**Query parameters:** `include_completed` (see Data scope above)
 
 **Response:**
 
