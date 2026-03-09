@@ -70,6 +70,28 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     return f;
   }, [selectedSpaceId]);
   const { categories, projects, tasks, load, setCategories, setProjects } = useMainData(includeCompleted, mainDataFilters);
+
+  /** When includeCompleted is false, filter to match Gantt chart: only categories/projects with uncompleted tasks */
+  const { sidebarCategories, sidebarProjects, sidebarProjectsByCategory } = useMemo(() => {
+    if (includeCompleted) {
+      return {
+        sidebarCategories: categories,
+        sidebarProjects: projects,
+        sidebarProjectsByCategory: (c: Category) => projects.filter((p) => p.category_id === c.id),
+      };
+    }
+    const projectsWithUncompleted = projects.filter((p) => tasks.some((t) => t.project_id === p.id));
+    const catsWithUncompleted = categories.filter((c) =>
+      projectsWithUncompleted.some((p) => p.category_id === c.id)
+    );
+    return {
+      sidebarCategories: catsWithUncompleted,
+      sidebarProjects: projectsWithUncompleted,
+      sidebarProjectsByCategory: (c: Category) =>
+        projectsWithUncompleted.filter((p) => p.category_id === c.id),
+    };
+  }, [includeCompleted, categories, projects, tasks]);
+
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [showClearEveryoneConfirm, setShowClearEveryoneConfirm] = useState(false);
   const [clearEveryoneError, setClearEveryoneError] = useState<string | null>(null);
@@ -2059,8 +2081,9 @@ onTaskDelete={handleDeleteTask}
             )}
             {mobilePage === 'categories' && (
               <CategoriesPage
-                categories={categories}
-                projects={projects}
+                categories={sidebarCategories}
+                projects={sidebarProjects}
+                allCategories={categories}
                 editCategory={editCategory}
                 editProject={editProject}
                 onAddCategory={handleCreateCategory}
@@ -2154,8 +2177,8 @@ onTaskDelete={handleDeleteTask}
                         )}
                         <section className={`sidebar-section ${!isMobile ? 'sidebar-section-flex' : ''}`}>
                           <h3>Categories</h3>
-                          {categories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
-                          {categories.map((c) => (
+                          {sidebarCategories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
+                          {sidebarCategories.map((c) => (
                             <div key={c.id} className="cat-block">
                               <div className="cat-item">
                                 <span className="cat-name">{c.name}</span>
@@ -2178,7 +2201,7 @@ onTaskDelete={handleDeleteTask}
                                   <Trash2 size={12} />
                                 </button>
                               </div>
-                              {projects.filter((p) => p.category_id === c.id).map((p) => (
+                              {sidebarProjectsByCategory(c).map((p) => (
                                 <div key={p.id} className="proj-item">
                                   <span>{p.name}</span>
                                   <button
@@ -2214,8 +2237,8 @@ onTaskDelete={handleDeleteTask}
                     ) : (
                       <section className="sidebar-section">
                         <h3>Categories</h3>
-                        {categories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
-                        {categories.map((c) => (
+                        {sidebarCategories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
+                        {sidebarCategories.map((c) => (
                           <div key={c.id} className="cat-block">
                             <div className="cat-item">
                               <span className="cat-name">{c.name}</span>
@@ -2238,7 +2261,7 @@ onTaskDelete={handleDeleteTask}
                                 <Trash2 size={12} />
                               </button>
                             </div>
-                            {projects.filter((p) => p.category_id === c.id).map((p) => (
+                            {sidebarProjectsByCategory(c).map((p) => (
                               <div key={p.id} className="proj-item">
                                 <span>{p.name}</span>
                                 <button

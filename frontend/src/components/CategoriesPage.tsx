@@ -6,6 +6,8 @@ import './CategoriesPage.css';
 interface Props {
   categories: Category[];
   projects: Project[];
+  /** Full categories for form dropdowns (e.g. when adding project); defaults to categories */
+  allCategories?: Category[];
   editCategory: Category | null;
   editProject: Project | null;
   onAddCategory: (name: string, apiVisible?: boolean) => void;
@@ -23,6 +25,7 @@ interface Props {
 export default function CategoriesPage({
   categories,
   projects,
+  allCategories,
   editCategory,
   editProject,
   onAddCategory,
@@ -37,6 +40,7 @@ export default function CategoriesPage({
   onShowAddForm,
 }: Props) {
   const showForm = editCategory || editProject || showAddForm;
+  const formCategories = allCategories ?? categories;
 
   return (
     <div className="mobile-page categories-page">
@@ -107,7 +111,7 @@ export default function CategoriesPage({
       </div>
       {showForm && (
         <CategoryProjectForm
-          categories={categories}
+          categories={formCategories}
           editingCategory={editCategory ?? undefined}
           editingProject={editProject ?? undefined}
           onAddCategory={onAddCategory}

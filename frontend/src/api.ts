@@ -555,7 +555,9 @@ export async function createCategory(name: string, spaceId?: number, apiVisible?
     method: 'POST',
     body: JSON.stringify({ name, space_id: spaceId, api_visible: apiVisible }),
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error((data as { error?: string }).error || 'Failed to create category');
+  return data;
 }
 
 export async function updateCategory(id: number, data: { name?: string; display_order?: number; api_visible?: boolean }) {
@@ -589,7 +591,9 @@ export async function createProject(name: string, categoryId: number, dueDate?: 
     method: 'POST',
     body: JSON.stringify({ name, category_id: categoryId, due_date: dueDate || null, start_date: startDate || null, api_visible: apiVisible }),
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error((data as { error?: string }).error || 'Failed to create project');
+  return data;
 }
 
 export async function updateProject(id: number, data: { name?: string; category_id?: number; due_date?: string | null; start_date?: string | null; api_visible?: boolean }) {

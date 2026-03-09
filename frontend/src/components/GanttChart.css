@@ -485,6 +485,11 @@
   opacity: 0.7;
 }
 
+.gantt-drag-handle-spacer {
+  display: block;
+  min-width: 0;
+}
+
 .gantt-drag-handle {
   cursor: grab;
   display: flex;

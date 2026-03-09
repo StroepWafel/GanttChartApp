@@ -22,7 +22,7 @@ import './GanttChart.css';
 type ViewMode = 'Day' | 'Week' | 'Month';
 
 const LIST_WIDTH_KEY = 'gantt-list-width';
-const LIST_WIDTH_MIN = 200;
+const LIST_WIDTH_MIN = 280;
 const LIST_WIDTH_MAX = 800;
 
 import { DEFAULT_PRIORITY_COLORS } from '../priorityColors';
@@ -906,7 +906,7 @@ export default function GanttChart({
               const hasChildren = projects.some((p) => p.category_id === row.category.id);
               const catSpan = categorySpans.get(row.category.id);
               return (
-                <div key={row.id} className="gantt-list-row gantt-row-category">
+                <div key={row.id} className={`gantt-list-row gantt-row-category ${onTaskReorder ? 'gantt-row-sortable' : ''}`}>
                   <div className="gantt-row-expand" style={{ paddingLeft: 0 }}>
                     {hasChildren ? (
                       <button
@@ -935,6 +935,7 @@ export default function GanttChart({
                       </span>
                     </>
                   )}
+                  {onTaskReorder && <span className="gantt-drag-handle-spacer" aria-hidden />}
                 </div>
               );
             }
@@ -943,7 +944,7 @@ export default function GanttChart({
               const hasChildren = tasks.some((t) => t.project_id === row.project.id);
               const span = projectSpans.get(row.project.id);
               return (
-                <div key={row.id} className="gantt-list-row gantt-row-project">
+                <div key={row.id} className={`gantt-list-row gantt-row-project ${onTaskReorder ? 'gantt-row-sortable' : ''}`}>
                   <div className="gantt-row-expand" style={{ paddingLeft: 8 }}>
                     {hasChildren ? (
                       <button
@@ -972,6 +973,7 @@ export default function GanttChart({
                       </span>
                     </>
                   )}
+                  {onTaskReorder && <span className="gantt-drag-handle-spacer" aria-hidden />}
                 </div>
               );
             }
@@ -985,7 +987,7 @@ export default function GanttChart({
                   <div
                     ref={setNodeRef}
                     style={style}
-                    className={`gantt-list-row ${row.task.completed ? 'completed' : ''} ${isDragging ? 'gantt-dragging' : ''} ${isTopLevel && onTaskReorder ? 'gantt-row-sortable' : ''}`}
+                    className={`gantt-list-row ${row.task.completed ? 'completed' : ''} ${isDragging ? 'gantt-dragging' : ''} ${onTaskReorder ? 'gantt-row-sortable' : ''}`}
                   >
                     <div className="gantt-row-expand" style={{ paddingLeft: 8 + row.indent * 14 }}>
                       {hasChildren ? (
@@ -1013,16 +1015,20 @@ export default function GanttChart({
                         </span>
                       </>
                     )}
-                    {isTopLevel && onTaskReorder && (
-                      <div
-                        className="gantt-drag-handle"
-                        {...attributes}
-                        {...(listeners ?? {})}
-                        title="Drag to reorder"
-                        aria-label="Drag to reorder"
-                      >
-                        <GripVertical size={14} />
-                      </div>
+                    {onTaskReorder && (
+                      isTopLevel ? (
+                        <div
+                          className="gantt-drag-handle"
+                          {...attributes}
+                          {...(listeners ?? {})}
+                          title="Drag to reorder"
+                          aria-label="Drag to reorder"
+                        >
+                          <GripVertical size={14} />
+                        </div>
+                      ) : (
+                        <span className="gantt-drag-handle-spacer" aria-hidden />
+                      )
                     )}
                   </div>
                 )}
