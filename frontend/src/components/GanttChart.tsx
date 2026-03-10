@@ -647,7 +647,7 @@ export default function GanttChart({
   const rowHeight = isSmallMobile ? 34 : isMobile ? 34 : 36;
   const isMobileChartSlim = isMobile && effectiveViewMode === 'chart';
   const effectiveListWidth =
-    isMobileChartSlim ? (isSmallMobile ? 140 : 180) : isSmallMobile ? 260 : isMobile ? 300 : listWidth;
+    isMobileChartSlim ? (isSmallMobile ? 240 : 280) : isSmallMobile ? 260 : isMobile ? 300 : listWidth;
 
   if (isMobile && effectiveViewMode === 'list') {
     return (
