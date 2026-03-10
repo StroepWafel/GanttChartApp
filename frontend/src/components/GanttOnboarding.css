@@ -1,0 +1,196 @@
+.gantt-onboarding-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gantt-onboarding-modal {
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  max-width: 420px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.gantt-onboarding-modal h3 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+/* Prompt mode */
+.gantt-onboarding-prompt-message {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+}
+
+.gantt-onboarding-prompt-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Tour mode */
+.gantt-onboarding-tour-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.gantt-onboarding-tour-header h3 {
+  margin: 0;
+}
+
+.gantt-onboarding-step-indicator {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.gantt-onboarding-tour-content {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+}
+
+.gantt-onboarding-tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.gantt-onboarding-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gantt-onboarding-nav:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gantt-onboarding-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.gantt-onboarding-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.gantt-onboarding-dot:hover {
+  background: var(--text-muted);
+}
+
+.gantt-onboarding-dot.active {
+  background: var(--accent);
+  transform: scale(1.2);
+}
+
+/* Guided interactive tour */
+.gantt-onboarding-guided {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.gantt-onboarding-guided > * {
+  pointer-events: auto;
+}
+
+.gantt-onboarding-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.gantt-onboarding-spotlight {
+  position: fixed;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 2px solid var(--accent);
+  background: transparent;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+  animation: gantt-onboarding-spotlight-pulse 2s ease-in-out infinite;
+  transition: box-shadow 0.2s;
+}
+
+.gantt-onboarding-spotlight:hover {
+  border-color: var(--accent-hover, var(--accent));
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+}
+
+.gantt-onboarding-spotlight-inner {
+  display: none;
+}
+
+@keyframes gantt-onboarding-spotlight-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.9; }
+}
+
+.gantt-onboarding-tooltip {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(420px, calc(100vw - 32px));
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.gantt-onboarding-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.gantt-onboarding-tooltip-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.gantt-onboarding-tooltip-content {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+
+.gantt-onboarding-tooltip-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+
+.gantt-onboarding-tooltip-hint svg {
+  flex-shrink: 0;
+}
+
+.gantt-onboarding-tooltip-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}

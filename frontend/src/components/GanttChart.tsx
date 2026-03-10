@@ -170,9 +170,7 @@ function buildHierarchicalRows(
   const sortedCats = [...categories].sort((a, b) => a.display_order - b.display_order);
   for (const cat of sortedCats) {
     let catProjects = projects.filter((p) => p.category_id === cat.id);
-    if (!includeCompleted) {
-      catProjects = catProjects.filter((p) => tasks.some((t) => t.project_id === p.id));
-    }
+    catProjects = catProjects.filter((p) => tasks.some((t) => t.project_id === p.id));
     if (catProjects.length === 0) continue;
     rows.push({ type: 'category', id: `cat-${cat.id}`, category: cat });
     if (!expandedCheck('category', cat.id)) continue;
@@ -410,21 +408,29 @@ export default function GanttChart({
       : baseColWidth;
 
     const hasTasks = relevantDates.length > 0;
+    const today = new Date();
+    const minAllowedStart = toStartOfDay(addDays(today, -7));
+
     if (viewMode === 'Day') {
       start = toStartOfDay(minDate);
       start.setDate(start.getDate() - 7);
+      if (start.getTime() < minAllowedStart.getTime()) start = new Date(minAllowedStart);
       const end = toStartOfDay(maxDate);
       colCount = diffDays(end, start) + 1;
       if (!hasTasks && colCount < 60) colCount = 60;
     } else if (viewMode === 'Week') {
       start = toStartOfWeek(minDate);
       start.setDate(start.getDate() - 14);
+      const minWeek = toStartOfWeek(minAllowedStart);
+      if (start.getTime() < minWeek.getTime()) start = minWeek;
       const end = toStartOfWeek(maxDate);
       colCount = Math.ceil(diffDays(end, start) / 7) + 1;
       if (!hasTasks && colCount < 12) colCount = 12;
     } else {
       start = toStartOfMonth(minDate);
       start.setMonth(start.getMonth() - 1);
+      const minMonth = toStartOfMonth(minAllowedStart);
+      if (start.getTime() < minMonth.getTime()) start = minMonth;
       const end = toStartOfMonth(maxDate);
       colCount = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
       if (!hasTasks && colCount < 6) colCount = 6;
@@ -621,10 +627,18 @@ export default function GanttChart({
   const todayInRange = todayX >= 0 && todayX <= totalWidth;
 
   if (taskRows.length === 0 && hierarchicalRows.length === 0) {
+    let emptyMessage: string;
+    if (categories.length === 0) {
+      emptyMessage = 'No tasks yet. Add a category and project in the sidebar (or press G), then create a task with + Task.';
+    } else if (projects.length === 0) {
+      emptyMessage = 'No tasks yet. Add a project to a category in the sidebar, then create a task with + Task.';
+    } else {
+      emptyMessage = 'No tasks yet. Create your first task with the + Task button.';
+    }
     return (
       <div className="gantt-chart-wrap">
         <div className="gantt-empty">
-          No tasks yet. Click Categories to add a category, then a project, then create a task.
+          {emptyMessage}
         </div>
       </div>
     );
@@ -633,7 +647,7 @@ export default function GanttChart({
   const rowHeight = isSmallMobile ? 34 : isMobile ? 34 : 36;
   const isMobileChartSlim = isMobile && effectiveViewMode === 'chart';
   const effectiveListWidth =
-    isMobileChartSlim ? 100 : isSmallMobile ? 260 : isMobile ? 300 : listWidth;
+    isMobileChartSlim ? (isSmallMobile ? 140 : 180) : isSmallMobile ? 260 : isMobile ? 300 : listWidth;
 
   if (isMobile && effectiveViewMode === 'list') {
     return (
@@ -852,7 +866,7 @@ export default function GanttChart({
               />
               Show completed in chart
             </label>
-            <div className="priority-strip">
+            <div className="priority-strip" data-onboarding="priority-strip">
               <span className="priority-label">Priority:</span>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((p) => {
                 const colors = priorityColors[p] ?? DEFAULT_PRIORITY_COLORS[p];
@@ -872,7 +886,7 @@ export default function GanttChart({
       </div>
 
       {!isMobile && (
-        <div className="gantt-toolbar">
+        <div className="gantt-toolbar" data-onboarding="view-modes">
           {(['Day', 'Week', 'Month'] as const).map((m) => (
             <button
               key={m}
@@ -885,7 +899,7 @@ export default function GanttChart({
         </div>
       )}
 
-      <div ref={scrollRef} className="gantt-main" onScroll={handleScroll}>
+      <div ref={scrollRef} className="gantt-main" data-onboarding="gantt-chart" onScroll={handleScroll}>
         <div
           className="gantt-inner"
           style={{ minWidth: effectiveListWidth + totalWidth, minHeight: 32 + hierarchicalRows.length * rowHeight }}
@@ -1040,6 +1054,7 @@ export default function GanttChart({
           {!isMobile && !isMobileChartSlim && (
             <div
               className="gantt-list-resizer"
+              data-onboarding="resize-handle"
               onMouseDown={handleResizeStart}
               role="separator"
               aria-orientation="vertical"

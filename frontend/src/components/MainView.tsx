@@ -21,6 +21,7 @@ import SpacesSidebar from './SpacesSidebar';
 import SpaceMembersModal from './SpaceMembersModal';
 import CreateSpaceModal from './CreateSpaceModal';
 import StatisticsPrompt from './StatisticsPrompt';
+import GanttOnboarding from './GanttOnboarding';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useMainData } from '../hooks/useMainData';
@@ -66,6 +67,9 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [showCreateSpaceModal, setShowCreateSpaceModal] = useState(false);
   const [showStatisticsPrompt, setShowStatisticsPrompt] = useState(false);
   const [statisticsPromptDismissed, setStatisticsPromptDismissed] = useState(false);
+  const [ganttOnboarded, setGanttOnboarded] = useState(true);
+  const [ganttOnboardedLoaded, setGanttOnboardedLoaded] = useState(false);
+  const [ganttOnboardingMode, setGanttOnboardingMode] = useState<'prompt' | 'tour' | null>(null);
   const mainDataFilters = useMemo(() => {
     const f: { filterScope?: api.ShareFilterScope } = {};
     f.filterScope = selectedSpaceId != null ? (`space:${selectedSpaceId}` as api.ShareFilterScope) : 'personal';
@@ -543,8 +547,32 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           } else {
             setApiSpaceFilter(null);
           }
+          const go = prefs.gantt_onboarded;
+          setGanttOnboarded(go === true);
+          setGanttOnboardedLoaded(true);
         })
-        .catch(() => {});
+        .catch(() => setGanttOnboardedLoaded(true));
+    } else {
+      setGanttOnboardedLoaded(true);
+      setGanttOnboarded(localStorage.getItem('gantt_onboarded') === '1');
+    }
+  }, [authEnabled]);
+
+  useEffect(() => {
+    if (ganttOnboardedLoaded && !ganttOnboarded && !isMobile && ganttOnboardingMode === null) {
+      setGanttOnboardingMode('prompt');
+    }
+  }, [ganttOnboardedLoaded, ganttOnboarded, isMobile, ganttOnboardingMode]);
+
+  const saveGanttOnboarded = useCallback(async (value: boolean) => {
+    setGanttOnboarded(value);
+    if (authEnabled) {
+      try {
+        await api.patchUserPreferences('gantt_onboarded', value);
+      } catch { /* ignore */ }
+    } else {
+      if (value) localStorage.setItem('gantt_onboarded', '1');
+      else localStorage.removeItem('gantt_onboarded');
     }
   }, [authEnabled]);
 
@@ -852,6 +880,23 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
       <>
         {settingsTab === 'personal' && (
           <div className="settings-tab-content" role="tabpanel">
+            {!isMobile && (
+              <div className="settings-section">
+                <h4>Onboarding</h4>
+                <p className="settings-desc">Retake the Gantt chart feature tour.</p>
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() => {
+                    saveGanttOnboarded(false);
+                    setGanttOnboardingMode('tour');
+                    setShowSettings(false);
+                  }}
+                >
+                  Retake onboarding
+                </button>
+              </div>
+            )}
             <div className="settings-section">
               <h4>Appearance</h4>
               <div className="settings-checkbox-row">
@@ -1922,6 +1967,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         {!isMobile && (
           <button
             className="sidebar-toggle"
+            data-onboarding="sidebar-toggle"
             onClick={() => setSidebarCollapsed((c) => !c)}
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -1976,6 +2022,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
             <>
               <button
                 className="btn-sm"
+                data-onboarding="add-task"
                 onClick={() => setShowAddTask(true)}
                 disabled={projects.length === 0}
                 title={projects.length === 0 ? 'Click Categories to add a category and project first' : 'Add task'}
@@ -2176,6 +2223,7 @@ onTaskDelete={handleDeleteTask}
                 <aside
                   className={`sidebar ${isSidebarOverlay ? 'sidebar-overlay' : ''}`}
                   aria-label="Categories and projects"
+                  data-onboarding="sidebar"
                   style={!isMobile ? { width: sidebarWidth } : undefined}
                 >
                   <div className={`sidebar-inner ${authEnabled && currentUser && !isMobile ? 'sidebar-inner-flex' : ''}`}>
@@ -2432,6 +2480,30 @@ onTaskDelete={handleDeleteTask}
             setShowStatisticsPrompt(false);
           }}
           onNotNow={() => setStatisticsPromptDismissed(true)}
+        />
+      )}
+
+      {!isMobile && ganttOnboardingMode && (
+        <GanttOnboarding
+          mode={ganttOnboardingMode}
+          onYes={() => setGanttOnboardingMode('tour')}
+          onNo={() => {
+            saveGanttOnboarded(true);
+            setGanttOnboardingMode(null);
+          }}
+          onLater={() => {
+            saveGanttOnboarded(true);
+            setGanttOnboardingMode(null);
+          }}
+          onTourComplete={() => {
+            saveGanttOnboarded(true);
+            setGanttOnboardingMode(null);
+          }}
+          onBeforeStep={(stepIndex) => {
+            if (stepIndex === 0 && sidebarCollapsed) {
+              setSidebarCollapsed(false);
+            }
+          }}
         />
       )}
 
