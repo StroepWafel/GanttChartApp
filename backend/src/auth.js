@@ -73,13 +73,28 @@ function normalizeUsername(s) {
   return s && typeof s === 'string' ? s.trim().toLowerCase() : '';
 }
 
-export async function login(username, password) {
-  if (!username || !password) return null;
-  const normalized = normalizeUsername(username);
-  if (!normalized) return null;
-  const user = db.prepare(
-    'SELECT id, username, password_hash, is_admin, is_active, token_version, must_change_password FROM users WHERE LOWER(username) = ?'
-  ).get(normalized);
+function looksLikeEmail(s) {
+  if (!s || typeof s !== 'string') return false;
+  const t = s.trim();
+  return t.includes('@') && t.includes('.');
+}
+
+export async function login(usernameOrEmail, password) {
+  if (!usernameOrEmail || !password) return null;
+  const input = String(usernameOrEmail).trim();
+  if (!input) return null;
+  let user;
+  if (looksLikeEmail(input)) {
+    user = db.prepare(
+      'SELECT id, username, password_hash, is_admin, is_active, token_version, must_change_password FROM users WHERE LOWER(email) = ?'
+    ).get(input.toLowerCase());
+  } else {
+    const normalized = normalizeUsername(input);
+    if (!normalized) return null;
+    user = db.prepare(
+      'SELECT id, username, password_hash, is_admin, is_active, token_version, must_change_password FROM users WHERE LOWER(username) = ?'
+    ).get(normalized);
+  }
   if (!user || user.is_active === 0) return null;
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return null;

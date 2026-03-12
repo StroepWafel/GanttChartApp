@@ -14,6 +14,14 @@ router.get('/me', optionalAuth, (req, res) => {
     'SELECT id, username, is_admin, api_key, created_at, email, must_change_password FROM users WHERE id = ?'
   ).get(req.user.userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
+  let allowShareWithUsers = true;
+  try {
+    const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('allow_share_with_users');
+    if (row?.value) {
+      const v = JSON.parse(row.value);
+      allowShareWithUsers = v !== false;
+    }
+  } catch {}
   res.json({
     id: user.id,
     username: user.username,
@@ -22,12 +30,24 @@ router.get('/me', optionalAuth, (req, res) => {
     createdAt: user.created_at,
     email: user.email ?? undefined,
     mustChangePassword: !!(user.must_change_password),
+    allowShareWithUsers,
   });
 });
 
 /** List users that can be shared with (all active users except self). Any authenticated user. */
 router.get('/shareable', optionalAuth, (req, res) => {
   if (!req.user?.userId) return res.status(401).json({ error: 'Authentication required' });
+  let allowShareWithUsers = true;
+  try {
+    const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('allow_share_with_users');
+    if (row?.value) {
+      const v = JSON.parse(row.value);
+      allowShareWithUsers = v !== false;
+    }
+  } catch {}
+  if (!allowShareWithUsers) {
+    return res.json([]);
+  }
   const rows = db.prepare(`
     SELECT id, username FROM users WHERE is_active = 1 AND id != ? ORDER BY username
   `).all(req.user.userId);

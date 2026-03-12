@@ -21,6 +21,7 @@ export function canAccess(userId, itemType, itemId, shareToken) {
         SELECT permission FROM share_links
         WHERE token = ? AND item_type = 'space' AND item_id = ?
         AND (expires_at IS NULL OR expires_at > datetime('now'))
+        AND (COALESCE(is_join_link, 0) = 0)
       `).get(shareToken, id);
       if (link) return { allowed: true, permission: link.permission === 'edit' ? 'edit' : 'view' };
     }
@@ -36,12 +37,13 @@ export function canAccess(userId, itemType, itemId, shareToken) {
     return { allowed: false, permission: 'view' };
   }
 
-  // 1. Share link (works without userId when token is valid)
+  // 1. Share link (works without userId when token is valid). Join links do NOT grant view access.
   if (shareToken) {
     const link = db.prepare(`
       SELECT permission FROM share_links
       WHERE token = ? AND item_type = ? AND item_id = ?
       AND (expires_at IS NULL OR expires_at > datetime('now'))
+      AND (COALESCE(is_join_link, 0) = 0)
     `).get(shareToken, itemType, id);
     if (link) {
       return { allowed: true, permission: link.permission === 'edit' ? 'edit' : 'view' };
@@ -61,6 +63,7 @@ export function canAccess(userId, itemType, itemId, shareToken) {
         SELECT permission FROM share_links
         WHERE token = ? AND item_type = 'space' AND item_id = ?
         AND (expires_at IS NULL OR expires_at > datetime('now'))
+        AND (COALESCE(is_join_link, 0) = 0)
       `).get(shareToken, spaceIdForItem);
       if (spaceLink) return { allowed: true, permission: spaceLink.permission === 'edit' ? 'edit' : 'view' };
     }
@@ -71,6 +74,7 @@ export function canAccess(userId, itemType, itemId, shareToken) {
         const projLink = db.prepare(`
           SELECT permission FROM share_links WHERE token = ? AND item_type = 'project' AND item_id = ?
           AND (expires_at IS NULL OR expires_at > datetime('now'))
+          AND (COALESCE(is_join_link, 0) = 0)
         `).get(shareToken, task.project_id);
         if (projLink) return { allowed: true, permission: projLink.permission === 'edit' ? 'edit' : 'view' };
         const proj = db.prepare('SELECT category_id FROM projects WHERE id = ?').get(task.project_id);
@@ -78,6 +82,7 @@ export function canAccess(userId, itemType, itemId, shareToken) {
           const catLink = db.prepare(`
             SELECT permission FROM share_links WHERE token = ? AND item_type = 'category' AND item_id = ?
             AND (expires_at IS NULL OR expires_at > datetime('now'))
+            AND (COALESCE(is_join_link, 0) = 0)
           `).get(shareToken, proj.category_id);
           if (catLink) return { allowed: true, permission: catLink.permission === 'edit' ? 'edit' : 'view' };
         }

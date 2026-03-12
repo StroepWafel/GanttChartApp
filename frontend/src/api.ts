@@ -111,6 +111,31 @@ function getAuthHeaders(): HeadersInit {
 }
 
 const SHARE_TOKEN_KEY = 'gantt_share_token';
+const PENDING_JOIN_TOKEN_KEY = 'gantt_pending_join_token';
+const REDIRECT_SPACE_KEY = 'gantt_redirect_space_id';
+
+export function getPendingJoinToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(PENDING_JOIN_TOKEN_KEY);
+}
+
+export function setPendingJoinToken(token: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (token) sessionStorage.setItem(PENDING_JOIN_TOKEN_KEY, token);
+  else sessionStorage.removeItem(PENDING_JOIN_TOKEN_KEY);
+}
+
+export function getRedirectSpaceId(): number | null {
+  if (typeof window === 'undefined') return null;
+  const v = sessionStorage.getItem(REDIRECT_SPACE_KEY);
+  sessionStorage.removeItem(REDIRECT_SPACE_KEY);
+  return v ? parseInt(v, 10) : null;
+}
+
+export function setRedirectSpaceId(spaceId: number): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(REDIRECT_SPACE_KEY, String(spaceId));
+}
 
 export function getShareToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -803,13 +828,41 @@ export async function deleteUserShare(shareId: number) {
   return data;
 }
 
-export async function createShareLink(itemType: 'category' | 'project' | 'task' | 'space', itemId: number, permission: 'view' | 'edit', expiresDays?: number) {
+export async function createShareLink(
+  itemType: 'category' | 'project' | 'task' | 'space',
+  itemId: number,
+  permission: 'view' | 'edit',
+  expiresDays?: number,
+  options?: { joinLink?: boolean; joinRole?: 'admin' | 'member' }
+) {
+  const body: Record<string, unknown> = { item_type: itemType, item_id: itemId, permission, expires_days: expiresDays };
+  if (options?.joinLink) {
+    body.join_link = true;
+    body.join_role = options.joinRole || 'member';
+  }
   const res = await fetchApi('/shares/links', {
     method: 'POST',
-    body: JSON.stringify({ item_type: itemType, item_id: itemId, permission, expires_days: expiresDays }),
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to create share link');
+  return data;
+}
+
+export async function getLinkInfo(token: string): Promise<{ isJoinLink: false } | { isJoinLink: true; spaceId: number; spaceName: string; role: string; used: boolean }> {
+  const res = await fetch(`${API}/shares/link-info?token=${encodeURIComponent(token)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to get link info');
+  return data;
+}
+
+export async function redeemJoinLink(token: string): Promise<{ ok: boolean; spaceId: number; spaceName: string; alreadyMember?: boolean }> {
+  const res = await fetchApi('/shares/redeem-join', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to join space');
   return data;
 }
 

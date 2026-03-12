@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAuthStatus, getMe, getVersion, login, setShareToken } from './api';
+import { getAuthStatus, getLinkInfo, getMe, getVersion, getPendingJoinToken, login, redeemJoinLink, setPendingJoinToken, setRedirectSpaceId, setShareToken } from './api';
 import { useServerConnected } from './hooks/useServerConnected';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { applyTheme, getStoredTheme } from './theme';
@@ -37,6 +37,8 @@ export default function App() {
   const [updatePhaseDetail, setUpdatePhaseDetail] = useState<'preparing' | 'restarting' | null>(null);
   const [updateReloadTimedOut, setUpdateReloadTimedOut] = useState(false);
   const updatePollRef = useRef<{ intervalId: ReturnType<typeof setInterval>; timeoutId: ReturnType<typeof setTimeout>; hasSeenFailure: boolean } | null>(null);
+  const [joinLinkPrompt, setJoinLinkPrompt] = useState<{ spaceName: string; role: string } | { used: true } | null>(null);
+  const [redeemingJoin, setRedeemingJoin] = useState(false);
 
   // Slow poll: all clients check periodically if server is about to restart.
   // Only trust data.updating from server—connection errors (e.g. app sleep, network blip)
@@ -109,11 +111,25 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('share_token');
-    if (token) {
-      setShareToken(token);
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+    const shareTokenParam = params.get('share_token');
+    if (!shareTokenParam) return;
+    window.history.replaceState({}, '', window.location.pathname);
+    getLinkInfo(shareTokenParam)
+      .then((info) => {
+        if (!info.isJoinLink) {
+          setShareToken(shareTokenParam);
+          return;
+        }
+        if (info.used) {
+          setJoinLinkPrompt({ used: true });
+          return;
+        }
+        setPendingJoinToken(shareTokenParam);
+        setJoinLinkPrompt({ spaceName: info.spaceName, role: info.role });
+      })
+      .catch(() => {
+        setShareToken(shareTokenParam);
+      });
   }, []);
 
   useEffect(() => {
@@ -121,6 +137,22 @@ export default function App() {
       .then((d) => setAuthEnabled(d.enabled))
       .catch(() => setAuthEnabled(false));
   }, []);
+
+  useEffect(() => {
+    if (!token || !joinLinkPrompt || 'used' in joinLinkPrompt) return;
+    const pendingToken = getPendingJoinToken();
+    if (!pendingToken) return;
+    setPendingJoinToken(null);
+    redeemJoinLink(pendingToken)
+      .then((r) => {
+        setJoinLinkPrompt(null);
+        if (r.spaceId) setRedirectSpaceId(r.spaceId);
+        window.location.reload();
+      })
+      .catch(() => {
+        setJoinLinkPrompt({ used: true });
+      });
+  }, [token, joinLinkPrompt]);
 
   // On native mobile: when localStorage token is gone (e.g. after app update) but we have
   // stored credentials, restore the session so the user stays logged in.
@@ -163,12 +195,27 @@ export default function App() {
     setResetToken(null);
   }
 
-  function handleLogin(data: string | { token: string; mustChangePassword?: boolean }) {
+  async function handleLogin(data: string | { token: string; mustChangePassword?: boolean }) {
+    const newToken = typeof data === 'string' ? data : data.token;
+    const pendingToken = getPendingJoinToken();
+    if (pendingToken) {
+      setPendingJoinToken(null);
+      setRedeemingJoin(true);
+      try {
+        const r = await redeemJoinLink(pendingToken);
+        setJoinLinkPrompt(null);
+        if (r.spaceId) setRedirectSpaceId(r.spaceId);
+      } catch {
+        setJoinLinkPrompt({ used: true });
+      } finally {
+        setRedeemingJoin(false);
+      }
+    }
     if (typeof data === 'string') {
-      setToken(data);
+      setToken(newToken);
       setMustChangePassword(false);
     } else {
-      setToken(data.token);
+      setToken(newToken);
       setMustChangePassword(data.mustChangePassword ?? false);
     }
   }
@@ -253,6 +300,21 @@ export default function App() {
     );
   }
 
+  if (joinLinkPrompt && 'used' in joinLinkPrompt) {
+    return (
+      <>
+        {connectionBanner}
+        {updateOverlay}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 16 }}>This join link has already been used.</p>
+          <button type="button" className="btn-sm" onClick={() => setJoinLinkPrompt(null)}>
+            Continue to app
+          </button>
+        </div>
+      </>
+    );
+  }
+
   if (authEnabled && !token) {
     if (restoringFromCredentials) {
       return (
@@ -269,7 +331,10 @@ export default function App() {
       <>
         {connectionBanner}
         {updateOverlay}
-        <AuthGate onLogin={handleLogin} />
+        <AuthGate
+          onLogin={handleLogin}
+          joinMessage={joinLinkPrompt && !('used' in joinLinkPrompt) ? `Sign in to join "${joinLinkPrompt.spaceName}" as ${joinLinkPrompt.role}` : undefined}
+        />
       </>
     );
   }
@@ -297,6 +362,18 @@ export default function App() {
   }
 
   const showConnectionBanner = !online || !serverReachable;
+
+  if (redeemingJoin) {
+    return (
+      <>
+        {connectionBanner}
+        {updateOverlay}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+          Joining space…
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

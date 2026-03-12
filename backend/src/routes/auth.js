@@ -30,17 +30,24 @@ router.get('/status', (req, res) => {
 
 router.get('/login-hash', (req, res) => {
   try {
-    const username = req.query.username;
-    if (!username || typeof username !== 'string') {
-      return res.status(400).json({ error: 'Username required' });
+    const input = req.query.username;
+    if (!input || typeof input !== 'string') {
+      return res.status(400).json({ error: 'Username or email required' });
     }
-    const normalized = username.trim().toLowerCase();
+    const normalized = input.trim().toLowerCase();
     if (!normalized) {
-      return res.status(400).json({ error: 'Username required' });
+      return res.status(400).json({ error: 'Username or email required' });
     }
-    const user = db.prepare(
-      'SELECT password_hash FROM users WHERE LOWER(username) = ? AND is_active = 1'
-    ).get(normalized);
+    let user;
+    if (normalized.includes('@')) {
+      user = db.prepare(
+        'SELECT password_hash FROM users WHERE LOWER(email) = ? AND is_active = 1'
+      ).get(normalized);
+    } else {
+      user = db.prepare(
+        'SELECT password_hash FROM users WHERE LOWER(username) = ? AND is_active = 1'
+      ).get(normalized);
+    }
     const hash = user
       ? user.password_hash
       : bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
@@ -54,7 +61,7 @@ router.post('/login', loginLimit, async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+      return res.status(400).json({ error: 'Email/username and password required' });
     }
     const result = await login(username, password);
     if (!result) {

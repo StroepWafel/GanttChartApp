@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, UserMinus, LogOut, Pencil } from 'lucide-react';
+import { UserMinus, LogOut, Pencil } from 'lucide-react';
 import * as api from '../api';
 import './SpaceMembersModal.css';
 import './ShareModal.css';
@@ -15,6 +15,7 @@ interface Props {
   spaceName: string;
   currentUserId: number;
   isAdmin: boolean;
+  allowShareWithUsers?: boolean;
   onClose: () => void;
   onDone?: () => void;
   onSpaceRenamed?: (newName: string) => void;
@@ -25,6 +26,7 @@ export default function SpaceMembersModal({
   spaceName,
   currentUserId,
   isAdmin,
+  allowShareWithUsers = true,
   onClose,
   onDone,
   onSpaceRenamed,
@@ -32,8 +34,6 @@ export default function SpaceMembersModal({
   const [tab, setTab] = useState<'members' | 'share'>('members');
   const [members, setMembers] = useState<SpaceMember[]>([]);
   const [shareableUsers, setShareableUsers] = useState<{ id: number; username: string }[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [newMemberRole, setNewMemberRole] = useState<'admin' | 'member'>('member');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -45,6 +45,7 @@ export default function SpaceMembersModal({
   const [shareSelectedUserId, setShareSelectedUserId] = useState<number | null>(null);
   const [sharePermission, setSharePermission] = useState<'view' | 'edit'>('edit');
   const [linkPermission, setLinkPermission] = useState<'view' | 'edit'>('edit');
+  const [joinLinkRole, setJoinLinkRole] = useState<'admin' | 'member'>('member');
 
   useEffect(() => {
     api.getSpaceMembers(spaceId).then(setMembers).catch(() => setMembers([]));
@@ -56,8 +57,6 @@ export default function SpaceMembersModal({
     setRenameValue(spaceName);
   }, [spaceName]);
 
-  const memberIds = new Set(members.map((m) => m.user_id));
-  const availableUsers = shareableUsers.filter((u) => !memberIds.has(u.id));
   const adminCount = members.filter((m) => m.role === 'admin').length;
   const canRemoveSelf = isAdmin && adminCount > 1;
 
@@ -66,23 +65,6 @@ export default function SpaceMembersModal({
     if (b.user_id === currentUserId) return 1;
     return 0;
   });
-
-  async function handleInvite() {
-    if (!selectedUserId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await api.inviteSpaceMember(spaceId, selectedUserId, newMemberRole);
-      const m = await api.getSpaceMembers(spaceId);
-      setMembers(m);
-      setSelectedUserId(null);
-      onDone?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to invite');
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleRemove(userId: number) {
     if (userId === currentUserId && !canRemoveSelf) return;
@@ -165,6 +147,23 @@ export default function SpaceMembersModal({
       onDone?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create link');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreateJoinLink() {
+    setLoading(true);
+    setError(null);
+    try {
+      const link = await api.createShareLink('space', spaceId, 'edit', undefined, { joinLink: true, joinRole: joinLinkRole });
+      const s = await api.getShares();
+      setShares(s);
+      const url = `${window.location.origin}${window.location.pathname}?share_token=${link.token}`;
+      await navigator.clipboard.writeText(url);
+      onDone?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create join link');
     } finally {
       setLoading(false);
     }
@@ -255,43 +254,6 @@ export default function SpaceMembersModal({
 
         {error && <p className="space-members-error">{error}</p>}
 
-        {tab === 'members' && isAdmin && (
-          <div className="space-members-add">
-            <div className="space-members-add-row">
-              <select
-                value={selectedUserId ?? ''}
-                onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
-                className="space-members-select"
-              >
-                <option value="">Select user to add…</option>
-                {availableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.username}
-                  </option>
-                ))}
-                {availableUsers.length === 0 && <option disabled>No users to add</option>}
-              </select>
-              <select
-                value={newMemberRole}
-                onChange={(e) => setNewMemberRole(e.target.value as 'admin' | 'member')}
-                className="space-members-role-select"
-              >
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-              </select>
-              <button
-                type="button"
-                className="btn-sm"
-                disabled={!selectedUserId || loading}
-                onClick={handleInvite}
-                title="Add to space"
-              >
-                <UserPlus size={14} /> Add
-              </button>
-            </div>
-          </div>
-        )}
-
         {tab === 'members' && (
         <ul className="space-members-list">
           {sortedMembers.map((m) => (
@@ -320,40 +282,45 @@ export default function SpaceMembersModal({
 
         {tab === 'share' && isAdmin && (
           <div className="share-modal-section">
-            <h4 style={{ margin: '0 0 12px', fontSize: 13 }}>Share with users</h4>
-            <form
-              className="share-add-row"
-              onSubmit={(e) => { e.preventDefault(); handleShareWithUser(); }}
-            >
-              <select
-                value={shareSelectedUserId ?? ''}
-                onChange={(e) => setShareSelectedUserId(e.target.value ? parseInt(e.target.value, 10) : null)}
-              >
-                <option value="">Select user...</option>
-                {shareableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>{u.username}</option>
-                ))}
-              </select>
-              <select value={sharePermission} onChange={(e) => setSharePermission(e.target.value as 'view' | 'edit')}>
-                <option value="view">View only</option>
-                <option value="edit">Can edit</option>
-              </select>
-              <button type="submit" className="btn-sm" disabled={!shareSelectedUserId || loading}>
-                Add
-              </button>
-            </form>
-            {myShares.length > 0 && (
-              <ul className="share-list">
-                {myShares.map((us) => (
-                  <li key={us.id}>
-                    <span>{us.target_username ?? us.target_user_id}</span>
-                    <span className="share-perm">{us.permission}</span>
-                    <button type="button" className="btn-sm" onClick={() => handleRemoveShare(us.id)}>Remove</button>
-                  </li>
-                ))}
-              </ul>
+            {allowShareWithUsers && (
+              <>
+                <h4 style={{ margin: '0 0 12px', fontSize: 13 }}>Share with users</h4>
+                <form
+                  className="share-add-row"
+                  onSubmit={(e) => { e.preventDefault(); handleShareWithUser(); }}
+                >
+                  <select
+                    value={shareSelectedUserId ?? ''}
+                    onChange={(e) => setShareSelectedUserId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                  >
+                    <option value="">Select user...</option>
+                    {shareableUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.username}</option>
+                    ))}
+                  </select>
+                  <select value={sharePermission} onChange={(e) => setSharePermission(e.target.value as 'view' | 'edit')}>
+                    <option value="view">View only</option>
+                    <option value="edit">Can edit</option>
+                  </select>
+                  <button type="submit" className="btn-sm" disabled={!shareSelectedUserId || loading}>
+                    Add
+                  </button>
+                </form>
+                {myShares.length > 0 && (
+                  <ul className="share-list">
+                    {myShares.map((us) => (
+                      <li key={us.id}>
+                        <span>{us.target_username ?? us.target_user_id}</span>
+                        <span className="share-perm">{us.permission}</span>
+                        <button type="button" className="btn-sm" onClick={() => handleRemoveShare(us.id)}>Remove</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <h4 style={{ margin: '16px 0 12px', fontSize: 13 }}>Share temporarily via Link</h4>
+              </>
             )}
-            <h4 style={{ margin: '16px 0 12px', fontSize: 13 }}>Share link</h4>
+            {!allowShareWithUsers && <h4 style={{ margin: '0 0 12px', fontSize: 13 }}>Share temporarily</h4>}
             <form
               className="share-add-row"
               onSubmit={(e) => { e.preventDefault(); handleCreateLink(); }}
@@ -366,16 +333,34 @@ export default function SpaceMembersModal({
                 Create link (copies to clipboard)
               </button>
             </form>
+            <h4 style={{ margin: '16px 0 12px', fontSize: 13 }}>Add with link</h4>
+            <p className="settings-desc" style={{ margin: '0 0 8px', fontSize: 12 }}>Creates a link that adds the visitor to this space as a member or admin. Link can only be used once.</p>
+            <form
+              className="share-add-row"
+              onSubmit={(e) => { e.preventDefault(); handleCreateJoinLink(); }}
+            >
+              <select value={joinLinkRole} onChange={(e) => setJoinLinkRole(e.target.value as 'admin' | 'member')}>
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button type="submit" className="btn-sm" disabled={loading}>
+                Create join link (copies to clipboard)
+              </button>
+            </form>
             {myLinks.length > 0 && (
               <ul className="share-list">
-                {myLinks.map((sl) => (
+                {myLinks.map((sl) => {
+                  const slAny = sl as { is_join_link?: number; join_role?: string; used_at?: string };
+                  return (
                   <li key={sl.id}>
                     <span className="share-link-token" title={sl.token}>
-                      {tokenPreview(sl.token)} ({sl.permission})
+                      {tokenPreview(sl.token)}
+                      {slAny.is_join_link ? ` (join as ${slAny.join_role || 'member'}${slAny.used_at ? ', used' : ''})` : ` (${sl.permission})`}
                     </span>
                     <button type="button" className="btn-sm" onClick={() => handleRevokeLink(sl.id)}>Revoke</button>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>

@@ -6,9 +6,10 @@ import './AuthGate.css';
 
 interface Props {
   onLogin: (token: string | { token: string; mustChangePassword?: boolean }) => void;
+  joinMessage?: string;
 }
 
-export default function AuthGate({ onLogin }: Props) {
+export default function AuthGate({ onLogin, joinMessage }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -103,9 +104,10 @@ export default function AuthGate({ onLogin }: Props) {
     <div className="auth-gate">
       <form className="auth-form" onSubmit={handleSubmit}>
         <h1>Sign in</h1>
+        {joinMessage && <p className="auth-form-desc">{joinMessage}</p>}
         <input
           type="text"
-          placeholder="Username"
+          placeholder="Email or username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required

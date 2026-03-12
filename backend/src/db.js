@@ -258,6 +258,19 @@ try {
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_share_links_token ON share_links(token)');
 
+  let shareLinkCols = db.prepare('PRAGMA table_info(share_links)').all();
+  if (!shareLinkCols.some((c) => c.name === 'is_join_link')) {
+    db.exec('ALTER TABLE share_links ADD COLUMN is_join_link INTEGER DEFAULT 0');
+  }
+  shareLinkCols = db.prepare('PRAGMA table_info(share_links)').all();
+  if (!shareLinkCols.some((c) => c.name === 'join_role')) {
+    db.exec('ALTER TABLE share_links ADD COLUMN join_role TEXT');
+  }
+  shareLinkCols = db.prepare('PRAGMA table_info(share_links)').all();
+  if (!shareLinkCols.some((c) => c.name === 'used_at')) {
+    db.exec('ALTER TABLE share_links ADD COLUMN used_at TEXT');
+  }
+
   const ganttCols = db.prepare("PRAGMA table_info(gantt_expanded)").all();
   const ganttNewExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gantt_expanded_new'").get();
   if (!ganttCols.some((c) => c.name === 'user_id')) {

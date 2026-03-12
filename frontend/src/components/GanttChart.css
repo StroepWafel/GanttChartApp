@@ -281,6 +281,11 @@
   font-size: 12px;
 }
 
+.gantt-list-slim .gantt-expand-btn::before {
+  left: -3px;
+  right: -3px;
+}
+
 .gantt-list-slim .gantt-expand-spacer {
   width: 22px;
   height: 22px;
@@ -435,6 +440,24 @@
   border-radius: 3px;
   cursor: pointer;
   transition: all 0.15s;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Expand hit area to fill cell without making button visually wider */
+.gantt-expand-btn::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  right: -9px;
+  top: 0;
+  bottom: 0;
+}
+
+.gantt-expand-btn svg {
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
 }
 
 .gantt-expand-btn:hover {
@@ -446,39 +469,30 @@
   display: inline-block;
   width: 18px;
   height: 18px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
-  .gantt-row-expand {
-    min-width: 28px;
-    min-height: 28px;
-    justify-content: flex-start;
-    align-items: center;
-  }
-
   .gantt-expand-btn {
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
-    font-size: 12px;
+    width: 18px;
+    height: 18px;
   }
 
   .gantt-expand-spacer {
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
   }
 }
 
 @media (max-width: 480px) {
   .gantt-expand-btn {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
   }
 
   .gantt-expand-spacer {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -692,6 +706,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
 }
 
 .gantt-bar-narrow .gantt-bar-label {
@@ -709,6 +724,7 @@
   gap: 4px;
   opacity: 0;
   transition: opacity 0.15s;
+  pointer-events: auto;
 }
 
 .gantt-bar:hover .gantt-bar-actions {
@@ -724,6 +740,8 @@
 .gantt-bar-btn {
   width: 22px;
   height: 22px;
+  min-width: 22px;
+  min-height: 22px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -735,6 +753,13 @@
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.15s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 3;
+}
+
+.gantt-bar-btn svg {
+  pointer-events: none;
 }
 
 .gantt-bar-btn:hover:not(:disabled) {

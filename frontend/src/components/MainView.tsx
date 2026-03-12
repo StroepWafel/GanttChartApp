@@ -129,7 +129,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [showPriorityColors, setShowPriorityColors] = useState(false);
   const [showWebhooks, setShowWebhooks] = useState(false);
   const [apiSpaceFilter, setApiSpaceFilter] = useState<(string | number)[] | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean; apiKey: string | null } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean; apiKey: string | null; allowShareWithUsers?: boolean } | null>(null);
   const [users, setUsers] = useState<{ id: number; username: string; isAdmin: boolean; isActive: boolean; apiKey: string | null; email?: string | null }[]>([]);
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showCreateManually, setShowCreateManually] = useState(false);
@@ -150,6 +150,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   const [masqueradeUserId, setMasqueradeUserId] = useState<string>('');
   const [userMgmtError, setUserMgmtError] = useState('');
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
+  const [allowShareWithUsers, setAllowShareWithUsers] = useState(true);
   const [updateCheck, setUpdateCheck] = useState<{
     updateAvailable: boolean;
     currentVersion?: string;
@@ -319,7 +320,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
   useEffect(() => {
     if (authEnabled) {
       api.getMe()
-        .then((u) => setCurrentUser({ id: u.id, username: u.username, isAdmin: u.isAdmin, apiKey: u.apiKey ?? null }))
+        .then((u) => setCurrentUser({ id: u.id, username: u.username, isAdmin: u.isAdmin, apiKey: u.apiKey ?? null, allowShareWithUsers: u.allowShareWithUsers !== false }))
         .catch(() => setCurrentUser(null));
     } else {
       setCurrentUser(null);
@@ -408,6 +409,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           setGithubTokenSet(!!s.github_token_set);
           setMobileAppEnabledSetting(!!s.mobile_app_enabled);
           setPublicUrl(typeof s.public_url === 'string' ? s.public_url : '');
+          setAllowShareWithUsers(s.allow_share_with_users !== false);
           const eoKeys = [
             'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
             'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
@@ -426,6 +428,11 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
 
   useEffect(() => {
     api.getVersion().then((v) => setAppVersion(v.version)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const redirectSpaceId = api.getRedirectSpaceId();
+    if (redirectSpaceId != null) setSelectedSpaceId(redirectSpaceId);
   }, []);
 
   useEffect(() => {
@@ -581,7 +588,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     api.getMobileAppStatus().then((s) => { setMobileAppEnabled(s.enabled); setMobileApkAvailable(!!s.apkAvailable); setMobileIosAvailable(!!s.iosAvailable); }).catch(() => {});
     if (authEnabled) {
       api.getMe()
-        .then((u) => setCurrentUser({ id: u.id, username: u.username, isAdmin: u.isAdmin, apiKey: u.apiKey ?? null }))
+        .then((u) => setCurrentUser({ id: u.id, username: u.username, isAdmin: u.isAdmin, apiKey: u.apiKey ?? null, allowShareWithUsers: u.allowShareWithUsers !== false }))
         .catch(() => setCurrentUser(null));
       api.getUserPreferences()
         .then((prefs) => {
@@ -639,6 +646,7 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
           setGithubTokenSet(!!s.github_token_set);
           setMobileAppEnabledSetting(!!s.mobile_app_enabled);
           setPublicUrl(typeof s.public_url === 'string' ? s.public_url : '');
+          setAllowShareWithUsers(s.allow_share_with_users !== false);
           const eoKeys = [
             'email_onboarding_enabled', 'email_onboarding_use_default_template', 'email_onboarding_api_key',
             'email_onboarding_region', 'email_onboarding_domain', 'email_onboarding_sending_username',
@@ -1529,6 +1537,31 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
         )}
         {settingsTab === 'admin' && currentUser?.isAdmin && (
           <div className="settings-tab-content" role="tabpanel">
+            <div className="settings-section">
+              <h4>Sharing</h4>
+              <div className="settings-checkbox-row">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={allowShareWithUsers}
+                    onChange={async (e) => {
+                      const v = e.target.checked;
+                      try {
+                        await api.patchSettings({ allow_share_with_users: v });
+                        setAllowShareWithUsers(v);
+                        setCurrentUser((u) => u ? { ...u, allowShareWithUsers: v } : null);
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to save';
+                        adminAlerts.addAlert('Settings', 'Error', msg);
+                        modal.showAlert({ title: 'Error', message: msg });
+                      }
+                    }}
+                  />
+                  <span>Allow sharing with users (show user list when sharing)</span>
+                </label>
+              </div>
+              <p className="settings-desc">When disabled, only link sharing is available. Users cannot see or select other users to share with.</p>
+            </div>
             <UserManagementSection
               users={users}
               setUsers={setUsers}
@@ -2513,6 +2546,7 @@ onTaskDelete={handleDeleteTask}
           spaceName={spaceMembersTarget.name}
           currentUserId={currentUser.id}
           isAdmin={spaceMembersTarget.role === 'admin'}
+          allowShareWithUsers={currentUser.allowShareWithUsers !== false}
           onClose={() => setSpaceMembersTarget(null)}
           onDone={() => { api.getSpaces().then(setSpaces).catch(() => {}); load(); }}
           onSpaceRenamed={(newName) => {
