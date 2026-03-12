@@ -252,6 +252,7 @@ export type MeResponse = {
   username: string;
   isAdmin: boolean;
   apiKey: string | null;
+  allowShareWithUsers?: boolean;
   createdAt?: string;
   email?: string;
   mustChangePassword?: boolean;
