@@ -82,6 +82,31 @@ function taskFromRow(row) {
   };
 }
 
+/** True if task is least important (priority 0 or 1). */
+function isLeastImportant(task) {
+  const p = task.base_priority ?? 5;
+  return p === 0 || p === 1;
+}
+
+/** Effective date for ordering: due_date if given, else end_date. */
+function effectiveDate(task) {
+  return task.due_date ?? task.end_date ?? null;
+}
+
+/** Compare tasks for most-important ordering: tier (0/1 last), then effective date ASC (nulls last), then base_priority DESC. */
+function compareByDateThenPriority(a, b) {
+  const aLeast = isLeastImportant(a) ? 1 : 0;
+  const bLeast = isLeastImportant(b) ? 1 : 0;
+  if (aLeast !== bLeast) return aLeast - bLeast;
+  const aDate = effectiveDate(a);
+  const bDate = effectiveDate(b);
+  const aVal = aDate ? new Date(aDate).getTime() : Infinity;
+  const bVal = bDate ? new Date(bDate).getTime() : Infinity;
+  if (aVal !== bVal) return aVal - bVal;
+  return (b.base_priority ?? 5) - (a.base_priority ?? 5);
+}
+
+
 router.get('/tasks', (req, res) => {
   try {
     const userId = req.user.userId;
@@ -112,10 +137,10 @@ router.get('/most-important-task', (req, res) => {
       FROM tasks t
       JOIN projects p ON t.project_id = p.id AND p.user_id = ?
       JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-      WHERE t.user_id = ? AND t.completed = 0 AND (t.base_priority IS NULL OR t.base_priority > 1)${spaceSql}${API_VISIBLE_SQL}
+      WHERE t.user_id = ? AND t.completed = 0${spaceSql}${API_VISIBLE_SQL}
     `).all(userId, userId, userId, ...spaceParams);
     const withUrgency = rows.map(r => ({ ...taskFromRow(r) }));
-    const sorted = withUrgency.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
+    const sorted = withUrgency.sort(compareByDateThenPriority);
     const tasks = sorted.slice(0, limit);
     if (limit === 1) {
       const task = tasks[0] || null;
@@ -213,6 +238,31 @@ router.get('/upcoming', (req, res) => {
       ORDER BY t.due_date
     `).all(userId, userId, userId, days, ...spaceParams);
     res.json({ servertime: servertime(), servertime_local: servertimeLocal(), data: rows.map(taskFromRow) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/projects/:id', (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(projectId) || projectId < 1) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { sql: spaceSql, params: spaceParams } = getSpaceFilterClause(userId);
+    const row = db.prepare(`
+      SELECT p.*, c.name as category_name,
+        (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ?) as task_count,
+        (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND user_id = ? AND completed = 1) as completed_count
+      FROM projects p
+      JOIN categories c ON p.category_id = c.id AND c.user_id = ?
+      WHERE p.id = ? AND p.user_id = ?${spaceSql}${API_VISIBLE_PROJECT_SQL}${API_VISIBLE_CAT_SQL}
+    `).get(userId, userId, userId, projectId, userId, ...spaceParams);
+    if (!row) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    res.json({ servertime: servertime(), servertime_local: servertimeLocal(), ...row });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -373,9 +423,9 @@ router.get('/batch', (req, res) => {
           FROM tasks t
           JOIN projects p ON t.project_id = p.id AND p.user_id = ?
           JOIN categories c ON p.category_id = c.id AND c.user_id = ?
-          WHERE t.user_id = ? AND t.completed = 0 AND (t.base_priority IS NULL OR t.base_priority > 1)${spaceSql}${API_VISIBLE_SQL}
+          WHERE t.user_id = ? AND t.completed = 0${spaceSql}${API_VISIBLE_SQL}
         `).all(userId, userId, userId, ...spaceParams);
-        const sorted = rows.map((r) => taskFromRow(r)).sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
+        const sorted = rows.map((r) => taskFromRow(r)).sort(compareByDateThenPriority);
         const tasks = sorted.slice(0, limit);
         out['most-important-task'] = limit === 1 ? (tasks[0] || null) : { data: tasks };
       }

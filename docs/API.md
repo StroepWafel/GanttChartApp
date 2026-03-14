@@ -134,7 +134,9 @@ Returns tasks. By default excludes completed tasks; use `include_completed=true`
 
 ### GET /most-important-task
 
-Returns the top N most urgent incomplete tasks based on priority and due date proximity, ordered from most to least important. Tasks with priority 1 (lowest) are excluded and never considered.
+Returns the top N most urgent incomplete tasks, ordered from most to least important.
+
+**Ordering:** Tasks are sorted by (1) **priority tier** — tasks with base_priority 0 or 1 are always ordered last (least important); (2) **effective date** — due date if given, otherwise end date (finish date), soonest first (tasks with no date go last in their tier); (3) **base_priority** — higher first when dates tie. So a task due in a week can rank above a task due in a month regardless of priority; priority 0/1 tasks never appear in the top positions unless there are no others.
 
 **Query parameters:**
 
@@ -145,7 +147,7 @@ Returns the top N most urgent incomplete tasks based on priority and due date pr
 **Response format:**
 
 - **When `limit=1` (default):** Object with `servertime`, `servertime_local`, and task fields spread at top level (when a task exists), or `servertime`, `servertime_local`, and `data: null` (when none).
-- **When `limit>1`:** Object with `servertime`, `servertime_local`, and `data` (array of task objects, ordered by urgency descending).
+- **When `limit>1`:** Object with `servertime`, `servertime_local`, and `data` (array of task objects, ordered as above).
 
 **Example: `limit=1` (default) with a task:**
 
@@ -194,6 +196,9 @@ GET /most-important-task?limit=3
       "project_id": 2,
       "parent_id": null,
       "name": "Fix critical bug",
+      "due_date": "2025-02-11",
+      "end_date": "2025-02-11",
+      "base_priority": 10,
       "urgency": 18.5
     },
     {
@@ -201,6 +206,9 @@ GET /most-important-task?limit=3
       "project_id": 1,
       "parent_id": null,
       "name": "Design mockups",
+      "due_date": "2025-02-14",
+      "end_date": "2025-02-15",
+      "base_priority": 7,
       "urgency": 12.5
     },
     {
@@ -208,6 +216,9 @@ GET /most-important-task?limit=3
       "project_id": 2,
       "parent_id": null,
       "name": "Review PR",
+      "due_date": "2025-02-20",
+      "end_date": "2025-02-20",
+      "base_priority": 5,
       "urgency": 8.2
     }
   ]
@@ -412,6 +423,40 @@ Returns projects with task counts. When `include_completed` is false, only retur
 | `data[].category_name` | string | Category name |
 | `data[].task_count` | number | Total tasks in project |
 | `data[].completed_count` | number | Completed tasks in project |
+
+---
+
+### GET /projects/:id
+
+Returns a single project's info by ID. Only projects belonging to the authenticated user and within API data scope (space filter, visible to API) are returned.
+
+**Path parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | number | Project ID |
+
+**Response:** Object with `servertime`, `servertime_local`, and the project object (same fields as one element of GET /projects): `id`, `category_id`, `name`, `start_date`, `due_date`, `created_at`, `category_name`, `task_count`, `completed_count`, etc.
+
+**404:** If the project does not exist, is not owned by the user, or is excluded by space/API visibility, the response is 404 with body `{ "error": "Project not found" }`.
+
+**Example:**
+
+```json
+{
+  "servertime": "2025-02-23T12:00:00.000Z",
+  "servertime_local": "2025-02-23T22:30:00.000+10:30",
+  "id": 1,
+  "category_id": 1,
+  "name": "Q1 Launch",
+  "start_date": null,
+  "due_date": null,
+  "created_at": "2025-02-01T10:00:00.000Z",
+  "category_name": "Work",
+  "task_count": 6,
+  "completed_count": 3
+}
+```
 
 ---
 
