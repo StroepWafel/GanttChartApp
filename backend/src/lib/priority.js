@@ -18,3 +18,27 @@ export function computeUrgency(task) {
   const boost = 10 / (daysLeft + 1);
   return base + boost;
 }
+
+/** True if task is least important (priority 0 or 1) for most-important-task ordering. */
+export function isLeastImportant(task) {
+  const p = task.base_priority ?? 5;
+  return p === 0 || p === 1;
+}
+
+/** Effective date for ordering: due_date if given, else end_date. */
+export function effectiveDate(task) {
+  return task.due_date ?? task.end_date ?? null;
+}
+
+/** Compare tasks for most-important ordering: tier (0/1 last), then effective date ASC (nulls last), then base_priority DESC. */
+export function compareByDateThenPriority(a, b) {
+  const aLeast = isLeastImportant(a) ? 1 : 0;
+  const bLeast = isLeastImportant(b) ? 1 : 0;
+  if (aLeast !== bLeast) return aLeast - bLeast;
+  const aDate = effectiveDate(a);
+  const bDate = effectiveDate(b);
+  const aVal = aDate ? new Date(aDate).getTime() : Infinity;
+  const bVal = bDate ? new Date(bDate).getTime() : Infinity;
+  if (aVal !== bVal) return aVal - bVal;
+  return (b.base_priority ?? 5) - (a.base_priority ?? 5);
+}
