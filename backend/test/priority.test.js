@@ -44,16 +44,16 @@ describe('compareByDateThenPriority (most-important-task ordering)', () => {
     expect(sorted[1]).toBe(taskDueLater);
   });
 
-  it('puts priority 0 and 1 last (least important)', () => {
+  it('orders by date first so priority-1 with sooner date comes before priority-5 with later date', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
     const lowPriorityDueSoon = { base_priority: 1, due_date: tomorrow.toISOString().slice(0, 10), end_date: tomorrow.toISOString().slice(0, 10) };
     const highPriorityDueLater = { base_priority: 5, due_date: nextMonth.toISOString().slice(0, 10), end_date: nextMonth.toISOString().slice(0, 10) };
-    const sorted = [lowPriorityDueSoon, highPriorityDueLater].sort(compareByDateThenPriority);
-    expect(sorted[0]).toBe(highPriorityDueLater);
-    expect(sorted[1]).toBe(lowPriorityDueSoon);
+    const sorted = [highPriorityDueLater, lowPriorityDueSoon].sort(compareByDateThenPriority);
+    expect(sorted[0]).toBe(lowPriorityDueSoon);
+    expect(sorted[1]).toBe(highPriorityDueLater);
   });
 
   it('uses due_date over end_date as effective date', () => {

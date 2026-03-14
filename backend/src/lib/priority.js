@@ -30,15 +30,12 @@ export function effectiveDate(task) {
   return task.due_date ?? task.end_date ?? null;
 }
 
-/** Compare tasks for most-important ordering: tier (0/1 last), then effective date ASC (nulls last), then base_priority DESC. */
+/** Compare tasks for most-important ordering: effective date ASC (soonest first; nulls last), then base_priority DESC. Date always wins: e.g. priority-1 with end_date next week comes before priority-8 due in June. */
 export function compareByDateThenPriority(a, b) {
-  const aLeast = isLeastImportant(a) ? 1 : 0;
-  const bLeast = isLeastImportant(b) ? 1 : 0;
-  if (aLeast !== bLeast) return aLeast - bLeast;
   const aDate = effectiveDate(a);
   const bDate = effectiveDate(b);
   const aVal = aDate ? new Date(aDate).getTime() : Infinity;
   const bVal = bDate ? new Date(bDate).getTime() : Infinity;
   if (aVal !== bVal) return aVal - bVal;
-  return (b.base_priority ?? 5) - (a.base_priority ?? 5);
+  return (Number(b.base_priority) || 5) - (Number(a.base_priority) || 5);
 }

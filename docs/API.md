@@ -136,7 +136,7 @@ Returns tasks. By default excludes completed tasks; use `include_completed=true`
 
 Returns the top N most urgent incomplete tasks, ordered from most to least important.
 
-**Ordering:** Tasks are sorted by (1) **priority tier** — tasks with base_priority 0 or 1 are always ordered last (least important); (2) **effective date** — due date if given, otherwise end date (finish date), soonest first (tasks with no date go last in their tier); (3) **base_priority** — higher first when dates tie. So a task due in a week can rank above a task due in a month regardless of priority; priority 0/1 tasks never appear in the top positions unless there are no others.
+**Ordering:** Tasks are sorted by (1) **effective date** — due date if given, otherwise end date (finish date), soonest first (tasks with no date go last); (2) **base_priority** — higher first when dates tie (priority 0 or 1 are least important and lose ties). So a task due or finishing next week ranks above a task due in June regardless of priority.
 
 **Query parameters:**
 
