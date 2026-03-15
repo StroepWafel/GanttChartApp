@@ -375,28 +375,37 @@ export default function GanttChart({
   }, [tasks, projects, categories, includeCompleted]);
 
   const { rangeStart, rangeEnd, columnWidth, totalWidth, totalColumns } = useMemo(() => {
-    // Use all tasks (and projects) for the date range so the chart length includes collapsed items too
-    const tasksForRange = includeCompleted ? tasks : tasks.filter((t) => !t.completed);
-    const allStarts = tasksForRange.map((t: Task) => new Date(t.start_date));
+    // Earliest date = start of earliest uncompleted task (so chart begins there)
+    const uncompletedTasks = tasks.filter((t) => !t.completed);
+    const allStartsForMin: Date[] = uncompletedTasks.map((t: Task) => new Date(t.start_date));
+    for (const t of uncompletedTasks) {
+      const proj = projects.find((p) => p.id === t.project_id);
+      if (proj?.start_date) allStartsForMin.push(new Date(proj.start_date));
+    }
+    const minDate = allStartsForMin.length
+      ? new Date(Math.min(...allStartsForMin.map((d: Date) => d.getTime())))
+      : new Date();
+
+    // Use all tasks (and projects) for end of range and for column count
+    const tasksForRange = includeCompleted ? tasks : uncompletedTasks;
     const relevantDates: Date[] = [];
     for (const t of tasksForRange) {
       relevantDates.push(new Date(t.end_date));
       if (t.due_date) relevantDates.push(new Date(t.due_date));
       const proj = projects.find((p) => p.id === t.project_id);
       if (proj?.due_date) relevantDates.push(new Date(proj.due_date));
-      if (proj?.start_date) allStarts.push(new Date(proj.start_date));
     }
     for (const p of projects) {
-      if (p.start_date) allStarts.push(new Date(p.start_date));
       if (p.due_date) relevantDates.push(new Date(p.due_date));
     }
-    const minDate = allStarts.length
-      ? new Date(Math.min(...allStarts.map((d: Date) => d.getTime())))
-      : new Date();
     const furthestDue = relevantDates.length
       ? new Date(Math.max(...relevantDates.map((d: Date) => d.getTime())))
       : addDays(new Date(), 14);
-    const maxDate = addDays(furthestDue, 7);
+    const candidateFromTasks = addDays(furthestDue, 7);
+    const fourDaysFromNow = addDays(new Date(), 4);
+    const maxDate = candidateFromTasks.getTime() > fourDaysFromNow.getTime()
+      ? candidateFromTasks
+      : fourDaysFromNow;
 
     let start: Date;
     let colCount: number;
@@ -408,29 +417,21 @@ export default function GanttChart({
       : baseColWidth;
 
     const hasTasks = relevantDates.length > 0;
-    const today = new Date();
-    const minAllowedStart = toStartOfDay(addDays(today, -7));
+    // Earliest date = 4 days before the earliest uncompleted task
+    const earliestAllowed = addDays(minDate, -4);
 
     if (viewMode === 'Day') {
-      start = toStartOfDay(minDate);
-      start.setDate(start.getDate() - 7);
-      if (start.getTime() < minAllowedStart.getTime()) start = new Date(minAllowedStart);
+      start = toStartOfDay(earliestAllowed);
       const end = toStartOfDay(maxDate);
       colCount = diffDays(end, start) + 1;
       if (!hasTasks && colCount < 60) colCount = 60;
     } else if (viewMode === 'Week') {
-      start = toStartOfWeek(minDate);
-      start.setDate(start.getDate() - 14);
-      const minWeek = toStartOfWeek(minAllowedStart);
-      if (start.getTime() < minWeek.getTime()) start = minWeek;
+      start = toStartOfWeek(earliestAllowed);
       const end = toStartOfWeek(maxDate);
       colCount = Math.ceil(diffDays(end, start) / 7) + 1;
       if (!hasTasks && colCount < 12) colCount = 12;
     } else {
-      start = toStartOfMonth(minDate);
-      start.setMonth(start.getMonth() - 1);
-      const minMonth = toStartOfMonth(minAllowedStart);
-      if (start.getTime() < minMonth.getTime()) start = minMonth;
+      start = toStartOfMonth(earliestAllowed);
       const end = toStartOfMonth(maxDate);
       colCount = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
       if (!hasTasks && colCount < 6) colCount = 6;
@@ -454,6 +455,21 @@ export default function GanttChart({
 
   const [scrollState, setScrollState] = useState({ scrollLeft: 0, width: 800 });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const hasInitialScrolledRef = useRef(false);
+
+  // On load, snap horizontal scroll so 6 days before today is at the left edge
+  useEffect(() => {
+    if (hasInitialScrolledRef.current) return;
+    const el = scrollRef.current;
+    if (!el || totalWidth <= 0) return;
+    const targetDate = toStartOfDay(addDays(new Date(), -6));
+    const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
+    const ms = targetDate.getTime() - rangeStart.getTime();
+    const x = Math.max(0, (ms / rangeMs) * totalWidth);
+    el.scrollLeft = x;
+    setScrollState((prev) => ({ ...prev, scrollLeft: x }));
+    hasInitialScrolledRef.current = true;
+  }, [rangeStart, rangeEnd, totalWidth]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
