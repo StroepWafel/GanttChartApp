@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import type { Category, Project, Task } from '../types';
 import { useModal } from '../context/ModalContext';
 import type { updateTask } from '../api';
-import { scheduleReminder, cancelReminder, getStoredReminder, isMobileNative, type ReminderOffset } from '../reminders';
+import { scheduleReminders, cancelReminder, getStoredReminders, isMobileNative, formatReminder, type Reminder, type ReminderUnit } from '../reminders';
 import MobileSelect from './MobileSelect';
+import { Trash2, Plus } from 'lucide-react';
 
 interface Props {
   categories: Category[];
@@ -38,7 +39,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
   const [basePriority, setBasePriority] = useState(5);
   const [progress, setProgress] = useState(0);
   const [taskVisibleToApi, setTaskVisibleToApi] = useState(true);
-  const [reminderOption, setReminderOption] = useState<ReminderOffset>('off');
+  const [reminders, setReminders] = useState<Reminder[]>([]);
 
   useEffect(() => {
     if (task) {
@@ -52,10 +53,10 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
       setBasePriority(task.base_priority ?? 5);
       setProgress(task.progress ?? 0);
       setTaskVisibleToApi((task.api_visible ?? 1) !== 0);
-      setReminderOption(getStoredReminder(task.id));
+      setReminders(getStoredReminders(task.id));
     } else {
       setTaskVisibleToApi(true);
-      setReminderOption('off');
+      setReminders([]);
     }
   }, [task, projects]);
 
@@ -77,7 +78,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
       return;
     }
     if (isEdit && task && onUpdate) {
-      if (!dueDate || reminderOption === 'off') {
+      if (!dueDate || reminders.length === 0) {
         cancelReminder(task.id);
       }
       onUpdate(task.id, {
@@ -90,8 +91,8 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
         progress,
         api_visible: taskVisibleToApi,
       });
-      if (dueDate && reminderOption !== 'off') {
-        scheduleReminder(task.id, name, dueDate, reminderOption);
+      if (dueDate && reminders.length > 0) {
+        scheduleReminders(task.id, name, dueDate, reminders);
       }
     } else {
       const result = await onCreate({
@@ -104,8 +105,8 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
         api_visible: taskVisibleToApi,
       });
       const created = result && typeof result === 'object' && 'id' in result ? result as { id: number } : null;
-      if (created && dueDate && reminderOption !== 'off') {
-        scheduleReminder(created.id, name, dueDate, reminderOption);
+      if (created && dueDate && reminders.length > 0) {
+        scheduleReminders(created.id, name, dueDate, reminders);
       }
     }
     onClose();
@@ -204,31 +205,69 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
             />
           </div>
           {dueDate && isMobileNative() && (
-            <div className="form-row">
-              <label>Remind me</label>
-              {embedded ? (
-                <MobileSelect
-                  value={reminderOption}
-                  options={[
-                    { value: 'off', label: 'Off' },
-                    { value: '1d', label: '1 day before' },
-                    { value: 'day', label: 'Day of' },
-                    { value: '1h', label: '1 hour before' },
-                  ]}
-                  onChange={(v) => setReminderOption(v as ReminderOffset)}
-                  aria-label="Remind me"
-                />
-              ) : (
-                <select
-                  value={reminderOption}
-                  onChange={(e) => setReminderOption(e.target.value as ReminderOffset)}
-                >
-                  <option value="off">Off</option>
-                  <option value="1d">1 day before</option>
-                  <option value="day">Day of</option>
-                  <option value="1h">1 hour before</option>
-                </select>
-              )}
+            <div className="form-row reminders-row">
+              <label>Reminders</label>
+              <div className="reminders-list">
+                {reminders.length === 0 && (
+                  <p className="reminders-empty">No reminders. Add one to get notified before this task is due.</p>
+                )}
+                {reminders.map((r, i) => (
+                  <div key={i} className="reminder-item">
+                    <input
+                      type="number"
+                      min={0}
+                      max={999}
+                      value={r.amount}
+                      onChange={(e) => {
+                        const v = Math.max(0, Math.min(999, parseInt(e.target.value || '0', 10) || 0));
+                        setReminders((prev) => prev.map((x, idx) => (idx === i ? { ...x, amount: v } : x)));
+                      }}
+                      className="reminder-amount"
+                      aria-label="Amount"
+                    />
+                    <select
+                      value={r.unit}
+                      onChange={(e) => {
+                        const u = e.target.value as ReminderUnit;
+                        setReminders((prev) => prev.map((x, idx) => (idx === i ? { ...x, unit: u } : x)));
+                      }}
+                      className="reminder-unit"
+                      aria-label="Unit"
+                    >
+                      <option value="minute">minute(s)</option>
+                      <option value="hour">hour(s)</option>
+                      <option value="day">day(s)</option>
+                      <option value="week">week(s)</option>
+                    </select>
+                    <span className="reminder-suffix">before{r.unit === 'day' && r.amount === 0 ? ' (on the day)' : ''}</span>
+                    <button
+                      type="button"
+                      className="btn-sm btn-sm-danger-outline reminder-remove"
+                      onClick={() => setReminders((prev) => prev.filter((_, idx) => idx !== i))}
+                      aria-label="Remove reminder"
+                      title="Remove reminder"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                {reminders.length < 5 && (
+                  <button
+                    type="button"
+                    className="btn-sm reminder-add"
+                    onClick={() => setReminders((prev) => [...prev, { amount: 1, unit: 'day' }])}
+                  >
+                    <Plus size={14} /> Add reminder
+                  </button>
+                )}
+                {reminders.length > 0 && (
+                  <div className="reminders-preview">
+                    {reminders.map((r, i) => (
+                      <span key={i} className="reminder-chip">{formatReminder(r)}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <div className="form-row">

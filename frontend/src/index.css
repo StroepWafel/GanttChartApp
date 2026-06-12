@@ -154,6 +154,80 @@ input, select, textarea {
   overflow-y: auto;
 }
 
+/* Reminders editor */
+.reminders-row {
+  gap: 8px;
+}
+
+.reminders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reminders-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.reminder-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.reminder-amount {
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.reminder-unit {
+  width: auto;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.reminder-suffix {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.reminder-remove {
+  flex-shrink: 0;
+  padding: 6px;
+  min-width: 32px;
+}
+
+.reminder-add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.reminders-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.reminder-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
 .add-task-page .task-form-embedded {
   flex: 1;
   min-height: 0;
