@@ -176,7 +176,6 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
               onChange={(e) => {
                 setStartDate(e.target.value);
                 if (endDate && e.target.value > endDate) setEndDate(e.target.value);
-                if (dueDate && e.target.value > dueDate) setDueDate('');
               }}
               required
             />
@@ -186,11 +185,7 @@ export default function TaskForm({ categories, projects, task, onClose, embedded
             <input
               type="date"
               value={endDate}
-              onChange={(e) => {
-                const v = e.target.value;
-                setEndDate(v);
-                if (dueDate && v < dueDate) setDueDate(v);
-              }}
+              onChange={(e) => setEndDate(e.target.value)}
               min={startDate}
               required
             />
