@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../db.js';
 import { computeUrgency, compareByDateThenPriority } from '../lib/priority.js';
+import { normalizeProgress, applyChildProgressRollup } from '../lib/taskProgress.js';
 import { requireApiKey } from '../auth.js';
 
 const router = express.Router();
@@ -64,6 +65,7 @@ function servertimeLocal() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${ms}${sign}${oh}:${om}`;
 }
 
+
 function taskFromRow(row) {
   if (!row) return null;
   return {
@@ -74,7 +76,7 @@ function taskFromRow(row) {
     start_date: row.start_date,
     end_date: row.end_date,
     due_date: row.due_date,
-    progress: row.progress ?? 0,
+    progress: normalizeProgress(row.progress),
     completed: !!row.completed,
     completed_at: row.completed_at,
     base_priority: row.base_priority ?? 5,
@@ -116,7 +118,7 @@ router.get('/most-important-task', (req, res) => {
     `).all(userId, userId, userId, ...spaceParams);
     const withUrgency = rows.map(r => ({ ...taskFromRow(r) }));
     const sorted = withUrgency.sort(compareByDateThenPriority);
-    const tasks = sorted.slice(0, limit);
+    const tasks = applyChildProgressRollup(sorted.slice(0, limit), db);
     if (limit === 1) {
       const task = tasks[0] || null;
       res.json(task ? { servertime: servertime(), servertime_local: servertimeLocal(), ...task } : { servertime: servertime(), servertime_local: servertimeLocal(), data: null });
@@ -401,7 +403,7 @@ router.get('/batch', (req, res) => {
           WHERE t.user_id = ? AND t.completed = 0${spaceSql}${API_VISIBLE_SQL}
         `).all(userId, userId, userId, ...spaceParams);
         const sorted = rows.map((r) => taskFromRow(r)).sort(compareByDateThenPriority);
-        const tasks = sorted.slice(0, limit);
+        const tasks = applyChildProgressRollup(sorted.slice(0, limit), db);
         out['most-important-task'] = limit === 1 ? (tasks[0] || null) : { data: tasks };
       }
     }

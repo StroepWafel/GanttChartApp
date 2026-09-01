@@ -55,6 +55,14 @@ function taskFromRow(row) {
   return task;
 }
 
+function syncParentProgressFromChildren(parentId) {
+  if (!parentId) return;
+  const children = db.prepare('SELECT progress FROM tasks WHERE parent_id = ? AND completed = 0').all(parentId);
+  if (children.length === 0) return;
+  const avg = Math.round(children.reduce((s, c) => s + (Number(c.progress) || 0), 0) / children.length);
+  db.prepare(`UPDATE tasks SET progress = ?, updated_at = datetime('now') WHERE id = ?`).run(avg, parentId);
+}
+
 router.get('/', (req, res) => {
   try {
     const userId = req.user?.userId;
@@ -289,6 +297,10 @@ router.patch('/:id', (req, res) => {
       : false;
     params.push(id);
     db.prepare(`UPDATE tasks SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).run(...params);
+    const updatedRow = db.prepare('SELECT parent_id FROM tasks WHERE id = ?').get(id);
+    if (updatedRow?.parent_id && (progress !== undefined || completed !== undefined)) {
+      syncParentProgressFromChildren(updatedRow.parent_id);
+    }
     const row = db.prepare(`
       SELECT t.*, p.name as project_name, c.name as category_name
       FROM tasks t
