@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus, MoreVertical, LogOut } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Trash2, CheckSquare, Settings, Copy, Smartphone, Github, Plus, MoreVertical, LogOut } from 'lucide-react';
 import * as api from '../api';
 import type { Category, Project, Task } from '../types';
 import GanttChart from './GanttChart';
@@ -18,6 +18,7 @@ import UpdatesSection from './settings/UpdatesSection';
 import UserManagementSection from './settings/UserManagementSection';
 import ShortcutsHelpModal from './ShortcutsHelpModal';
 import SpacesSidebar from './SpacesSidebar';
+import SidebarCategoriesSection from './SidebarCategoriesSection';
 import SpaceMembersModal from './SpaceMembersModal';
 import CreateSpaceModal from './CreateSpaceModal';
 import StatisticsPrompt from './StatisticsPrompt';
@@ -699,6 +700,43 @@ export default function MainView({ authEnabled, onLogout, onUpdateApplySucceeded
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name, api_visible: apiVisible ?? c.api_visible } : c)));
     await load();
   }
+
+  async function handleReorderCategories(reorderedVisible: Category[]) {
+    const sorted = [...categories].sort((a, b) => a.display_order - b.display_order);
+    const visibleIds = new Set(reorderedVisible.map((c) => c.id));
+    let vi = 0;
+    const merged = sorted.map((c) => (visibleIds.has(c.id) ? reorderedVisible[vi++]! : c));
+    const updates = merged.map((c, i) => ({ id: c.id, display_order: i }));
+    await api.reorderCategories(updates);
+    await load();
+  }
+
+  const sidebarCategoryHandlers = {
+    sidebarCategories,
+    projectsByCategory: sidebarProjectsByCategory,
+    includeCompletedInSidebar,
+    onIncludeCompletedInSidebarChange: setIncludeCompletedInSidebar,
+    isCategoryExpanded: isSidebarCategoryExpanded,
+    onToggleCategoryExpanded: toggleSidebarCategory,
+    onEditCategory: (c: Category) => {
+      setEditCategory(c);
+      setEditProject(null);
+      setShowCatProj(true);
+    },
+    onDeleteCategory: setDeleteCategoryConfirm,
+    onEditProject: (p: Project) => {
+      setEditProject(p);
+      setEditCategory(null);
+      setShowCatProj(true);
+    },
+    onDeleteProject: setDeleteProjectConfirm,
+    onAddCategoryProject: () => {
+      setEditCategory(null);
+      setEditProject(null);
+      setShowCatProj(true);
+    },
+    onReorderCategories: handleReorderCategories,
+  };
 
   async function handleUpdateProject(
     id: number,
@@ -2281,166 +2319,13 @@ onTaskDelete={handleDeleteTask}
                             aria-label="Resize spaces and categories"
                           />
                         )}
-                        <section className={`sidebar-section ${!isMobile ? 'sidebar-section-flex' : ''}`}>
-                          <h3>Categories</h3>
-                          <label className="sidebar-filter-row" style={{ fontSize: 11, marginBottom: 6 }}>
-                            <input
-                              type="checkbox"
-                              checked={includeCompletedInSidebar}
-                              onChange={(e) => setIncludeCompletedInSidebar(e.target.checked)}
-                            />
-                            Show completed
-                          </label>
-                          {sidebarCategories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
-                          {sidebarCategories.map((c) => {
-                            const projs = sidebarProjectsByCategory(c);
-                            const expanded = isSidebarCategoryExpanded(c.id);
-                            return (
-                            <div key={c.id} className="cat-block">
-                              <div className="cat-item">
-                                <button
-                                  type="button"
-                                  className="sidebar-expand-btn"
-                                  onClick={() => toggleSidebarCategory(c.id)}
-                                  title={expanded ? 'Collapse' : 'Expand'}
-                                  aria-label={expanded ? 'Collapse' : 'Expand'}
-                                  aria-expanded={expanded}
-                                >
-                                  {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                </button>
-                                <span className="cat-name">{c.name}</span>
-                                <button
-                                  type="button"
-                                  className="sidebar-edit"
-                                  onClick={() => { setEditCategory(c); setEditProject(null); setShowCatProj(true); }}
-                                  title="Edit category"
-                                  aria-label="Edit category"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="sidebar-delete"
-                                  onClick={() => setDeleteCategoryConfirm(c)}
-                                  title="Delete category"
-                                  aria-label="Delete category"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                              {expanded && projs.map((p) => (
-                                <div key={p.id} className="proj-item">
-                                  <span>{p.name}</span>
-                                  <button
-                                    type="button"
-                                    className="sidebar-edit"
-                                    onClick={(e) => { e.stopPropagation(); setEditProject(p); setEditCategory(null); setShowCatProj(true); }}
-                                    title="Edit project"
-                                    aria-label="Edit project"
-                                  >
-                                    <Pencil size={12} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="sidebar-delete"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteProjectConfirm(p);
-                                    }}
-                                    title="Delete project"
-                                    aria-label="Delete project"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          );})}
-                          <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
-                            + Category / Project
-                          </button>
-                        </section>
+                        <SidebarCategoriesSection
+                          {...sidebarCategoryHandlers}
+                          sectionClassName={`sidebar-section ${!isMobile ? 'sidebar-section-flex' : ''}`}
+                        />
                       </>
                     ) : (
-                      <section className="sidebar-section">
-                        <h3>Categories</h3>
-                        <label className="sidebar-filter-row" style={{ fontSize: 11, marginBottom: 6 }}>
-                          <input
-                            type="checkbox"
-                            checked={includeCompletedInSidebar}
-                            onChange={(e) => setIncludeCompletedInSidebar(e.target.checked)}
-                          />
-                          Show completed
-                        </label>
-                        {sidebarCategories.length === 0 && <p className="muted" style={{ fontSize: 11 }}>No categories yet</p>}
-                        {sidebarCategories.map((c) => {
-                          const projs = sidebarProjectsByCategory(c);
-                          const expanded = isSidebarCategoryExpanded(c.id);
-                          return (
-                          <div key={c.id} className="cat-block">
-                            <div className="cat-item">
-                              <button
-                                type="button"
-                                className="sidebar-expand-btn"
-                                onClick={() => toggleSidebarCategory(c.id)}
-                                title={expanded ? 'Collapse' : 'Expand'}
-                                aria-label={expanded ? 'Collapse' : 'Expand'}
-                                aria-expanded={expanded}
-                              >
-                                {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                              </button>
-                              <span className="cat-name">{c.name}</span>
-                              <button
-                                type="button"
-                                className="sidebar-edit"
-                                onClick={() => { setEditCategory(c); setEditProject(null); setShowCatProj(true); }}
-                                title="Edit category"
-                                aria-label="Edit category"
-                              >
-                                <Pencil size={12} />
-                              </button>
-                              <button
-                                type="button"
-                                className="sidebar-delete"
-                                onClick={() => setDeleteCategoryConfirm(c)}
-                                title="Delete category"
-                                aria-label="Delete category"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                            {expanded && projs.map((p) => (
-                              <div key={p.id} className="proj-item">
-                                <span>{p.name}</span>
-                                <button
-                                  type="button"
-                                  className="sidebar-edit"
-                                  onClick={(e) => { e.stopPropagation(); setEditProject(p); setEditCategory(null); setShowCatProj(true); }}
-                                  title="Edit project"
-                                  aria-label="Edit project"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="sidebar-delete"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteProjectConfirm(p);
-                                  }}
-                                  title="Delete project"
-                                  aria-label="Delete project"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        );})}
-                        <button className="btn-link" onClick={() => { setEditCategory(null); setEditProject(null); setShowCatProj(true); }}>
-                          + Category / Project
-                        </button>
-                      </section>
+                      <SidebarCategoriesSection {...sidebarCategoryHandlers} />
                     )}
                   </div>
                 </aside>

@@ -24,6 +24,9 @@ type ViewMode = 'Day' | 'Week' | 'Month';
 const LIST_WIDTH_KEY = 'gantt-list-width';
 const LIST_WIDTH_MIN = 415;
 const LIST_WIDTH_MAX = 800;
+const DRAG_EDIT_KEY = 'gantt-drag-edit-mode';
+
+type BarDragMode = 'move' | 'resize-start' | 'resize-end';
 
 import { DEFAULT_PRIORITY_COLORS } from '../priorityColors';
 
@@ -113,6 +116,19 @@ function addMonths(d: Date, n: number): Date {
 
 function diffDays(a: Date, b: Date): number {
   return Math.round((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function formatIsoDateLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function snapDateForView(d: Date, viewMode: ViewMode): Date {
+  if (viewMode === 'Day') return toStartOfDay(d);
+  if (viewMode === 'Week') return toStartOfWeek(d);
+  return toStartOfMonth(d);
 }
 
 function getColumnForIndex(
@@ -224,7 +240,7 @@ export default function GanttChart({
   priorityColors = DEFAULT_PRIORITY_COLORS,
   includeCompleted,
   onIncludeCompletedChange,
-  onTaskChange: _onTaskChange,
+  onTaskChange,
   onTaskComplete,
   onTaskUncomplete,
   onTaskDelete,
@@ -266,6 +282,23 @@ export default function GanttChart({
     project: {},
     task: {},
   });
+  const [dragEditMode, setDragEditMode] = useState(() => {
+    try {
+      return localStorage.getItem(DRAG_EDIT_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [barDragPreview, setBarDragPreview] = useState<{ taskId: number; start: Date; end: Date } | null>(null);
+  const barDragRef = useRef<{
+    taskId: number;
+    mode: BarDragMode;
+    startClientX: number;
+    origStart: Date;
+    origEnd: Date;
+  } | null>(null);
+  const [isBarDragging, setIsBarDragging] = useState(false);
+  const timelineMetricsRef = useRef({ rangeStart: new Date(), rangeEnd: new Date(), totalWidth: 1, viewMode: 'Day' as ViewMode });
 
   useEffect(() => {
     api.getGanttExpanded().then((data) => {
@@ -461,6 +494,10 @@ export default function GanttChart({
     };
   }, [tasks, projects, includeCompleted, viewMode, isMobile, isSmallMobile]);
 
+  useEffect(() => {
+    timelineMetricsRef.current = { rangeStart, rangeEnd, totalWidth, viewMode };
+  }, [rangeStart, rangeEnd, totalWidth, viewMode]);
+
   const [scrollState, setScrollState] = useState({ scrollLeft: 0, width: 800 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasInitialScrolledRef = useRef(false);
@@ -539,8 +576,9 @@ export default function GanttChart({
   const BAR_ACTIONS_THRESHOLD = 85;
 
   function getBarLayout(task: Task) {
-    const start = new Date(task.start_date);
-    const end = new Date(task.end_date);
+    const preview = barDragPreview?.taskId === task.id ? barDragPreview : null;
+    const start = preview ? preview.start : new Date(task.start_date);
+    const end = preview ? preview.end : new Date(task.end_date);
     const x = dateToX(start);
     const w = Math.max(24, dateToX(end) - x);
     return { x, w };
@@ -618,6 +656,101 @@ export default function GanttChart({
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+  }, []);
+
+  const computeBarDatesFromClientX = useCallback((clientX: number) => {
+    const drag = barDragRef.current;
+    if (!drag) return null;
+    const { rangeStart: rs, rangeEnd: re, totalWidth: tw, viewMode: vm } = timelineMetricsRef.current;
+    const rangeMsLocal = re.getTime() - rs.getTime();
+    if (rangeMsLocal <= 0 || tw <= 0) return null;
+    const dateToXLocal = (date: Date) => {
+      const ms = date.getTime() - rs.getTime();
+      return Math.max(0, (ms / rangeMsLocal) * tw);
+    };
+    const xToDateLocal = (x: number) => new Date(rs.getTime() + (x / tw) * rangeMsLocal);
+
+    const deltaX = clientX - drag.startClientX;
+    const origStartX = dateToXLocal(drag.origStart);
+    const origEndX = dateToXLocal(drag.origEnd);
+    let start = new Date(drag.origStart);
+    let end = new Date(drag.origEnd);
+
+    if (drag.mode === 'move') {
+      const durationMs = drag.origEnd.getTime() - drag.origStart.getTime();
+      const newStart = snapDateForView(xToDateLocal(origStartX + deltaX), vm);
+      start = newStart;
+      end = new Date(newStart.getTime() + durationMs);
+    } else if (drag.mode === 'resize-start') {
+      start = snapDateForView(xToDateLocal(origStartX + deltaX), vm);
+      if (start > end) start = new Date(end);
+    } else {
+      end = snapDateForView(xToDateLocal(origEndX + deltaX), vm);
+      if (end < start) end = new Date(start);
+    }
+    return { start, end };
+  }, []);
+
+  const startBarDrag = useCallback(
+    (e: React.MouseEvent, task: Task, mode: BarDragMode) => {
+      if (!dragEditMode || task.completed) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setTooltip(null);
+      setHoverActions(null);
+      const origStart = new Date(task.start_date);
+      const origEnd = new Date(task.end_date);
+      barDragRef.current = {
+        taskId: task.id,
+        mode,
+        startClientX: e.clientX,
+        origStart,
+        origEnd,
+      };
+      setBarDragPreview({ taskId: task.id, start: origStart, end: origEnd });
+      setIsBarDragging(true);
+    },
+    [dragEditMode]
+  );
+
+  useEffect(() => {
+    if (!isBarDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const dates = computeBarDatesFromClientX(e.clientX);
+      const drag = barDragRef.current;
+      if (dates && drag) {
+        setBarDragPreview({ taskId: drag.taskId, start: dates.start, end: dates.end });
+      }
+    };
+    const onUp = (e: MouseEvent) => {
+      const drag = barDragRef.current;
+      const dates = computeBarDatesFromClientX(e.clientX);
+      barDragRef.current = null;
+      setIsBarDragging(false);
+      setBarDragPreview(null);
+      if (drag && dates) {
+        const origStart = formatIsoDateLocal(drag.origStart);
+        const origEnd = formatIsoDateLocal(drag.origEnd);
+        const newStart = formatIsoDateLocal(dates.start);
+        const newEnd = formatIsoDateLocal(dates.end);
+        if (newStart !== origStart || newEnd !== origEnd) {
+          onTaskChange(drag.taskId, { start_date: newStart, end_date: newEnd });
+        }
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isBarDragging, computeBarDatesFromClientX, onTaskChange]);
+
+  const setDragEditModePersisted = useCallback((v: boolean) => {
+    setDragEditMode(v);
+    try {
+      localStorage.setItem(DRAG_EDIT_KEY, v ? '1' : '0');
+    } catch {}
   }, []);
 
   const handleConfirmDeleteTask = useCallback(() => {
@@ -852,6 +985,16 @@ export default function GanttChart({
               />
               Completed
             </label>
+            {effectiveViewMode === 'chart' && (
+              <label className="filter-row" title="Drag task bars to move or resize dates">
+                <input
+                  type="checkbox"
+                  checked={dragEditMode}
+                  onChange={(e) => setDragEditModePersisted(e.target.checked)}
+                />
+                Drag edit
+              </label>
+            )}
             {!forceViewMode && (
               <div className="gantt-toolbar gantt-toolbar-inline">
                 <button
@@ -890,6 +1033,14 @@ export default function GanttChart({
               />
               Show completed in chart
             </label>
+            <label className="filter-row" title="Drag task bars to move or resize start and end dates">
+              <input
+                type="checkbox"
+                checked={dragEditMode}
+                onChange={(e) => setDragEditModePersisted(e.target.checked)}
+              />
+              Drag edit mode
+            </label>
             <div className="priority-strip" data-onboarding="priority-strip">
               <span className="priority-label">Priority:</span>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((p) => {
@@ -923,7 +1074,12 @@ export default function GanttChart({
         </div>
       )}
 
-      <div ref={scrollRef} className="gantt-main" data-onboarding="gantt-chart" onScroll={handleScroll}>
+      <div
+        ref={scrollRef}
+        className={`gantt-main${dragEditMode ? ' gantt-main-drag-edit' : ''}`}
+        data-onboarding="gantt-chart"
+        onScroll={handleScroll}
+      >
         <div
           className="gantt-inner"
           style={{ minWidth: effectiveListWidth + totalWidth, minHeight: 32 + hierarchicalRows.length * rowHeight }}
@@ -1186,14 +1342,20 @@ export default function GanttChart({
                     style={{ height: rowHeight }}
                   >
                     <div
-                      className={`gantt-bar ${task.completed ? 'completed' : ''} ${!showInlineActions ? 'gantt-bar-narrow' : ''}`}
+                      className={`gantt-bar ${task.completed ? 'completed' : ''} ${!showInlineActions ? 'gantt-bar-narrow' : ''}${dragEditMode && !task.completed ? ' gantt-bar-editable' : ''}${barDragPreview?.taskId === task.id ? ' gantt-bar-dragging' : ''}`}
                       style={{
                         left: x,
                         width: w,
                         backgroundColor: colors.bg,
                       }}
+                      onMouseDown={(e) => {
+                        if (dragEditMode && !task.completed && e.button === 0) {
+                          startBarDrag(e, task, 'move');
+                        }
+                      }}
                       onMouseEnter={(e) => {
-                        const rect = (e.target as HTMLElement).getBoundingClientRect();
+                        if (dragEditMode || isBarDragging) return;
+                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                         if (hoverLeaveTimerRef.current) {
                           clearTimeout(hoverLeaveTimerRef.current);
                           hoverLeaveTimerRef.current = null;
@@ -1207,6 +1369,7 @@ export default function GanttChart({
                         }
                       }}
                       onMouseLeave={() => {
+                        if (dragEditMode || isBarDragging) return;
                         setTooltip(null);
                         hoverLeaveTimerRef.current = setTimeout(() => setHoverActions(null), 150);
                       }}
@@ -1216,6 +1379,22 @@ export default function GanttChart({
                       onTouchMove={handleBarTouchMove}
                       onTouchCancel={handleBarTouchEnd}
                     >
+                      {dragEditMode && !task.completed && (
+                        <>
+                          <div
+                            className="gantt-bar-resize gantt-bar-resize-start"
+                            onMouseDown={(e) => startBarDrag(e, task, 'resize-start')}
+                            title="Drag to change start date"
+                            aria-label="Drag to change start date"
+                          />
+                          <div
+                            className="gantt-bar-resize gantt-bar-resize-end"
+                            onMouseDown={(e) => startBarDrag(e, task, 'resize-end')}
+                            title="Drag to change end date"
+                            aria-label="Drag to change end date"
+                          />
+                        </>
+                      )}
                       <div
                         className="gantt-bar-progress"
                         style={{

@@ -462,6 +462,24 @@
   margin-bottom: 4px;
 }
 
+.cat-block-dragging {
+  opacity: 0.85;
+}
+
+.sidebar-cat-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: grab;
+  flex-shrink: 0;
+  touch-action: none;
+}
+
+.sidebar-cat-drag-handle:active {
+  cursor: grabbing;
+}
+
 .cat-item {
   padding: 2px 0;
   font-size: 12px;

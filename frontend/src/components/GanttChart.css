@@ -669,6 +669,46 @@
   opacity: 0.9;
 }
 
+.gantt-bar-editable {
+  cursor: grab;
+}
+
+.gantt-bar-editable.gantt-bar-dragging,
+.gantt-bar-editable:active {
+  cursor: grabbing;
+}
+
+.gantt-bar-resize {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  z-index: 3;
+  touch-action: none;
+}
+
+.gantt-bar-resize-start {
+  left: 0;
+  cursor: ew-resize;
+  border-radius: 6px 0 0 6px;
+}
+
+.gantt-bar-resize-end {
+  right: 0;
+  cursor: ew-resize;
+  border-radius: 0 6px 6px 0;
+}
+
+.gantt-bar-editable:hover .gantt-bar-resize-start,
+.gantt-bar-editable:hover .gantt-bar-resize-end {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.gantt-main-drag-edit .gantt-bar-editable .gantt-bar-actions {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .gantt-bar.completed {
   opacity: 0.75;
 }

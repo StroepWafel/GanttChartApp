@@ -104,6 +104,29 @@ router.post('/', (req, res) => {
   }
 });
 
+router.patch('/reorder', (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+    const { updates } = req.body;
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: 'updates must be a non-empty array of { id, display_order }' });
+    }
+    for (const u of updates) {
+      if (typeof u.id !== 'number' && typeof u.id !== 'string') continue;
+      const categoryId = parseInt(String(u.id), 10);
+      const order = typeof u.display_order === 'number' ? u.display_order : parseInt(String(u.display_order), 10);
+      if (isNaN(categoryId) || isNaN(order) || order < 0) continue;
+      const acc = canAccess(userId, 'category', categoryId);
+      if (!acc.allowed || acc.permission !== 'edit') continue;
+      db.prepare('UPDATE categories SET display_order = ? WHERE id = ?').run(order, categoryId);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.patch('/:id', (req, res) => {
   try {
     const userId = req.user?.userId;

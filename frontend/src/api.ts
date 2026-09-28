@@ -596,6 +596,16 @@ export async function updateCategory(id: number, data: { name?: string; display_
   return dataOut;
 }
 
+export async function reorderCategories(updates: { id: number; display_order: number }[]) {
+  const res = await fetchApi('/categories/reorder', {
+    method: 'PATCH',
+    body: JSON.stringify({ updates }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data as { error?: string }).error || 'Failed to reorder categories');
+  return data;
+}
+
 export async function deleteCategory(id: number) {
   const res = await fetchApi(`/categories/${id}`, { method: 'DELETE' });
   return res.json();
