@@ -150,6 +150,32 @@ type GanttRow =
   | { type: 'project'; id: string; project: Project }
   | { type: 'task'; task: Task; indent: number };
 
+function compareTasksForDisplay(a: Task, b: Task): number {
+  const orderA = a.display_order ?? 0;
+  const orderB = b.display_order ?? 0;
+  if (orderA !== orderB) return orderA - orderB;
+  const uA = (a as Task & { urgency?: number }).urgency ?? 0;
+  const uB = (b as Task & { urgency?: number }).urgency ?? 0;
+  if (uB !== uA) return uB - uA;
+  return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+}
+
+function appendTaskRows(
+  task: Task,
+  indent: number,
+  byParent: Map<number, Task[]>,
+  rows: GanttRow[],
+  expandedCheck: (type: 'category' | 'project' | 'task', id: number) => boolean
+): void {
+  rows.push({ type: 'task', task, indent });
+  const children = (byParent.get(task.id) ?? []).slice().sort(compareTasksForDisplay);
+  if (children.length > 0 && expandedCheck('task', task.id)) {
+    for (const child of children) {
+      appendTaskRows(child, indent + 1, byParent, rows, expandedCheck);
+    }
+  }
+}
+
 function buildHierarchicalRows(
   tasks: Task[],
   projects: Project[],
@@ -177,32 +203,14 @@ function buildHierarchicalRows(
     for (const proj of catProjects) {
       const projTasks = tasks
         .filter((t) => t.project_id === proj.id)
-        .sort((a, b) => {
-          const orderA = a.display_order ?? 0;
-          const orderB = b.display_order ?? 0;
-          if (orderA !== orderB) return orderA - orderB;
-          const uA = (a as Task & { urgency?: number }).urgency ?? 0;
-          const uB = (b as Task & { urgency?: number }).urgency ?? 0;
-          if (uB !== uA) return uB - uA;
-          return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
-        });
+        .sort(compareTasksForDisplay);
       if (!includeCompleted && projTasks.length === 0) continue;
       rows.push({ type: 'project', id: `proj-${proj.id}`, project: proj });
       if (!expandedCheck('project', proj.id)) continue;
       const topLevel = projTasks.filter((t) => !t.parent_id);
       if (topLevel.length === 0 && projTasks.length === 0) continue;
       for (const task of topLevel) {
-        const children = byParent.get(task.id) ?? [];
-        if (children.length > 0) {
-          rows.push({ type: 'task', task, indent: 2 });
-          if (expandedCheck('task', task.id)) {
-            for (const child of children) {
-              rows.push({ type: 'task', task: child, indent: 3 });
-            }
-          }
-        } else {
-          rows.push({ type: 'task', task, indent: 2 });
-        }
+        appendTaskRows(task, 2, byParent, rows, expandedCheck);
       }
     }
   }
